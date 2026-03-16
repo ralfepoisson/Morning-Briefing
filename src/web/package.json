@@ -1,0 +1,27 @@
+{
+  "name": "morning-briefing-web",
+  "version": "1.0.0",
+  "description": "AngularJS frontend for the Morning Briefing dashboard MVP",
+  "private": true,
+  "scripts": {
+    "start": "http-server . -p 8080 -c-1",
+    "dev": "http-server . -p 8080 -c-1"
+  },
+  "keywords": [
+    "angularjs",
+    "bootstrap",
+    "dashboard"
+  ],
+  "author": "",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "dependencies": {
+    "angular": "^1.8.3",
+    "angular-route": "^1.8.3",
+    "bootstrap": "^5.3.8",
+    "interactjs": "^1.10.27"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}

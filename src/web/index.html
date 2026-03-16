@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="morningBriefingApp">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Morning Briefing</title>
+    <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="./assets/styles/main.css" />
+  </head>
+  <body>
+    <mb-top-nav></mb-top-nav>
+
+    <main class="app-shell container-fluid px-3 px-lg-4 py-4">
+      <div ng-view></div>
+    </main>
+
+    <script src="./node_modules/angular/angular.min.js"></script>
+    <script src="./node_modules/angular-route/angular-route.min.js"></script>
+    <script src="./node_modules/interactjs/dist/interact.min.js"></script>
+
+    <script src="./app/app.module.js"></script>
+    <script src="./app/app.routes.js"></script>
+    <script src="./app/core/services/ui-shell.service.js"></script>
+    <script src="./app/core/services/dashboard.service.js"></script>
+    <script src="./app/core/services/widget.service.js"></script>
+    <script src="./app/shared/directives/draggable-widget.directive.js"></script>
+    <script src="./app/features/shell/top-nav.component.js"></script>
+    <script src="./app/features/dashboard/dashboard-page.component.js"></script>
+  </body>
+</html>

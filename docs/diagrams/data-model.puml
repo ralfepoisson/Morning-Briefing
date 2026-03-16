@@ -1,0 +1,151 @@
+@startuml
+hide circle
+hide methods
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+left to right direction
+
+class Tenant {
+  +tenant_id : UUID
+  --
+  tenant_name : varchar
+  tenant_slug : varchar
+  status : varchar
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+class AppUser {
+  +user_id : UUID
+  --
+  tenant_id : UUID
+  email : varchar
+  display_name : varchar
+  timezone : varchar
+  locale : varchar
+  is_active : boolean
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+class Dashboard {
+  +dashboard_id : UUID
+  --
+  tenant_id : UUID
+  owner_user_id : UUID
+  name : varchar
+  description : varchar
+  dashboard_type : varchar
+  is_default : boolean
+  is_active : boolean
+  activation_rule_json : json
+  theme_json : json
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+class Widget {
+  +widget_id : UUID
+  --
+  tenant_id : UUID
+  dashboard_id : UUID
+  widget_type : varchar
+  title : varchar
+  position_x : int
+  position_y : int
+  width : int
+  height : int
+  min_width : int
+  min_height : int
+  is_visible : boolean
+  refresh_mode : varchar
+  sort_order : int
+  config_json : json
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+class Connector {
+  +connector_id : UUID
+  --
+  tenant_id : UUID
+  connector_type : varchar
+  name : varchar
+  status : varchar
+  auth_type : varchar
+  base_url : varchar
+  config_json : json
+  secret_ref : varchar
+  last_sync_at : timestamp
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+class WidgetConnector {
+  +widget_connector_id : UUID
+  --
+  widget_id : UUID
+  connector_id : UUID
+  usage_role : varchar
+  created_at : timestamp
+}
+
+class BriefingSnapshot {
+  +snapshot_id : UUID
+  --
+  tenant_id : UUID
+  user_id : UUID
+  dashboard_id : UUID
+  snapshot_date : date
+  generated_at : timestamp
+  generation_status : varchar
+  summary_json : json
+  expires_at : timestamp
+}
+
+class WidgetSnapshot {
+  +widget_snapshot_id : UUID
+  --
+  snapshot_id : UUID
+  widget_id : UUID
+  content_json : json
+  content_hash : varchar
+  generated_at : timestamp
+  status : varchar
+  error_message : varchar
+}
+
+Tenant "1" -- "0..*" AppUser : has >
+Tenant "1" -- "0..*" Dashboard : owns >
+Tenant "1" -- "0..*" Connector : provides >
+Tenant "1" -- "0..*" Widget : scopes >
+Tenant "1" -- "0..*" BriefingSnapshot : contains >
+
+AppUser "1" -- "0..*" Dashboard : owns >
+Dashboard "1" -- "0..*" Widget : contains >
+
+Widget "1" -- "0..*" WidgetConnector : uses >
+Connector "1" -- "0..*" WidgetConnector : linked to >
+
+AppUser "1" -- "0..*" BriefingSnapshot : receives >
+Dashboard "1" -- "0..*" BriefingSnapshot : rendered as >
+
+BriefingSnapshot "1" -- "0..*" WidgetSnapshot : includes >
+Widget "1" -- "0..*" WidgetSnapshot : materialised as >
+
+note right of Widget
+Represents the configured widget instance
+placed on a dashboard layout.
+end note
+
+note right of WidgetSnapshot
+Stores the resolved content displayed
+for a widget at a specific point in time.
+end note
+
+note bottom of Connector
+Tenant-level integration configuration,
+for example weather, calendar, RSS, or news.
+end note
+
+@enduml

@@ -1,2 +1,317 @@
-# Morning-Briefing
-Personal Dashboard to give you all the info you need to start your day right.
+# Daily Briefing Dashboard
+
+## Vision
+
+Daily Briefing Dashboard is a personalised “single pane of glass” for the start of the day.
+
+The core idea is simple: when the user wakes up, they should be able to open one screen — on a phone, desktop, or television — and immediately see the information that matters most for that day. Rather than manually checking multiple apps, websites, feeds, and calendars, the platform aggregates and prepares a curated morning briefing in advance.
+
+The long-term product vision is a configurable, multi-tenant dashboard platform with modular widgets, tenant-level connectors, optional AI-driven summarisation, and support for multiple dashboards per user depending on context such as workdays, weekends, holidays, travel, or specific projects.
+
+Examples of content that may appear on a dashboard include:
+
+- Weather
+- Calendar appointments
+- AI and technology news
+- Geopolitical news
+- Local news
+- RSS feed summaries
+- Tasks or reminders
+- Personalised “what matters today” summaries
+
+## Product concept
+
+The dashboard is composed of movable and resizable widgets. Each widget represents a content source or computed insight. Users can configure multiple dashboards, for example:
+
+- Workday Dashboard
+- Weekend Dashboard
+- Holiday Dashboard
+- Project Dashboard
+
+A user may either switch between dashboards manually or, in a later version, allow the system to activate dashboards automatically based on rules such as day of week, travel state, or project context.
+
+The platform is designed from the outset to support future productisation, which is why the initial model includes:
+
+- Tenant as a first-class entity
+- Users belonging to tenants
+- Tenant-level connectors and credentials
+- Multiple dashboards per user
+- Configurable widget instances per dashboard
+- Snapshot-based briefing generation
+
+## Why a snapshot-based architecture
+
+A key design principle is that the morning dashboard should load quickly and reliably.
+
+Instead of fetching live data from every external service at the moment the user opens the dashboard, the platform can prepare the briefing ahead of time using a scheduled pipeline. This produces a daily briefing snapshot and per-widget snapshots containing the resolved content that should be shown.
+
+Benefits include:
+
+- Faster load times
+- Reduced dependency on live API latency
+- Lower risk of rate limits
+- Better support for TV or kiosk-like display modes
+- Easier debugging and historical replay
+- Efficient use of AI summarisation or ranking
+
+In practice, the dashboard shown at 07:00 may already have been prepared at 05:45 or 06:00.
+
+## Role of AI agents in the pipeline
+
+AI agents are not required for the MVP, but they are an important part of the longer-term vision.
+
+The safest architectural approach is to treat agents as enrichment components inside the briefing generation pipeline, not as the core control plane of the system. In other words, the system should still function if AI processing is reduced, disabled, or replaced with deterministic logic.
+
+Examples of agent responsibilities include:
+
+- Summarising collections of articles
+- Ranking news by relevance to user preferences
+- Extracting key items from RSS feeds
+- Producing “top three things to know today”
+- Merging similar stories from multiple sources
+- Filtering noise from high-volume feeds
+- Generating concise display text for limited screen sizes
+
+Recommended principle:
+
+- deterministic connectors and schedulers first
+- AI enrichment second
+- autonomous agent orchestration later, only where it provides clear value
+
+## MVP proposal
+
+The MVP should be intentionally narrow.
+
+### MVP objective
+
+Deliver a working web-based dashboard with a small number of widgets, beginning with weather, using a modular data model and a layout that can evolve into a richer dashboard product.
+
+### Suggested first milestone
+
+- Single tenant
+- Single user
+- One dashboard
+- One weather widget
+- Tenant-level weather connector configuration
+- Basic drag-and-drop or grid placement
+- Snapshot generation for the weather widget
+
+### Suggested second milestone
+
+- Multiple widgets on one dashboard
+- Dashboard persistence
+- Multiple dashboards per user
+- Manual dashboard switching
+- Additional widgets such as calendar or RSS
+
+### Suggested third milestone
+
+- Scheduled daily briefing generation
+- News ingestion
+- AI summarisation of selected feeds
+- TV-friendly display mode
+
+## Functional requirements
+
+### Core requirements
+
+- Users can sign in
+- Users belong to a tenant
+- Users can have multiple dashboards
+- Dashboards contain widgets
+- Widgets can be positioned and resized
+- Widget configuration is persisted
+- Tenant-level connectors can be configured
+- A scheduler can prepare daily briefing content
+- The UI can display either live data or generated snapshots
+
+### Content requirements
+
+- Weather widget support
+- Calendar widget support in a later increment
+- RSS/news widget support
+- Local news and thematic news support
+- Basic user preferences for filtering and source selection
+
+### Administration requirements
+
+- Tenant isolation
+- Secure management of external credentials
+- Connector health and sync monitoring
+- Auditability of snapshot generation
+
+## Non-functional requirements
+
+### Performance
+
+- Dashboard should load quickly, ideally from precomputed briefing data
+- Widget rendering should not require multiple blocking API calls at page load
+
+### Security
+
+- Tenant data must be isolated
+- API credentials should not be stored in plaintext
+- Secrets should be externalised to a secure store where possible
+
+### Scalability
+
+- Support future multi-tenant SaaS deployment
+- Support additional widgets without major schema redesign
+- Allow introduction of more connectors and enrichment services over time
+
+### Reliability
+
+- The dashboard should still function even if one connector fails
+- Widget-level errors should be isolated and surfaced cleanly
+
+### Extensibility
+
+- New widget types should be easy to add
+- Connector model should support multiple providers of the same category
+- AI enrichment should be pluggable, not hard-coded into every widget
+
+## Initial data model direction
+
+The current design direction includes the following core entities:
+
+- Tenant
+- User
+- Dashboard
+- Widget
+- Connector
+- WidgetConnector
+- BriefingSnapshot
+- WidgetSnapshot
+
+At a high level:
+
+- a tenant owns users, connectors, dashboards, and snapshots
+- a user may own multiple dashboards
+- a dashboard contains multiple widgets
+- widgets may use one or more connectors
+- briefing snapshots store the generated state of a dashboard for a point in time
+- widget snapshots store the generated content for each widget in that briefing
+
+## Proposed technology stack
+
+The technology stack should balance speed of delivery, familiarity, and future extensibility.
+
+### Front end
+Because the initial preferred stack is Bootstrap plus AngularJS-style SPA development, a practical starting point is:
+
+- HTML
+- CSS
+- Bootstrap
+- JavaScript or TypeScript
+- Angular (preferred modern path) or AngularJS if continuing from an existing comfort zone
+- Grid layout / widget library for drag-drop and resize behaviour
+
+For the widget layout capability, a grid-based dashboard library is recommended rather than implementing drag-and-drop from scratch.
+
+### Back end
+A lightweight back end is sufficient for the MVP:
+
+- Python with FastAPI, or
+- Node.js with Express / NestJS
+
+FastAPI is attractive if the project later expands into AI enrichment, scheduling, and data processing pipelines.
+
+### Database
+- PostgreSQL
+
+Why PostgreSQL:
+- strong relational model for tenants, dashboards, widgets, and connectors
+- good JSON support for flexible widget configuration
+- mature ecosystem
+- well suited for future SaaS growth
+
+### Scheduling and background jobs
+- Cron for local MVP development
+- APScheduler, Celery, or a queue-based worker model for richer scheduling
+- Alternatively, cloud scheduler plus worker functions in later deployment
+
+### Secrets management
+- environment variables for local development
+- Vault / cloud secret manager / encrypted secret store for production
+
+### Hosting
+Possible options:
+- Vercel / Netlify for front end if decoupled
+- Render / Railway / Fly.io / cloud VM for full-stack MVP
+- Containerised deployment later with Docker
+
+### Television display
+For a Google TV or smart TV scenario, the most pragmatic early approach is:
+
+- responsive web application in a browser
+- optional kiosk or fullscreen mode
+- later evolution into an Android TV app if needed
+
+## Weather API recommendation for MVP
+
+A sensible free provider to start with is a public weather API with a free tier. OpenWeather is a common candidate for prototypes because it is widely used and straightforward to integrate, though it is worth comparing free-tier limits, forecast depth, and licensing conditions against alternatives before locking in the provider.
+
+The architecture should avoid hard-coding to one vendor. The connector abstraction should allow weather providers to be swapped later.
+
+## Suggested repository structure
+
+```text
+daily-briefing-dashboard/
+├── README.md
+├── docs/
+│   ├── architecture/
+│   ├── adr/
+│   └── data-model/
+├── frontend/
+├── backend/
+├── infra/
+├── scripts/
+└── plantuml/
+```
+
+## Suggested first development sequence
+
+1. Create repository and baseline README
+2. Model core entities in PostgreSQL
+3. Build a very small front end with one dashboard and one weather widget
+4. Persist widget placement and configuration
+5. Add tenant-level connector configuration
+6. Add scheduled generation of a weather widget snapshot
+7. Expand to additional widgets and dashboards
+8. Introduce news/RSS aggregation
+9. Add AI summarisation as an optional enrichment layer
+10. Optimise for TV display mode
+
+## Architectural guardrails
+
+These are worth keeping in mind from the beginning:
+
+- Do not make the MVP dependent on agents
+- Do not fetch everything live on page load
+- Keep secrets out of normal tables where possible
+- Use JSON fields only where flexibility is genuinely useful
+- Keep tenant_id on major tables for easier security and operations
+- Start with a modular monolith before considering microservices
+- Design widgets as independent units with isolated failure handling
+
+## Open design questions
+
+Some questions to resolve as the design matures:
+
+- Should dashboard activation be fully manual at first, or rule-based from the start?
+- Should snapshots be generated per user, per dashboard, or partially shared at tenant level?
+- Which content should always be live versus snapshot-based?
+- How much personalisation should be explicit rules versus AI ranking?
+- What is the best UI mode for a bedroom TV: passive display, remote control navigation, or auto-rotating panels?
+
+## Conclusion
+
+Daily Briefing Dashboard is best approached as a focused, modular product that starts with one or two useful widgets and evolves into a configurable briefing platform. The key architectural insight is to separate widget configuration from generated widget content, which enables scheduling, caching, AI enrichment, and high-performance display across phone, desktop, and TV use cases.
+
+The MVP should remain deliberately simple, but the model should already leave room for:
+
+- multi-tenancy
+- multiple dashboards per user
+- connector abstraction
+- snapshot-based delivery
+- later AI-assisted briefing enrichment
