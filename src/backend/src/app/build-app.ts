@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { registerDashboardRoutes } from '../modules/dashboards/dashboard-routes.js';
+import { registerWidgetRoutes } from '../modules/widgets/widget-routes.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -8,7 +9,8 @@ export async function buildApp() {
   });
 
   await app.register(cors, {
-    origin: true
+    origin: true,
+    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
   });
 
   app.get('/health', async function handleHealth() {
@@ -18,6 +20,7 @@ export async function buildApp() {
   });
 
   await registerDashboardRoutes(app);
+  await registerWidgetRoutes(app);
 
   return app;
 }

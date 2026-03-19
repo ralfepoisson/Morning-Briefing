@@ -251,6 +251,17 @@ Recommended approach:
 5. Add snapshot read endpoints.
 6. Add connector management and a first end-to-end generator for the weather widget.
 
+## Implemented So Far
+
+- `GET /api/v1/me` resolves a temporary default local user named `Ralfe`
+- `GET /api/v1/dashboards` lists that user's dashboards
+- `POST /api/v1/dashboards` creates dashboards for that user
+- `PATCH /api/v1/dashboards/:dashboardId` updates dashboard metadata
+- `GET /api/v1/dashboards/:dashboardId/widgets` lists persisted widget instances for a dashboard
+- `POST /api/v1/dashboards/:dashboardId/widgets` creates widget instances using server-side widget defaults
+
+Widget definitions remain code-owned rather than database-owned. The backend currently uses a server-side widget definition catalog to validate widget types, choose default layout values, and provide mock content until snapshot-backed content is introduced.
+
 ## Related Diagrams
 
 - Data model: `docs/diagrams/data-model.puml`

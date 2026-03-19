@@ -22,6 +22,8 @@
         vertical: false
       },
       createMockWidget: function createMockWidget(options) {
+        var data = options.data || {};
+
         return {
           id: options.id,
           dashboardId: options.dashboardId,
@@ -29,15 +31,15 @@
           title: options.title || 'Weather Outlook',
           x: options.x,
           y: options.y,
-          width: 320,
-          height: 360,
+          width: options.width || 320,
+          height: options.height || 360,
           data: {
-            location: options.location || 'Mocked forecast',
-            temperature: options.temperature || '18°',
-            condition: options.condition || 'Partly sunny',
-            highLow: options.highLow || 'H: 20°  L: 11°',
-            summary: options.summary || 'Mock data for the MVP. This widget will later hydrate from a briefing snapshot.',
-            details: options.details || [
+            location: data.location || options.location || 'Mocked forecast',
+            temperature: data.temperature || options.temperature || '18°',
+            condition: data.condition || options.condition || 'Partly sunny',
+            highLow: data.highLow || options.highLow || 'H: 20°  L: 11°',
+            summary: data.summary || options.summary || 'Mock data for the MVP. This widget will later hydrate from a briefing snapshot.',
+            details: data.details || options.details || [
               { label: 'Feels like', value: '17°' },
               { label: 'Rain', value: '10%' },
               { label: 'UV', value: 'Moderate' }

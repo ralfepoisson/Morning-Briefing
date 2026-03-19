@@ -24,6 +24,8 @@
         maxHeight: 560
       },
       createMockWidget: function createMockWidget(options) {
+        var data = options.data || {};
+
         return {
           id: options.id,
           dashboardId: options.dashboardId,
@@ -31,11 +33,11 @@
           title: options.title || 'Today on Calendar',
           x: options.x,
           y: options.y,
-          width: 360,
-          height: 360,
+          width: options.width || 360,
+          height: options.height || 360,
           data: {
-            dateLabel: options.dateLabel || 'Today',
-            appointments: options.appointments || [
+            dateLabel: data.dateLabel || options.dateLabel || 'Today',
+            appointments: data.appointments || options.appointments || [
               {
                 time: '09:00',
                 title: 'Stand-up',

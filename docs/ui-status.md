@@ -20,6 +20,7 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 
 - Horizontal top navigation bar
 - Dark mode and light mode toggle
+- Theme preference is stored in local storage and restored on page load
 - Dashboard dropdown in the top navigation for selecting existing dashboards
 - Dashboard creation action inside the top navigation dropdown
 - Simplified top navigation with secondary sections removed from the main bar
@@ -34,11 +35,14 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 - Explicit dashboard edit mode
 - `Edit Dashboard` / `Save Dashboard` flow
 - Dashboard list and create actions are wired to the backend REST API
+- Dashboard save now persists widget layout edits through backend widget update endpoints
 
 ### Widget editing
 
 - Widgets can be dragged in edit mode
 - Widget library opens from a right-side panel
+- Widget library adds widgets through backend widget endpoints
+- Dashboard widgets now load from backend widget endpoints
 - Widget library includes placeholder slots for future widget types
 
 ### Weather widget

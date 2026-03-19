@@ -28,3 +28,14 @@ Default values assume:
 - `db:init` is intended for first-time local setup.
 - Prisma CLI configuration, including the seed command, lives in `src/backend/prisma.config.ts`.
 - After the initial migration exists, future schema changes should be made by editing `prisma/schema.prisma` and generating a new named migration.
+
+## Current API
+
+- `GET /health`
+- `GET /api/v1/me`
+- `GET /api/v1/dashboards`
+- `POST /api/v1/dashboards`
+- `PATCH /api/v1/dashboards/:dashboardId`
+- `GET /api/v1/dashboards/:dashboardId/widgets`
+- `POST /api/v1/dashboards/:dashboardId/widgets`
+- `PATCH /api/v1/dashboards/:dashboardId/widgets/:widgetId`

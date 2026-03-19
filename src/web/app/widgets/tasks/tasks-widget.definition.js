@@ -24,6 +24,8 @@
         maxHeight: 560
       },
       createMockWidget: function createMockWidget(options) {
+        var data = options.data || {};
+
         return {
           id: options.id,
           dashboardId: options.dashboardId,
@@ -31,10 +33,10 @@
           title: options.title || 'Task List',
           x: options.x,
           y: options.y,
-          width: 360,
-          height: 360,
+          width: options.width || 360,
+          height: options.height || 360,
           data: {
-            groups: options.groups || [
+            groups: data.groups || options.groups || [
               {
                 label: 'Due Today',
                 items: [

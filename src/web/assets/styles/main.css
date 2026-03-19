@@ -707,6 +707,94 @@ body.theme-light .widget-card {
   margin-bottom: 0.5rem;
 }
 
+.drawer-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding-top: 60px;
+  background: rgba(5, 10, 18, 0.28);
+  backdrop-filter: blur(6px);
+}
+
+.widget-drawer {
+  width: min(420px, 100vw);
+  height: calc(100vh - 60px);
+  padding: 1.25rem 1.1rem 1.5rem;
+  overflow-y: auto;
+  border-left: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    var(--panel);
+  box-shadow: -24px 0 48px rgba(4, 8, 14, 0.22);
+}
+
+.widget-library-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.8rem;
+  margin-top: 1.2rem;
+}
+
+.widget-library-card {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  align-items: start;
+  gap: 0.8rem;
+  width: 100%;
+  padding: 1rem;
+  color: var(--text);
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--chip);
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.widget-library-card:hover,
+.widget-library-card:focus {
+  transform: translateX(-2px);
+  border-color: rgba(121, 224, 192, 0.36);
+  background: var(--chip-active);
+}
+
+.widget-library-card strong,
+.widget-library-card span {
+  display: block;
+}
+
+.widget-library-card strong {
+  font-size: 0.98rem;
+}
+
+.widget-library-card span {
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.widget-library-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: rgba(121, 224, 192, 0.14);
+  color: var(--accent);
+}
+
+.widget-library-card--placeholder {
+  opacity: 0.55;
+}
+
+.widget-library-card__icon--placeholder {
+  background: var(--panel-soft);
+}
+
 .modal-shell {
   position: fixed;
   inset: 0;
@@ -808,6 +896,12 @@ body.theme-light .widget-card {
   .dashboard-menu__trigger,
   .dashboard-menu__panel {
     width: 100%;
+  }
+
+  .widget-drawer {
+    width: 100vw;
+    height: calc(100vh - 60px);
+    padding: 1rem 0.85rem 1.25rem;
   }
 
   .widget-card {

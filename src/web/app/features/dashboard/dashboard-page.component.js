@@ -100,7 +100,7 @@
     $ctrl.$onInit = function onInit() {
       bindUiWatchers();
       DashboardService.load().then(function handleDashboardLoad() {
-        syncState();
+        return syncState();
       }).finally(function markReady() {
         $ctrl.ready = true;
       });
@@ -143,9 +143,12 @@
       }
 
       request.then(function handleDashboardSave() {
-        $ctrl.closeModal();
-        syncState();
-        $ctrl.isEditing = isCreateMode;
+        persistDashboard().then(function handlePersistedDashboard() {
+          $ctrl.closeModal();
+          syncState().then(function handleStateSync() {
+            $ctrl.isEditing = isCreateMode;
+          });
+        });
       });
     };
 
@@ -157,11 +160,15 @@
     };
 
     $ctrl.toggleEditing = function toggleEditing() {
-      $ctrl.isEditing = !$ctrl.isEditing;
-
-      if (!$ctrl.isEditing) {
-        UiShellService.closeWidgetPanel();
+      if ($ctrl.isEditing) {
+        persistDashboard().then(function handlePersistedDashboard() {
+          $ctrl.isEditing = false;
+          UiShellService.closeWidgetPanel();
+        });
+        return;
       }
+
+      $ctrl.isEditing = true;
     };
 
     $ctrl.openWidgetPanel = function openWidgetPanel() {
@@ -181,9 +188,10 @@
         return;
       }
 
-      WidgetService.addWidget($ctrl.activeDashboard.id, type);
-      UiShellService.closeWidgetPanel();
-      syncState();
+      WidgetService.addWidget($ctrl.activeDashboard.id, type).then(function handleWidgetAdded() {
+        UiShellService.closeWidgetPanel();
+        syncState();
+      });
     };
 
     $ctrl.persistWidgetPosition = function persistWidgetPosition(widget) {
@@ -215,9 +223,26 @@
     function syncState() {
       $ctrl.dashboards = DashboardService.list();
       $ctrl.activeDashboard = DashboardService.getActive();
-      $ctrl.widgets = $ctrl.activeDashboard
-        ? WidgetService.listForDashboard($ctrl.activeDashboard.id)
-        : [];
+
+      if (!$ctrl.activeDashboard) {
+        $ctrl.widgets = [];
+        return Promise.resolve([]);
+      }
+
+      $ctrl.widgets = WidgetService.listForDashboard($ctrl.activeDashboard.id);
+
+      return WidgetService.loadForDashboard($ctrl.activeDashboard.id).then(function handleWidgetLoad(widgets) {
+        $ctrl.widgets = widgets;
+        return widgets;
+      });
+    }
+
+    function persistDashboard() {
+      if (!$ctrl.activeDashboard) {
+        return Promise.resolve([]);
+      }
+
+      return WidgetService.saveDashboardWidgets($ctrl.activeDashboard.id);
     }
 
     function bindUiWatchers() {
