@@ -55,17 +55,17 @@
             interact.modifiers.restrictSize({
               min: {
                 width: scope.widget.width,
-                height: scope.widget.type === 'calendar' ? 260 : scope.widget.height
+                height: scope.widget.type === 'calendar' || scope.widget.type === 'tasks' ? 260 : scope.widget.height
               },
               max: {
                 width: scope.widget.width,
-                height: scope.widget.type === 'calendar' ? 560 : scope.widget.height
+                height: scope.widget.type === 'calendar' || scope.widget.type === 'tasks' ? 560 : scope.widget.height
               }
             })
           ],
           listeners: {
             move: function onResizeMove(event) {
-              if (scope.widget.type !== 'calendar') {
+              if (scope.widget.type !== 'calendar' && scope.widget.type !== 'tasks') {
                 return;
               }
 
@@ -74,7 +74,7 @@
               });
             },
             end: function onResizeEnd() {
-              if (scope.widget.type !== 'calendar') {
+              if (scope.widget.type !== 'calendar' && scope.widget.type !== 'tasks') {
                 return;
               }
 
@@ -93,7 +93,7 @@
             enabled: !!isEnabled
           });
           interactable.resizable({
-            enabled: !!isEnabled && scope.widget.type === 'calendar'
+            enabled: !!isEnabled && (scope.widget.type === 'calendar' || scope.widget.type === 'tasks')
           });
           element.toggleClass('widget-card--editable', !!isEnabled);
         });

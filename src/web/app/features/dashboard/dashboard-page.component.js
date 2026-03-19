@@ -21,7 +21,7 @@
       '      </div>' +
       '    </div>' +
       '    <div class="dashboard-canvas" ng-class="{\'dashboard-canvas--editing\': $ctrl.isEditing}">' +
-      '      <article class="widget-card" ng-class="{\'widget-card--weather\': widget.type === \'weather\', \'widget-card--calendar\': widget.type === \'calendar\'}" ng-repeat="widget in $ctrl.widgets track by widget.id" draggable-widget widget="widget" enabled="$ctrl.isEditing" on-move="$ctrl.persistWidgetPosition(widget)" on-resize="$ctrl.persistWidgetSize(widget)" ng-style="{ width: widget.width + \'px\', height: widget.height + \'px\' }">' +
+      '      <article class="widget-card" ng-class="{\'widget-card--weather\': widget.type === \'weather\', \'widget-card--calendar\': widget.type === \'calendar\', \'widget-card--tasks\': widget.type === \'tasks\'}" ng-repeat="widget in $ctrl.widgets track by widget.id" draggable-widget widget="widget" enabled="$ctrl.isEditing" on-move="$ctrl.persistWidgetPosition(widget)" on-resize="$ctrl.persistWidgetSize(widget)" ng-style="{ width: widget.width + \'px\', height: widget.height + \'px\' }">' +
       '        <div class="widget-handle">' +
       '          <div>' +
       '            <div class="widget-label">{{widget.type}} widget</div>' +
@@ -52,7 +52,16 @@
       '            </div>' +
       '          </div>' +
       '        </div>' +
-      '        <div class="widget-resize-handle" ng-if="$ctrl.isEditing && widget.type === \'calendar\'" aria-hidden="true"></div>' +
+      '        <div class="tasks-card" ng-if="widget.type === \'tasks\'">' +
+      '          <section class="task-group" ng-repeat="group in widget.data.groups track by group.label">' +
+      '            <div class="task-group__label">{{group.label}}</div>' +
+      '            <div class="task-item" ng-repeat="task in group.items track by $index">' +
+      '              <span class="task-item__bullet"><i class="fa-regular fa-square" aria-hidden="true"></i></span>' +
+      '              <span class="task-item__title">{{task.title}}</span>' +
+      '            </div>' +
+      '          </section>' +
+      '        </div>' +
+      '        <div class="widget-resize-handle" ng-if="$ctrl.isEditing && (widget.type === \'calendar\' || widget.type === \'tasks\')" aria-hidden="true"></div>' +
       '      </article>' +
       '      <div class="canvas-empty-state" ng-if="!$ctrl.widgets.length">' +
       '        <div>' +
@@ -99,6 +108,11 @@
       '          <span class="widget-library-card__icon"><i class="fa-regular fa-calendar" aria-hidden="true"></i></span>' +
       '          <strong>Calendar</strong>' +
       '          <span>Today&apos;s appointments</span>' +
+      '        </button>' +
+      '        <button type="button" class="widget-library-card widget-library-card--active" ng-click="$ctrl.addTaskWidget()">' +
+      '          <span class="widget-library-card__icon"><i class="fa-solid fa-list-check" aria-hidden="true"></i></span>' +
+      '          <strong>Task list</strong>' +
+      '          <span>Today, tomorrow, and undated tasks</span>' +
       '        </button>' +
       '        <div class="widget-library-card widget-library-card--placeholder" ng-repeat="item in $ctrl.widgetCatalog track by item.id" ng-if="item.type === \'placeholder\'">' +
       '          <span class="widget-library-card__icon widget-library-card__icon--placeholder"></span>' +
@@ -209,6 +223,16 @@
       syncState();
     };
 
+    $ctrl.addTaskWidget = function addTaskWidget() {
+      if (!$ctrl.activeDashboard) {
+        return;
+      }
+
+      WidgetService.addTaskWidget($ctrl.activeDashboard.id);
+      UiShellService.closeWidgetPanel();
+      syncState();
+    };
+
     $ctrl.persistWidgetPosition = function persistWidgetPosition(widget) {
       WidgetService.updatePosition($ctrl.activeDashboard.id, widget.id, widget.x, widget.y);
     };
@@ -252,7 +276,7 @@
       var placeholders = [];
       var index;
 
-      for (index = 0; index < 18; index += 1) {
+      for (index = 0; index < 17; index += 1) {
         placeholders.push({
           id: 'placeholder-' + index,
           name: 'Coming Soon',
@@ -272,6 +296,12 @@
           name: 'Calendar',
           description: 'Today\'s appointments and locations.',
           type: 'calendar'
+        },
+        {
+          id: 'tasks',
+          name: 'Task list',
+          description: 'Tasks grouped by today, tomorrow, and no due date.',
+          type: 'tasks'
         }
       ].concat(placeholders);
     }

@@ -4,7 +4,7 @@
   angular.module('morningBriefingApp').service('WidgetService', WidgetService);
 
   function WidgetService() {
-    var nextWidgetId = 3;
+    var nextWidgetId = 4;
     var widgetsByDashboard = {
       1: [
         {
@@ -60,6 +60,41 @@
                 time: '18:15',
                 title: 'Gym session',
                 location: 'Neighborhood fitness club'
+              }
+            ]
+          }
+        },
+        {
+          id: 3,
+          dashboardId: 1,
+          type: 'tasks',
+          title: 'Task List',
+          x: 756,
+          y: 24,
+          width: 360,
+          height: 360,
+          data: {
+            groups: [
+              {
+                label: 'Due Today',
+                items: [
+                  { title: 'Send expense report' },
+                  { title: 'Book train tickets for Lyon' }
+                ]
+              },
+              {
+                label: 'Due Tomorrow',
+                items: [
+                  { title: 'Prepare sprint demo notes' },
+                  { title: 'Pick up dry cleaning' }
+                ]
+              },
+              {
+                label: 'No Due Date',
+                items: [
+                  { title: 'Review summer travel options' },
+                  { title: 'Organize desk drawer' }
+                ]
               }
             ]
           }
@@ -143,6 +178,48 @@
       return widget;
     };
 
+    this.addTaskWidget = function addTaskWidget(dashboardId) {
+      var currentWidgets = this.listForDashboard(dashboardId);
+      var widget = {
+        id: nextWidgetId++,
+        dashboardId: dashboardId,
+        type: 'tasks',
+        title: 'Task List',
+        x: 36 + currentWidgets.length * 28,
+        y: 36 + currentWidgets.length * 28,
+        width: 360,
+        height: 360,
+        data: {
+          groups: [
+            {
+              label: 'Due Today',
+              items: [
+                { title: 'Reply to insurance email' },
+                { title: 'Confirm dinner reservation' }
+              ]
+            },
+            {
+              label: 'Due Tomorrow',
+              items: [
+                { title: 'Draft project update' },
+                { title: 'Buy birthday card' }
+              ]
+            },
+            {
+              label: 'No Due Date',
+              items: [
+                { title: 'Declutter camera roll' },
+                { title: 'Research standing desk options' }
+              ]
+            }
+          ]
+        }
+      };
+
+      currentWidgets.push(widget);
+      return widget;
+    };
+
     this.updatePosition = function updatePosition(dashboardId, widgetId, x, y) {
       var widget = this.listForDashboard(dashboardId).find(function (item) {
         return item.id === widgetId;
@@ -166,7 +243,7 @@
       }
 
       widget.width = Math.round(width);
-      widget.height = Math.max(widget.type === 'calendar' ? 260 : widget.height, Math.round(height));
+      widget.height = Math.max(widget.type === 'calendar' || widget.type === 'tasks' ? 260 : widget.height, Math.round(height));
     };
   }
 })();

@@ -390,6 +390,14 @@ body.theme-light .widget-card {
   background: linear-gradient(180deg, var(--accent), rgba(121, 224, 192, 0.15));
 }
 
+.widget-card--tasks::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--accent-2), rgba(255, 200, 103, 0.15));
+}
+
 .widget-handle {
   display: flex;
   align-items: flex-start;
@@ -532,6 +540,49 @@ body.theme-light .widget-card {
 
 .widget-library-card__icon i {
   font-size: 0.9rem;
+}
+
+.tasks-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin-top: 0.25rem;
+  padding-bottom: 0.9rem;
+}
+
+.task-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.task-group__label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.task-item {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 0.55rem;
+  align-items: start;
+  padding: 0.6rem 0.7rem;
+  border-radius: 14px;
+  background: var(--chip);
+}
+
+.task-item__bullet {
+  color: var(--accent-2);
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+.task-item__title {
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.35;
 }
 
 .canvas-empty-state {

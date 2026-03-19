@@ -197,6 +197,7 @@ At a high level:
 The technology stack should balance speed of delivery, familiarity, and future extensibility.
 
 ### Front end
+
 Because the initial preferred stack is Bootstrap plus AngularJS-style SPA development, a practical starting point is:
 
 - HTML
@@ -209,6 +210,7 @@ Because the initial preferred stack is Bootstrap plus AngularJS-style SPA develo
 For the widget layout capability, a grid-based dashboard library is recommended rather than implementing drag-and-drop from scratch.
 
 ### Back end
+
 A lightweight back end is sufficient for the MVP:
 
 - Python with FastAPI, or
@@ -217,30 +219,33 @@ A lightweight back end is sufficient for the MVP:
 FastAPI is attractive if the project later expands into AI enrichment, scheduling, and data processing pipelines.
 
 ### Database
+
 - PostgreSQL
 
 Why PostgreSQL:
+
 - strong relational model for tenants, dashboards, widgets, and connectors
 - good JSON support for flexible widget configuration
 - mature ecosystem
 - well suited for future SaaS growth
 
 ### Scheduling and background jobs
+
 - Cron for local MVP development
 - APScheduler, Celery, or a queue-based worker model for richer scheduling
 - Alternatively, cloud scheduler plus worker functions in later deployment
 
 ### Secrets management
+
 - environment variables for local development
 - Vault / cloud secret manager / encrypted secret store for production
 
 ### Hosting
-Possible options:
-- Vercel / Netlify for front end if decoupled
-- Render / Railway / Fly.io / cloud VM for full-stack MVP
-- Containerised deployment later with Docker
+
+- Containerised deployment with Docker running locally for Dev and in AWS ECS for Test & Prod.
 
 ### Television display
+
 For a Google TV or smart TV scenario, the most pragmatic early approach is:
 
 - responsive web application in a browser
