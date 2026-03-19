@@ -98,9 +98,12 @@
     $ctrl.widgetCatalog = buildWidgetCatalog();
 
     $ctrl.$onInit = function onInit() {
-      syncState();
       bindUiWatchers();
-      $ctrl.ready = true;
+      DashboardService.load().then(function handleDashboardLoad() {
+        syncState();
+      }).finally(function markReady() {
+        $ctrl.ready = true;
+      });
     };
 
     $ctrl.openEditDashboardModal = function openEditDashboardModal() {
@@ -116,24 +119,34 @@
     };
 
     $ctrl.submitDashboardModal = function submitDashboardModal() {
+      var isCreateMode = $ctrl.ui.dashboardModalMode === 'create';
+      var request;
+
       if (!$ctrl.modalForm.name) {
         return;
       }
 
-      if ($ctrl.ui.dashboardModalMode === 'create') {
-        DashboardService.create({
+      if (isCreateMode) {
+        request = DashboardService.create({
           name: $ctrl.modalForm.name,
           description: $ctrl.modalForm.description
         });
       } else if ($ctrl.activeDashboard) {
-        DashboardService.update($ctrl.activeDashboard.id, {
+        request = DashboardService.update($ctrl.activeDashboard.id, {
           name: $ctrl.modalForm.name,
           description: $ctrl.modalForm.description
         });
       }
 
-      $ctrl.closeModal();
-      syncState();
+      if (!request) {
+        return;
+      }
+
+      request.then(function handleDashboardSave() {
+        $ctrl.closeModal();
+        syncState();
+        $ctrl.isEditing = isCreateMode;
+      });
     };
 
     $ctrl.selectDashboard = function selectDashboard(dashboardId) {
@@ -208,6 +221,15 @@
     }
 
     function bindUiWatchers() {
+      $scope.$watch(
+        function watchActiveDashboardId() {
+          return DashboardService.getActiveId();
+        },
+        function handleActiveDashboardIdChange() {
+          syncState();
+        }
+      );
+
       $scope.$watch(
         function watchDashboardModalMode() {
           return $ctrl.ui.dashboardModalMode;

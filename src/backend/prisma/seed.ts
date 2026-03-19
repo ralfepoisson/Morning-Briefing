@@ -5,11 +5,11 @@ const snapshotDate = new Date('2026-03-19');
 
 async function main() {
   const tenant = await prisma.tenant.upsert({
-    where: { slug: 'demo-tenant' },
+    where: { slug: 'ralfe-local' },
     update: {},
     create: {
-      name: 'Demo Tenant',
-      slug: 'demo-tenant'
+      name: 'Ralfe Local',
+      slug: 'ralfe-local'
     }
   });
 
@@ -17,19 +17,19 @@ async function main() {
     where: {
       tenantId_email: {
         tenantId: tenant.id,
-        email: 'demo.user@example.com'
+        email: 'ralfe@example.com'
       }
     },
     update: {
-      displayName: 'Demo User',
+      displayName: 'Ralfe',
       timezone: 'Europe/Paris',
       locale: 'en-GB',
       isActive: true
     },
     create: {
       tenantId: tenant.id,
-      email: 'demo.user@example.com',
-      displayName: 'Demo User',
+      email: 'ralfe@example.com',
+      displayName: 'Ralfe',
       timezone: 'Europe/Paris',
       locale: 'en-GB'
     }

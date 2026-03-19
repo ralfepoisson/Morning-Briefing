@@ -123,6 +123,99 @@ body.theme-light::before {
   gap: 0.55rem !important;
 }
 
+.dashboard-menu {
+  position: relative;
+}
+
+.dashboard-menu__trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 220px;
+  padding: 0.5rem 0.9rem;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+}
+
+.dashboard-menu__trigger:hover,
+.dashboard-menu__trigger:focus {
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+
+.dashboard-menu__eyebrow {
+  display: block;
+  margin-right: auto;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.65rem;
+  color: var(--accent);
+}
+
+.dashboard-menu__label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dashboard-menu__panel {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  left: 0;
+  width: min(320px, calc(100vw - 2rem));
+  padding: 0.7rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.2);
+}
+
+.dashboard-menu__item,
+.dashboard-menu__create {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0.75rem 0.8rem;
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 14px;
+}
+
+.dashboard-menu__item:hover,
+.dashboard-menu__item:focus,
+.dashboard-menu__create:hover,
+.dashboard-menu__create:focus {
+  background: var(--chip);
+}
+
+.dashboard-menu__item--active {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.dashboard-menu__item-title {
+  font-weight: 600;
+}
+
+.dashboard-menu__item-copy {
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.dashboard-menu__create {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.35rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line);
+}
+
 .app-shell {
   position: relative;
   z-index: 1;
@@ -680,6 +773,10 @@ body.theme-light .widget-card {
     justify-content: flex-end;
   }
 
+  .dashboard-menu__trigger {
+    min-width: 200px;
+  }
+
   .dashboard-canvas {
     min-height: calc(100vh - 130px);
   }
@@ -702,6 +799,15 @@ body.theme-light .widget-card {
 
   .dashboard-canvas {
     min-height: calc(100vh - 150px);
+  }
+
+  .dashboard-menu {
+    width: 100%;
+  }
+
+  .dashboard-menu__trigger,
+  .dashboard-menu__panel {
+    width: 100%;
   }
 
   .widget-card {

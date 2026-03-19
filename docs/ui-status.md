@@ -4,7 +4,7 @@ This document tracks the current state of the web UI MVP under `src/web/`.
 
 ## Current status
 
-The frontend currently exists as a Bootstrap + AngularJS single-page application with mocked widget data and local in-memory state.
+The frontend currently exists as a Bootstrap + AngularJS single-page application. Dashboard list and create flows now target the backend REST API, while widget content and layout state remain mocked in the UI layer.
 
 ## Implemented
 
@@ -20,7 +20,9 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 
 - Horizontal top navigation bar
 - Dark mode and light mode toggle
-- `+ Dashboard` action in the top navigation
+- Dashboard dropdown in the top navigation for selecting existing dashboards
+- Dashboard creation action inside the top navigation dropdown
+- Simplified top navigation with secondary sections removed from the main bar
 - Compact branding treatment using the provided logo assets
 
 ### Dashboard workspace
@@ -28,8 +30,10 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 - Dashboard title and description shown in a compact header area
 - Modal-based dashboard configuration
 - Modal-based dashboard creation
+- Newly created dashboards open in edit mode on first load
 - Explicit dashboard edit mode
 - `Edit Dashboard` / `Save Dashboard` flow
+- Dashboard list and create actions are wired to the backend REST API
 
 ### Widget editing
 
@@ -53,7 +57,7 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 
 - Widget state is in memory only and is not yet persisted
 - Widget content is mocked and does not yet come from briefing snapshots or live connectors
-- Dashboard switching and dashboard lists are still minimal
+- Dashboard metadata updates are only partially wired and broader dashboard management is still minimal
 - Layout editing is custom and lightweight rather than using a dedicated dashboard grid library
 - Widget resizing is currently implemented only for calendar widgets
 
