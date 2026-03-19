@@ -4,7 +4,7 @@
   angular.module('morningBriefingApp').service('WidgetService', WidgetService);
 
   function WidgetService() {
-    var nextWidgetId = 2;
+    var nextWidgetId = 3;
     var widgetsByDashboard = {
       1: [
         {
@@ -26,6 +26,41 @@
               { label: 'Sunrise', value: '06:58' },
               { label: 'Humidity', value: '61%' },
               { label: 'Wind', value: '12 km/h' }
+            ]
+          }
+        },
+        {
+          id: 2,
+          dashboardId: 1,
+          type: 'calendar',
+          title: 'Today on Calendar',
+          x: 372,
+          y: 24,
+          width: 360,
+          height: 360,
+          data: {
+            dateLabel: 'Today',
+            appointments: [
+              {
+                time: '08:30',
+                title: 'Product sync',
+                location: 'Zoom Room A'
+              },
+              {
+                time: '11:00',
+                title: 'Lunch with Marie',
+                location: 'Cafe de la Paix'
+              },
+              {
+                time: '15:30',
+                title: 'Dentist appointment',
+                location: 'Rue de Rennes Clinic'
+              },
+              {
+                time: '18:15',
+                title: 'Gym session',
+                location: 'Neighborhood fitness club'
+              }
             ]
           }
         }
@@ -66,6 +101,48 @@
       return widget;
     };
 
+    this.addCalendarWidget = function addCalendarWidget(dashboardId) {
+      var currentWidgets = this.listForDashboard(dashboardId);
+      var widget = {
+        id: nextWidgetId++,
+        dashboardId: dashboardId,
+        type: 'calendar',
+        title: 'Today on Calendar',
+        x: 36 + currentWidgets.length * 28,
+        y: 36 + currentWidgets.length * 28,
+        width: 360,
+        height: 360,
+        data: {
+          dateLabel: 'Today',
+          appointments: [
+            {
+              time: '09:00',
+              title: 'Stand-up',
+              location: 'Teams'
+            },
+            {
+              time: '10:30',
+              title: 'Deep work block',
+              location: 'Home office'
+            },
+            {
+              time: '13:00',
+              title: 'Client review',
+              location: 'WeWork Meeting Room'
+            },
+            {
+              time: '19:00',
+              title: 'Dinner reservation',
+              location: 'Le Petit Marchand'
+            }
+          ]
+        }
+      };
+
+      currentWidgets.push(widget);
+      return widget;
+    };
+
     this.updatePosition = function updatePosition(dashboardId, widgetId, x, y) {
       var widget = this.listForDashboard(dashboardId).find(function (item) {
         return item.id === widgetId;
@@ -77,6 +154,19 @@
 
       widget.x = Math.max(0, Math.round(x));
       widget.y = Math.max(0, Math.round(y));
+    };
+
+    this.updateSize = function updateSize(dashboardId, widgetId, width, height) {
+      var widget = this.listForDashboard(dashboardId).find(function (item) {
+        return item.id === widgetId;
+      });
+
+      if (!widget) {
+        return;
+      }
+
+      widget.width = Math.round(width);
+      widget.height = Math.max(widget.type === 'calendar' ? 260 : widget.height, Math.round(height));
     };
   }
 })();

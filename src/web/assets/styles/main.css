@@ -349,6 +349,26 @@ body.theme-light .widget-card {
   cursor: grabbing;
 }
 
+.widget-resize-handle {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  width: 56px;
+  height: 10px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgba(121, 224, 192, 0.18);
+  cursor: ns-resize;
+}
+
+.widget-resize-handle::before {
+  content: "";
+  position: absolute;
+  inset: 3px 14px;
+  border-radius: 999px;
+  background: rgba(121, 224, 192, 0.7);
+}
+
 .widget-card--weather::after {
   content: "";
   position: absolute;
@@ -360,6 +380,14 @@ body.theme-light .widget-card {
   background:
     radial-gradient(circle, rgba(255, 255, 255, 0.85), rgba(255, 200, 103, 0.92) 60%, rgba(255, 200, 103, 0.12) 62%);
   box-shadow: 0 0 45px rgba(255, 200, 103, 0.25);
+}
+
+.widget-card--calendar::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--accent), rgba(121, 224, 192, 0.15));
 }
 
 .widget-handle {
@@ -444,6 +472,65 @@ body.theme-light .widget-card {
   display: block;
   margin-top: 0.18rem;
   color: var(--text);
+  font-size: 0.9rem;
+}
+
+.calendar-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin-top: 0.25rem;
+  padding-bottom: 0.9rem;
+}
+
+.calendar-date-label {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 0.32rem 0.65rem;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.calendar-appointment {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 0.8rem;
+  align-items: start;
+  padding: 0.7rem 0.75rem;
+  border-radius: 14px;
+  background: var(--chip);
+}
+
+.calendar-appointment__time {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.calendar-appointment__body strong,
+.calendar-appointment__body span {
+  display: block;
+}
+
+.calendar-appointment__body strong {
+  color: var(--text);
+  font-size: 0.94rem;
+  line-height: 1.25;
+}
+
+.calendar-appointment__body span {
+  margin-top: 0.18rem;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.widget-library-card__icon i {
   font-size: 0.9rem;
 }
 

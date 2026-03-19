@@ -9,6 +9,7 @@
       scope: {
         widget: '=',
         onMove: '&',
+        onResize: '&',
         enabled: '<'
       },
       link: function link(scope, element) {
@@ -46,10 +47,53 @@
           }
         });
 
+        interactable.resizable({
+          edges: {
+            bottom: '.widget-resize-handle'
+          },
+          modifiers: [
+            interact.modifiers.restrictSize({
+              min: {
+                width: scope.widget.width,
+                height: scope.widget.type === 'calendar' ? 260 : scope.widget.height
+              },
+              max: {
+                width: scope.widget.width,
+                height: scope.widget.type === 'calendar' ? 560 : scope.widget.height
+              }
+            })
+          ],
+          listeners: {
+            move: function onResizeMove(event) {
+              if (scope.widget.type !== 'calendar') {
+                return;
+              }
+
+              scope.$applyAsync(function applyResizeMove() {
+                scope.widget.height = Math.round(event.rect.height);
+              });
+            },
+            end: function onResizeEnd() {
+              if (scope.widget.type !== 'calendar') {
+                return;
+              }
+
+              scope.$applyAsync(function applyResizeEnd() {
+                scope.onResize({
+                  widget: scope.widget
+                });
+              });
+            }
+          }
+        });
+
         scope.$watchGroup(['widget.x', 'widget.y'], syncPosition);
         scope.$watch('enabled', function watchEnabled(isEnabled) {
           interactable.draggable({
             enabled: !!isEnabled
+          });
+          interactable.resizable({
+            enabled: !!isEnabled && scope.widget.type === 'calendar'
           });
           element.toggleClass('widget-card--editable', !!isEnabled);
         });

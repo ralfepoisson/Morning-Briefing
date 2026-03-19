@@ -21,14 +21,15 @@
       '      </div>' +
       '    </div>' +
       '    <div class="dashboard-canvas" ng-class="{\'dashboard-canvas--editing\': $ctrl.isEditing}">' +
-      '      <article class="widget-card widget-card--weather" ng-repeat="widget in $ctrl.widgets track by widget.id" draggable-widget widget="widget" enabled="$ctrl.isEditing" on-move="$ctrl.persistWidgetPosition(widget)" ng-style="{ width: widget.width + \'px\', height: widget.height + \'px\' }">' +
+      '      <article class="widget-card" ng-class="{\'widget-card--weather\': widget.type === \'weather\', \'widget-card--calendar\': widget.type === \'calendar\'}" ng-repeat="widget in $ctrl.widgets track by widget.id" draggable-widget widget="widget" enabled="$ctrl.isEditing" on-move="$ctrl.persistWidgetPosition(widget)" on-resize="$ctrl.persistWidgetSize(widget)" ng-style="{ width: widget.width + \'px\', height: widget.height + \'px\' }">' +
       '        <div class="widget-handle">' +
       '          <div>' +
-      '            <div class="widget-label">Weather widget</div>' +
+      '            <div class="widget-label">{{widget.type}} widget</div>' +
       '            <h3 class="widget-title">{{widget.title}}</h3>' +
       '          </div>' +
       '          <span class="drag-pill" ng-if="$ctrl.isEditing">Drag</span>' +
       '        </div>' +
+      '        <div ng-if="widget.type === \'weather\'">' +
       '        <div class="weather-temperature">{{widget.data.temperature}}</div>' +
       '        <div class="weather-condition">{{widget.data.condition}}</div>' +
       '        <div class="weather-location">{{widget.data.location}}</div>' +
@@ -40,6 +41,18 @@
       '            <strong>{{item.value}}</strong>' +
       '          </div>' +
       '        </div>' +
+      '        </div>' +
+      '        <div class="calendar-card" ng-if="widget.type === \'calendar\'">' +
+      '          <div class="calendar-date-label">{{widget.data.dateLabel}}</div>' +
+      '          <div class="calendar-appointment" ng-repeat="appointment in widget.data.appointments track by $index">' +
+      '            <div class="calendar-appointment__time">{{appointment.time}}</div>' +
+      '            <div class="calendar-appointment__body">' +
+      '              <strong>{{appointment.title}}</strong>' +
+      '              <span>{{appointment.location}}</span>' +
+      '            </div>' +
+      '          </div>' +
+      '        </div>' +
+      '        <div class="widget-resize-handle" ng-if="$ctrl.isEditing && widget.type === \'calendar\'" aria-hidden="true"></div>' +
       '      </article>' +
       '      <div class="canvas-empty-state" ng-if="!$ctrl.widgets.length">' +
       '        <div>' +
@@ -81,6 +94,11 @@
       '          <span class="widget-library-card__icon">W</span>' +
       '          <strong>Weather</strong>' +
       '          <span>Mocked daily forecast</span>' +
+      '        </button>' +
+      '        <button type="button" class="widget-library-card widget-library-card--active" ng-click="$ctrl.addCalendarWidget()">' +
+      '          <span class="widget-library-card__icon"><i class="fa-regular fa-calendar" aria-hidden="true"></i></span>' +
+      '          <strong>Calendar</strong>' +
+      '          <span>Today&apos;s appointments</span>' +
       '        </button>' +
       '        <div class="widget-library-card widget-library-card--placeholder" ng-repeat="item in $ctrl.widgetCatalog track by item.id" ng-if="item.type === \'placeholder\'">' +
       '          <span class="widget-library-card__icon widget-library-card__icon--placeholder"></span>' +
@@ -181,8 +199,22 @@
       syncState();
     };
 
+    $ctrl.addCalendarWidget = function addCalendarWidget() {
+      if (!$ctrl.activeDashboard) {
+        return;
+      }
+
+      WidgetService.addCalendarWidget($ctrl.activeDashboard.id);
+      UiShellService.closeWidgetPanel();
+      syncState();
+    };
+
     $ctrl.persistWidgetPosition = function persistWidgetPosition(widget) {
       WidgetService.updatePosition($ctrl.activeDashboard.id, widget.id, widget.x, widget.y);
+    };
+
+    $ctrl.persistWidgetSize = function persistWidgetSize(widget) {
+      WidgetService.updateSize($ctrl.activeDashboard.id, widget.id, widget.width, widget.height);
     };
 
     function syncState() {
@@ -220,7 +252,7 @@
       var placeholders = [];
       var index;
 
-      for (index = 0; index < 19; index += 1) {
+      for (index = 0; index < 18; index += 1) {
         placeholders.push({
           id: 'placeholder-' + index,
           name: 'Coming Soon',
@@ -234,6 +266,12 @@
           name: 'Weather',
           description: 'Mocked daily conditions and outlook.',
           type: 'weather'
+        },
+        {
+          id: 'calendar',
+          name: 'Calendar',
+          description: 'Today\'s appointments and locations.',
+          type: 'calendar'
         }
       ].concat(placeholders);
     }
