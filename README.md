@@ -247,6 +247,83 @@ For a Google TV or smart TV scenario, the most pragmatic early approach is:
 - optional kiosk or fullscreen mode
 - later evolution into an Android TV app if needed
 
+## UI requirements
+
+The current UI direction for the web MVP is a personal-information dashboard that feels closer to a lightweight BI workspace than a consumer app landing page.
+
+Implementation status for the current frontend can be tracked in `docs/ui-status.md`.
+
+### Front-end stack
+
+- Use Bootstrap for layout and base UI primitives
+- Use AngularJS for the SPA structure
+- Use Font Awesome Free for UI icons
+
+### General visual direction
+
+- Prefer a modern, clean, workspace-style dashboard aesthetic
+- Keep the dashboard frame visually flat so widgets feel like the primary layer
+- Minimise wasted space around the widget canvas
+- Support both dark mode and light mode
+- Use theme-specific branding assets in the top navigation
+
+### Top navigation
+
+- Use a horizontal top menu
+- The top menu should remain visually compact
+- Increase left and right spacing so the logo and right-side actions do not sit against the screen edges
+- Use `logo-dark.png` in dark mode and `logo-light.png` in light mode
+- The logo image already contains the product name, so no duplicate product-name text should appear beside it
+- Remove the preview action from the top-right area
+
+### Dashboard header and controls
+
+- Keep the dashboard title area compact so most vertical space is reserved for widgets
+- Show the dashboard name and description near the top of the workspace
+- Provide a configuration button using a cog icon
+- Place the configuration button inline with the dashboard editing controls
+- Use an `Edit Dashboard` button to enter layout-editing mode
+- Replace `Edit Dashboard` with `Save Dashboard` while editing
+- Do not show widget-layout controls when not editing
+
+### Dashboard configuration
+
+- Creating a dashboard should happen through a modal
+- Editing the current dashboard name and description should happen through a modal
+- A `+ Dashboard` button should exist in the top navigation
+- Creating a dashboard should take the user to a blank dashboard
+
+### Widget editing behaviour
+
+- Widgets should be draggable only while the dashboard is in edit mode
+- The widget-add control should be hidden unless the dashboard is in edit mode
+- The visual layout grid should not become messy or duplicated between normal and edit states
+
+### Widget library panel
+
+- The `+ Widget` action should open a sliding panel on the right
+- The panel should show a grid of widget choices
+- Plan the grid for roughly 20 widget types
+- Unimplemented widget slots can use muted placeholder tiles
+
+### Implemented widget types
+
+- Weather widget
+- Calendar widget
+
+### Weather widget requirements
+
+- Use mocked content in the UI for now
+- Present current conditions and supporting detail in a coherent card layout
+- Ensure the card height is sufficient so content does not overflow awkwardly
+
+### Calendar widget requirements
+
+- Show appointments for the current day
+- For each appointment, show time, title, and location
+- Use mocked data in the UI for now
+- Allow the calendar widget to be resized vertically to become taller or shorter
+
 ## Weather API recommendation for MVP
 
 A sensible free provider to start with is a public weather API with a free tier. OpenWeather is a common candidate for prototypes because it is widely used and straightforward to integrate, though it is worth comparing free-tier limits, forecast depth, and licensing conditions against alternatives before locking in the provider.
