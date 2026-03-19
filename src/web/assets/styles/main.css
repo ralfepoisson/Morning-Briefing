@@ -334,6 +334,14 @@ body.theme-light .theme-toggle__button.active {
   overflow: hidden;
 }
 
+.widget-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 body.theme-light .widget-card {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(245, 248, 252, 0.9)),
@@ -485,10 +493,14 @@ body.theme-light .widget-card {
 
 .calendar-card {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 0.7rem;
   margin-top: 0.25rem;
   padding-bottom: 0.9rem;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
 }
 
 .calendar-date-label {
@@ -544,10 +556,14 @@ body.theme-light .widget-card {
 
 .tasks-card {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 0.9rem;
   margin-top: 0.25rem;
   padding-bottom: 0.9rem;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
 }
 
 .task-group {

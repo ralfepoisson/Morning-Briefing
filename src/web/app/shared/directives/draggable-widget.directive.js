@@ -3,7 +3,9 @@
 
   angular.module('morningBriefingApp').directive('draggableWidget', draggableWidget);
 
-  function draggableWidget() {
+  draggableWidget.$inject = ['WidgetRegistryService'];
+
+  function draggableWidget(WidgetRegistryService) {
     return {
       restrict: 'A',
       scope: {
@@ -55,17 +57,17 @@
             interact.modifiers.restrictSize({
               min: {
                 width: scope.widget.width,
-                height: scope.widget.type === 'calendar' || scope.widget.type === 'tasks' ? 260 : scope.widget.height
+                height: getMinHeight()
               },
               max: {
                 width: scope.widget.width,
-                height: scope.widget.type === 'calendar' || scope.widget.type === 'tasks' ? 560 : scope.widget.height
+                height: getMaxHeight()
               }
             })
           ],
           listeners: {
             move: function onResizeMove(event) {
-              if (scope.widget.type !== 'calendar' && scope.widget.type !== 'tasks') {
+              if (!isResizable()) {
                 return;
               }
 
@@ -74,7 +76,7 @@
               });
             },
             end: function onResizeEnd() {
-              if (scope.widget.type !== 'calendar' && scope.widget.type !== 'tasks') {
+              if (!isResizable()) {
                 return;
               }
 
@@ -93,7 +95,7 @@
             enabled: !!isEnabled
           });
           interactable.resizable({
-            enabled: !!isEnabled && (scope.widget.type === 'calendar' || scope.widget.type === 'tasks')
+            enabled: !!isEnabled && isResizable()
           });
           element.toggleClass('widget-card--editable', !!isEnabled);
         });
@@ -101,6 +103,28 @@
         scope.$on('$destroy', function destroy() {
           interactable.unset();
         });
+
+        function isResizable() {
+          var definition = WidgetRegistryService.get(scope.widget.type);
+
+          return !!(definition && definition.resizable && definition.resizable.vertical);
+        }
+
+        function getMinHeight() {
+          var definition = WidgetRegistryService.get(scope.widget.type);
+
+          return definition && definition.resizable && definition.resizable.vertical
+            ? definition.resizable.minHeight
+            : scope.widget.height;
+        }
+
+        function getMaxHeight() {
+          var definition = WidgetRegistryService.get(scope.widget.type);
+
+          return definition && definition.resizable && definition.resizable.vertical
+            ? definition.resizable.maxHeight
+            : scope.widget.height;
+        }
       }
     };
   }

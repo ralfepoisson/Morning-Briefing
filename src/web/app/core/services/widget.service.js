@@ -3,102 +3,77 @@
 
   angular.module('morningBriefingApp').service('WidgetService', WidgetService);
 
-  function WidgetService() {
+  WidgetService.$inject = ['WidgetRegistryService'];
+
+  function WidgetService(WidgetRegistryService) {
     var nextWidgetId = 4;
     var widgetsByDashboard = {
       1: [
-        {
-          id: 1,
-          dashboardId: 1,
-          type: 'weather',
+        createSeedWidget('weather', 1, 24, 24, {
           title: 'Paris Weather',
-          x: 24,
-          y: 24,
-          width: 320,
-          height: 360,
-          data: {
-            location: 'Paris, France',
-            temperature: '14°',
-            condition: 'Clear and bright',
-            highLow: 'H: 17°  L: 9°',
-            summary: 'Dry through the afternoon with soft sunshine and a light breeze.',
-            details: [
-              { label: 'Sunrise', value: '06:58' },
-              { label: 'Humidity', value: '61%' },
-              { label: 'Wind', value: '12 km/h' }
-            ]
-          }
-        },
-        {
-          id: 2,
-          dashboardId: 1,
-          type: 'calendar',
+          location: 'Paris, France',
+          temperature: '14°',
+          condition: 'Clear and bright',
+          highLow: 'H: 17°  L: 9°',
+          summary: 'Dry through the afternoon with soft sunshine and a light breeze.',
+          details: [
+            { label: 'Sunrise', value: '06:58' },
+            { label: 'Humidity', value: '61%' },
+            { label: 'Wind', value: '12 km/h' }
+          ]
+        }),
+        createSeedWidget('calendar', 1, 372, 24, {
           title: 'Today on Calendar',
-          x: 372,
-          y: 24,
-          width: 360,
-          height: 360,
-          data: {
-            dateLabel: 'Today',
-            appointments: [
-              {
-                time: '08:30',
-                title: 'Product sync',
-                location: 'Zoom Room A'
-              },
-              {
-                time: '11:00',
-                title: 'Lunch with Marie',
-                location: 'Cafe de la Paix'
-              },
-              {
-                time: '15:30',
-                title: 'Dentist appointment',
-                location: 'Rue de Rennes Clinic'
-              },
-              {
-                time: '18:15',
-                title: 'Gym session',
-                location: 'Neighborhood fitness club'
-              }
-            ]
-          }
-        },
-        {
-          id: 3,
-          dashboardId: 1,
-          type: 'tasks',
+          dateLabel: 'Today',
+          appointments: [
+            {
+              time: '08:30',
+              title: 'Product sync',
+              location: 'Zoom Room A'
+            },
+            {
+              time: '11:00',
+              title: 'Lunch with Marie',
+              location: 'Cafe de la Paix'
+            },
+            {
+              time: '15:30',
+              title: 'Dentist appointment',
+              location: 'Rue de Rennes Clinic'
+            },
+            {
+              time: '18:15',
+              title: 'Gym session',
+              location: 'Neighborhood fitness club'
+            }
+          ]
+        }),
+        createSeedWidget('tasks', 1, 756, 24, {
           title: 'Task List',
-          x: 756,
-          y: 24,
-          width: 360,
-          height: 360,
-          data: {
-            groups: [
-              {
-                label: 'Due Today',
-                items: [
-                  { title: 'Send expense report' },
-                  { title: 'Book train tickets for Lyon' }
-                ]
-              },
-              {
-                label: 'Due Tomorrow',
-                items: [
-                  { title: 'Prepare sprint demo notes' },
-                  { title: 'Pick up dry cleaning' }
-                ]
-              },
-              {
-                label: 'No Due Date',
-                items: [
-                  { title: 'Review summer travel options' },
-                  { title: 'Organize desk drawer' }
-                ]
-              }
-            ]
-          }
-        }
+          groups: [
+            {
+              label: 'Due Today',
+              items: [
+                { title: 'Send expense report' },
+                { title: 'Book train tickets for Lyon' }
+              ]
+            },
+            {
+              label: 'Due Tomorrow',
+              items: [
+                { title: 'Prepare sprint demo notes' },
+                { title: 'Pick up dry cleaning' }
+              ]
+            },
+            {
+              label: 'No Due Date',
+              items: [
+                { title: 'Review summer travel options' },
+                { title: 'Organize desk drawer' }
+              ]
+            }
+          ]
+        })
       ]
     };
 
@@ -107,114 +82,21 @@
       return widgetsByDashboard[dashboardId];
     };
 
-    this.addWeatherWidget = function addWeatherWidget(dashboardId) {
+    this.addWidget = function addWidget(dashboardId, type) {
       var currentWidgets = this.listForDashboard(dashboardId);
-      var widget = {
+      var definition = WidgetRegistryService.get(type);
+      var widget;
+
+      if (!definition || typeof definition.createMockWidget !== 'function') {
+        return null;
+      }
+
+      widget = definition.createMockWidget({
         id: nextWidgetId++,
         dashboardId: dashboardId,
-        type: 'weather',
-        title: 'Weather Outlook',
         x: 36 + currentWidgets.length * 28,
-        y: 36 + currentWidgets.length * 28,
-        width: 320,
-        height: 360,
-        data: {
-          location: 'Mocked forecast',
-          temperature: '18°',
-          condition: 'Partly sunny',
-          highLow: 'H: 20°  L: 11°',
-          summary: 'Mock data for the MVP. This widget will later hydrate from a briefing snapshot.',
-          details: [
-            { label: 'Feels like', value: '17°' },
-            { label: 'Rain', value: '10%' },
-            { label: 'UV', value: 'Moderate' }
-          ]
-        }
-      };
-
-      currentWidgets.push(widget);
-      return widget;
-    };
-
-    this.addCalendarWidget = function addCalendarWidget(dashboardId) {
-      var currentWidgets = this.listForDashboard(dashboardId);
-      var widget = {
-        id: nextWidgetId++,
-        dashboardId: dashboardId,
-        type: 'calendar',
-        title: 'Today on Calendar',
-        x: 36 + currentWidgets.length * 28,
-        y: 36 + currentWidgets.length * 28,
-        width: 360,
-        height: 360,
-        data: {
-          dateLabel: 'Today',
-          appointments: [
-            {
-              time: '09:00',
-              title: 'Stand-up',
-              location: 'Teams'
-            },
-            {
-              time: '10:30',
-              title: 'Deep work block',
-              location: 'Home office'
-            },
-            {
-              time: '13:00',
-              title: 'Client review',
-              location: 'WeWork Meeting Room'
-            },
-            {
-              time: '19:00',
-              title: 'Dinner reservation',
-              location: 'Le Petit Marchand'
-            }
-          ]
-        }
-      };
-
-      currentWidgets.push(widget);
-      return widget;
-    };
-
-    this.addTaskWidget = function addTaskWidget(dashboardId) {
-      var currentWidgets = this.listForDashboard(dashboardId);
-      var widget = {
-        id: nextWidgetId++,
-        dashboardId: dashboardId,
-        type: 'tasks',
-        title: 'Task List',
-        x: 36 + currentWidgets.length * 28,
-        y: 36 + currentWidgets.length * 28,
-        width: 360,
-        height: 360,
-        data: {
-          groups: [
-            {
-              label: 'Due Today',
-              items: [
-                { title: 'Reply to insurance email' },
-                { title: 'Confirm dinner reservation' }
-              ]
-            },
-            {
-              label: 'Due Tomorrow',
-              items: [
-                { title: 'Draft project update' },
-                { title: 'Buy birthday card' }
-              ]
-            },
-            {
-              label: 'No Due Date',
-              items: [
-                { title: 'Declutter camera roll' },
-                { title: 'Research standing desk options' }
-              ]
-            }
-          ]
-        }
-      };
+        y: 36 + currentWidgets.length * 28
+      });
 
       currentWidgets.push(widget);
       return widget;
@@ -243,7 +125,28 @@
       }
 
       widget.width = Math.round(width);
-      widget.height = Math.max(widget.type === 'calendar' || widget.type === 'tasks' ? 260 : widget.height, Math.round(height));
+      widget.height = Math.max(getMinHeight(widget.type, widget.height), Math.round(height));
+    };
+
+    function createSeedWidget(type, dashboardId, x, y, overrides) {
+      var definition = WidgetRegistryService.get(type);
+
+      return definition.createMockWidget(angular.extend({}, overrides, {
+        id: nextWidgetId - 3 + (type === 'weather' ? 0 : type === 'calendar' ? 1 : 2),
+        dashboardId: dashboardId,
+        x: x,
+        y: y
+      }));
+    }
+
+    function getMinHeight(type, fallbackHeight) {
+      var definition = WidgetRegistryService.get(type);
+
+      if (definition && definition.resizable && definition.resizable.vertical) {
+        return definition.resizable.minHeight;
+      }
+
+      return fallbackHeight;
     };
   }
 })();
