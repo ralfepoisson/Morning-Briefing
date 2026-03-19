@@ -83,8 +83,10 @@ body.theme-light::before {
 
 .top-nav .container-fluid {
   min-height: 60px;
-  padding-left: 1.5rem !important;
-  padding-right: 1.5rem !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin-left: 1.5rem;
+  margin-right: 1.5rem;
 }
 
 .navbar-brand {
@@ -220,6 +222,10 @@ body.theme-light .theme-toggle__button.active {
   padding: 0;
   font-size: 0.95rem;
   line-height: 1;
+}
+
+.icon-button i {
+  pointer-events: none;
 }
 
 .btn,
@@ -534,8 +540,10 @@ body.theme-light .widget-card {
 
   .top-nav .container-fluid {
     min-height: auto;
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0.75rem;
+    margin-right: 0.75rem;
   }
 
   .dashboard-canvas {

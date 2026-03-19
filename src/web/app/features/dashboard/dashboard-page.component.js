@@ -14,7 +14,7 @@
       '          <p class="stage-copy stage-copy--compact mb-0" ng-if="!$ctrl.activeDashboard.description">Blank dashboard ready for widgets.</p>' +
       '        </div>' +
       '        <div class="header-controls d-flex flex-wrap align-items-center justify-content-xl-end gap-2">' +
-      '          <button type="button" class="btn btn-outline-light icon-button" ng-click="$ctrl.openEditDashboardModal()" aria-label="Configure dashboard">&#9881;</button>' +
+      '          <button type="button" class="btn btn-outline-light icon-button" ng-click="$ctrl.openEditDashboardModal()" aria-label="Configure dashboard"><i class="fa-solid fa-gear" aria-hidden="true"></i></button>' +
       '          <button type="button" class="btn btn-light text-dark" ng-click="$ctrl.toggleEditing()">{{ $ctrl.isEditing ? "Save Dashboard" : "Edit Dashboard" }}</button>' +
       '          <button type="button" class="btn btn-outline-light" ng-if="$ctrl.isEditing" ng-click="$ctrl.openWidgetPanel()">+ Widget</button>' +
       '        </div>' +
@@ -74,7 +74,7 @@
       '          <h2 class="modal-title mb-2">Add a widget</h2>' +
       '          <p class="modal-copy mb-0">We are planning for a broader catalog. For now, weather is the first live option.</p>' +
       '        </div>' +
-      '        <button type="button" class="btn btn-outline-secondary icon-button" ng-click="$ctrl.closeWidgetPanel()" aria-label="Close widget panel">&times;</button>' +
+      '        <button type="button" class="btn btn-outline-secondary icon-button" ng-click="$ctrl.closeWidgetPanel()" aria-label="Close widget panel"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>' +
       '      </div>' +
       '      <div class="widget-library-grid">' +
       '        <button type="button" class="widget-library-card widget-library-card--active" ng-click="$ctrl.addWeatherWidget()">' +
