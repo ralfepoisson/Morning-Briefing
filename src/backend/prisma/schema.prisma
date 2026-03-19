@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum DashboardType {
+  PERSONAL
+  SHARED
+  CONTEXTUAL
+}
+
+enum ConnectorStatus {
+  ACTIVE
+  DISABLED
+  ERROR
+}
+
+enum ConnectorAuthType {
+  NONE
+  API_KEY
+  OAUTH
+  BASIC
+}
+
+enum WidgetRefreshMode {
+  SNAPSHOT
+  LIVE
+  HYBRID
+}
+
+enum SnapshotGenerationStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+enum WidgetSnapshotStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+model Tenant {
+  id          String             @id @default(uuid()) @db.Uuid
+  name        String             @map("tenant_name")
+  slug        String             @unique @map("tenant_slug")
+  status      TenantStatus       @default(ACTIVE)
+  createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  users       AppUser[]
+  dashboards  Dashboard[]
+  widgets     DashboardWidget[]
+  connectors  Connector[]
+  snapshots   BriefingSnapshot[]
+
+  @@map("tenants")
+}
+
+model AppUser {
+  id           String             @id @default(uuid()) @db.Uuid
+  tenantId     String             @map("tenant_id") @db.Uuid
+  email        String
+  displayName  String             @map("display_name")
+  timezone     String
+  locale       String
+  isActive     Boolean            @default(true) @map("is_active")
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  dashboards   Dashboard[]
+  snapshots    BriefingSnapshot[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("app_users")
+}
+
+model Dashboard {
+  id                 String          @id @default(uuid()) @db.Uuid
+  tenantId           String          @map("tenant_id") @db.Uuid
+  ownerUserId        String          @map("owner_user_id") @db.Uuid
+  name               String
+  description        String?
+  dashboardType      DashboardType   @default(PERSONAL) @map("dashboard_type")
+  isDefault          Boolean         @default(false) @map("is_default")
+  isActive           Boolean         @default(true) @map("is_active")
+  version            Int             @default(1)
+  activationRuleJson Json?           @map("activation_rule_json")
+  themeJson          Json?           @map("theme_json")
+  createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant             Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  owner              AppUser         @relation(fields: [ownerUserId], references: [id], onDelete: Restrict)
+  widgets            DashboardWidget[]
+  snapshots          BriefingSnapshot[]
+
+  @@index([tenantId])
+  @@index([ownerUserId])
+  @@map("dashboards")
+}
+
+model DashboardWidget {
+  id            String            @id @default(uuid()) @db.Uuid
+  tenantId      String            @map("tenant_id") @db.Uuid
+  dashboardId   String            @map("dashboard_id") @db.Uuid
+  widgetType    String            @map("widget_type")
+  title         String
+  positionX     Int               @map("position_x")
+  positionY     Int               @map("position_y")
+  width         Int
+  height        Int
+  minWidth      Int               @default(1) @map("min_width")
+  minHeight     Int               @default(1) @map("min_height")
+  isVisible     Boolean           @default(true) @map("is_visible")
+  refreshMode   WidgetRefreshMode @default(SNAPSHOT) @map("refresh_mode")
+  sortOrder     Int               @default(0) @map("sort_order")
+  version       Int               @default(1)
+  configJson    Json?             @map("config_json")
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  dashboard     Dashboard         @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  connectors    WidgetConnector[]
+  snapshots     WidgetSnapshot[]
+
+  @@index([tenantId])
+  @@index([dashboardId])
+  @@map("dashboard_widgets")
+}
+
+model Connector {
+  id          String            @id @default(uuid()) @db.Uuid
+  tenantId    String            @map("tenant_id") @db.Uuid
+  connectorType String          @map("connector_type")
+  name        String
+  status      ConnectorStatus   @default(ACTIVE)
+  authType    ConnectorAuthType @default(NONE) @map("auth_type")
+  baseUrl     String?           @map("base_url")
+  configJson  Json?             @map("config_json")
+  secretRef   String?           @map("secret_ref")
+  lastSyncAt  DateTime?         @map("last_sync_at") @db.Timestamptz(6)
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  widgets     WidgetConnector[]
+
+  @@index([tenantId])
+  @@map("connectors")
+}
+
+model WidgetConnector {
+  id                String          @id @default(uuid()) @db.Uuid
+  dashboardWidgetId String          @map("dashboard_widget_id") @db.Uuid
+  connectorId       String          @map("connector_id") @db.Uuid
+  usageRole         String          @map("usage_role")
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  dashboardWidget   DashboardWidget @relation(fields: [dashboardWidgetId], references: [id], onDelete: Cascade)
+  connector         Connector       @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+
+  @@unique([dashboardWidgetId, connectorId, usageRole])
+  @@index([connectorId])
+  @@map("widget_connectors")
+}
+
+model BriefingSnapshot {
+  id               String                   @id @default(uuid()) @db.Uuid
+  tenantId         String                   @map("tenant_id") @db.Uuid
+  userId           String                   @map("user_id") @db.Uuid
+  dashboardId      String                   @map("dashboard_id") @db.Uuid
+  snapshotDate     DateTime                 @map("snapshot_date") @db.Date
+  generatedAt      DateTime                 @default(now()) @map("generated_at") @db.Timestamptz(6)
+  generationStatus SnapshotGenerationStatus @default(PENDING) @map("generation_status")
+  summaryJson      Json?                    @map("summary_json")
+  expiresAt        DateTime?                @map("expires_at") @db.Timestamptz(6)
+  tenant           Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user             AppUser                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  dashboard        Dashboard                @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  widgetSnapshots  WidgetSnapshot[]
+
+  @@unique([userId, dashboardId, snapshotDate])
+  @@index([tenantId])
+  @@index([dashboardId])
+  @@map("briefing_snapshots")
+}
+
+model WidgetSnapshot {
+  id                String               @id @default(uuid()) @db.Uuid
+  snapshotId        String               @map("snapshot_id") @db.Uuid
+  dashboardWidgetId String               @map("dashboard_widget_id") @db.Uuid
+  widgetType        String               @map("widget_type")
+  title             String
+  contentJson       Json?                @map("content_json")
+  contentHash       String?              @map("content_hash")
+  generatedAt       DateTime             @default(now()) @map("generated_at") @db.Timestamptz(6)
+  status            WidgetSnapshotStatus @default(PENDING)
+  errorMessage      String?              @map("error_message")
+  snapshot          BriefingSnapshot     @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  dashboardWidget   DashboardWidget      @relation(fields: [dashboardWidgetId], references: [id], onDelete: Restrict)
+
+  @@index([snapshotId])
+  @@index([dashboardWidgetId])
+  @@map("widget_snapshots")
+}

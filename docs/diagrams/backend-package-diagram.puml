@@ -1,0 +1,67 @@
+@startuml
+title Morning Briefing Backend Package Diagram
+skinparam packageStyle rectangle
+skinparam linetype ortho
+left to right direction
+
+package "Web UI\n(AngularJS SPA)" as WebUi
+
+package "Backend API\nNode.js + Fastify" as Api {
+  package "API Layer" as ApiLayer {
+    [Routes]
+    [Schemas]
+    [Controllers]
+  }
+
+  package "Application Layer" as AppLayer {
+    [Dashboard Use Cases]
+    [Widget Use Cases]
+    [Connector Use Cases]
+    [Briefing Use Cases]
+  }
+
+  package "Domain Layer" as DomainLayer {
+    [Dashboard Domain]
+    [Widget Domain]
+    [Connector Domain]
+    [Snapshot Domain]
+  }
+
+  package "Infrastructure Layer" as InfraLayer {
+    [Postgres Repositories]
+    [Connector Clients]
+    [Secret Store]
+    [Job Runner]
+    [Observability]
+  }
+}
+
+database "PostgreSQL\n(Local + AWS RDS)" as Postgres
+cloud "Secret Backend\n(Local env / AWS Secrets Manager)" as Secrets
+cloud "External Providers\nWeather / Calendar / Tasks / News" as Providers
+
+WebUi --> ApiLayer : REST /api/v1
+ApiLayer --> AppLayer
+AppLayer --> DomainLayer
+AppLayer --> InfraLayer
+InfraLayer --> Postgres
+InfraLayer --> Secrets
+InfraLayer --> Providers
+
+[Job Runner] ..> [Briefing Use Cases] : executes
+[Connector Clients] ..> [Connector Domain]
+[Postgres Repositories] ..> [Dashboard Domain]
+[Postgres Repositories] ..> [Widget Domain]
+[Postgres Repositories] ..> [Snapshot Domain]
+
+note bottom of WebUi
+UI communicates with backend only through REST.
+No direct database or provider access.
+end note
+
+note bottom of InfraLayer
+Background jobs remain inside the modular monolith
+initially, with clean seams for later extraction.
+end note
+
+@enduml

@@ -38,14 +38,15 @@ class Dashboard {
   dashboard_type : varchar
   is_default : boolean
   is_active : boolean
+  version : int
   activation_rule_json : json
   theme_json : json
   created_at : timestamp
   updated_at : timestamp
 }
 
-class Widget {
-  +widget_id : UUID
+class DashboardWidget {
+  +dashboard_widget_id : UUID
   --
   tenant_id : UUID
   dashboard_id : UUID
@@ -60,6 +61,7 @@ class Widget {
   is_visible : boolean
   refresh_mode : varchar
   sort_order : int
+  version : int
   config_json : json
   created_at : timestamp
   updated_at : timestamp
@@ -84,7 +86,7 @@ class Connector {
 class WidgetConnector {
   +widget_connector_id : UUID
   --
-  widget_id : UUID
+  dashboard_widget_id : UUID
   connector_id : UUID
   usage_role : varchar
   created_at : timestamp
@@ -107,7 +109,9 @@ class WidgetSnapshot {
   +widget_snapshot_id : UUID
   --
   snapshot_id : UUID
-  widget_id : UUID
+  dashboard_widget_id : UUID
+  widget_type : varchar
+  title : varchar
   content_json : json
   content_hash : varchar
   generated_at : timestamp
@@ -118,22 +122,22 @@ class WidgetSnapshot {
 Tenant "1" -- "0..*" AppUser : has >
 Tenant "1" -- "0..*" Dashboard : owns >
 Tenant "1" -- "0..*" Connector : provides >
-Tenant "1" -- "0..*" Widget : scopes >
+Tenant "1" -- "0..*" DashboardWidget : scopes >
 Tenant "1" -- "0..*" BriefingSnapshot : contains >
 
 AppUser "1" -- "0..*" Dashboard : owns >
-Dashboard "1" -- "0..*" Widget : contains >
+Dashboard "1" -- "0..*" DashboardWidget : contains >
 
-Widget "1" -- "0..*" WidgetConnector : uses >
+DashboardWidget "1" -- "0..*" WidgetConnector : uses >
 Connector "1" -- "0..*" WidgetConnector : linked to >
 
 AppUser "1" -- "0..*" BriefingSnapshot : receives >
 Dashboard "1" -- "0..*" BriefingSnapshot : rendered as >
 
 BriefingSnapshot "1" -- "0..*" WidgetSnapshot : includes >
-Widget "1" -- "0..*" WidgetSnapshot : materialised as >
+DashboardWidget "1" -- "0..*" WidgetSnapshot : materialised as >
 
-note right of Widget
+note right of DashboardWidget
 Represents the configured widget instance
 placed on a dashboard layout.
 end note
@@ -141,11 +145,21 @@ end note
 note right of WidgetSnapshot
 Stores the resolved content displayed
 for a widget at a specific point in time.
+Denormalises widget type and title so
+historical snapshots remain readable even
+if widget configuration changes later.
 end note
 
 note bottom of Connector
 Tenant-level integration configuration,
 for example weather, calendar, RSS, or news.
+Secrets stay outside Postgres and are
+referenced through secret_ref.
+end note
+
+note bottom of BriefingSnapshot
+Recommended unique key:
+(user_id, dashboard_id, snapshot_date)
 end note
 
 @enduml
