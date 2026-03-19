@@ -60,6 +60,7 @@ model Tenant {
   dashboards  Dashboard[]
   widgets     DashboardWidget[]
   connectors  Connector[]
+  referenceCities ReferenceCity[]
   snapshots   BriefingSnapshot[]
 
   @@map("tenants")
@@ -135,6 +136,29 @@ model DashboardWidget {
   @@index([tenantId])
   @@index([dashboardId])
   @@map("dashboard_widgets")
+}
+
+model ReferenceCity {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String?   @map("tenant_id") @db.Uuid
+  geonameId     Int       @unique @map("geoname_id")
+  name          String
+  asciiName     String    @map("ascii_name")
+  countryCode   String    @map("country_code")
+  adminName1    String?   @map("admin_name_1")
+  timezone      String?
+  latitude      Decimal   @db.Decimal(9, 6)
+  longitude     Decimal   @db.Decimal(9, 6)
+  population    BigInt?
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([name])
+  @@index([asciiName])
+  @@index([countryCode, name])
+  @@map("reference_cities")
 }
 
 model Connector {

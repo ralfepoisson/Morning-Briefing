@@ -91,6 +91,7 @@ export async function registerWidgetRoutes(
       y?: number;
       width?: number;
       height?: number;
+      config?: Record<string, unknown>;
     };
 
     if (!params.dashboardId) {
@@ -122,7 +123,8 @@ export async function registerWidgetRoutes(
       x: body.x,
       y: body.y,
       width: body.width,
-      height: body.height
+      height: body.height,
+      config: body.config
     });
 
     if (!widget) {

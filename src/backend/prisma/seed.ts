@@ -93,7 +93,16 @@ async function main() {
           refreshMode: 'SNAPSHOT',
           sortOrder: 1,
           configJson: {
-            location: 'Paris, France',
+            location: {
+              geonameId: 2988507,
+              name: 'Paris',
+              countryCode: 'FR',
+              adminName1: 'Ile-de-France',
+              timezone: 'Europe/Paris',
+              latitude: 48.85341,
+              longitude: 2.3488,
+              displayName: 'Paris, Ile-de-France, FR'
+            },
             units: 'metric'
           }
         }
@@ -113,7 +122,16 @@ async function main() {
           refreshMode: 'SNAPSHOT',
           sortOrder: 1,
           configJson: {
-            location: 'Paris, France',
+            location: {
+              geonameId: 2988507,
+              name: 'Paris',
+              countryCode: 'FR',
+              adminName1: 'Ile-de-France',
+              timezone: 'Europe/Paris',
+              latitude: 48.85341,
+              longitude: 2.3488,
+              displayName: 'Paris, Ile-de-France, FR'
+            },
             units: 'metric'
           }
         }
@@ -185,7 +203,57 @@ async function main() {
     });
   }
 
+  await seedReferenceCities();
+
   console.log('Seed data created.');
+}
+
+async function seedReferenceCities() {
+  const cities = [
+    {
+      geonameId: 2988507,
+      name: 'Paris',
+      asciiName: 'Paris',
+      countryCode: 'FR',
+      adminName1: 'Ile-de-France',
+      timezone: 'Europe/Paris',
+      latitude: '48.853410',
+      longitude: '2.348800',
+      population: BigInt('2138551')
+    },
+    {
+      geonameId: 2643743,
+      name: 'London',
+      asciiName: 'London',
+      countryCode: 'GB',
+      adminName1: 'England',
+      timezone: 'Europe/London',
+      latitude: '51.508530',
+      longitude: '-0.125740',
+      population: BigInt('8961989')
+    },
+    {
+      geonameId: 5128581,
+      name: 'New York City',
+      asciiName: 'New York City',
+      countryCode: 'US',
+      adminName1: 'New York',
+      timezone: 'America/New_York',
+      latitude: '40.714270',
+      longitude: '-74.005970',
+      population: BigInt('8804190')
+    }
+  ];
+
+  for (const city of cities) {
+    await prisma.referenceCity.upsert({
+      where: {
+        geonameId: city.geonameId
+      },
+      update: city,
+      create: city
+    });
+  }
 }
 
 main()

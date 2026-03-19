@@ -1,6 +1,8 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { registerDashboardRoutes } from '../modules/dashboards/dashboard-routes.js';
+import { registerReferenceCityRoutes } from '../modules/reference-data/reference-city-routes.js';
+import { registerSnapshotRoutes } from '../modules/snapshots/snapshot-routes.js';
 import { registerWidgetRoutes } from '../modules/widgets/widget-routes.js';
 
 export async function buildApp() {
@@ -20,6 +22,8 @@ export async function buildApp() {
   });
 
   await registerDashboardRoutes(app);
+  await registerReferenceCityRoutes(app);
+  await registerSnapshotRoutes(app);
   await registerWidgetRoutes(app);
 
   return app;

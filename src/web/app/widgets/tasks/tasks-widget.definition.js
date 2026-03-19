@@ -35,6 +35,7 @@
           y: options.y,
           width: options.width || 360,
           height: options.height || 360,
+          config: options.config || {},
           data: {
             groups: data.groups || options.groups || [
               {

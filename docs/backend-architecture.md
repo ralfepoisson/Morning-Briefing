@@ -70,6 +70,7 @@ The UI should communicate with the backend only through REST over HTTP/JSON. No 
 - `GET /api/v1/dashboards/:dashboardId/widgets`
 - `POST /api/v1/dashboards/:dashboardId/widgets`
 - `PATCH /api/v1/dashboards/:dashboardId/widgets/:widgetId`
+- `GET /api/v1/reference/cities?q=<query>`
 - `DELETE /api/v1/dashboards/:dashboardId/widgets/:widgetId`
 - `GET /api/v1/dashboards/:dashboardId/snapshots/latest`
 - `GET /api/v1/snapshots/:snapshotId`
@@ -162,6 +163,7 @@ PostgreSQL is the system of record for:
 - tenant and user metadata
 - dashboard definitions
 - widget layout and configuration
+- reference data such as cities used by provider-agnostic widget configuration
 - connector metadata
 - generated briefing snapshots
 
@@ -259,6 +261,10 @@ Recommended approach:
 - `PATCH /api/v1/dashboards/:dashboardId` updates dashboard metadata
 - `GET /api/v1/dashboards/:dashboardId/widgets` lists persisted widget instances for a dashboard
 - `POST /api/v1/dashboards/:dashboardId/widgets` creates widget instances using server-side widget defaults
+- `PATCH /api/v1/dashboards/:dashboardId/widgets/:widgetId` persists widget layout and configuration
+- `GET /api/v1/reference/cities` searches a reference-city catalog for weather widget location configuration
+
+Reference-city imports are designed around the GeoNames `cities5000` open dataset so weather configuration stays independent of any single weather provider.
 
 Widget definitions remain code-owned rather than database-owned. The backend currently uses a server-side widget definition catalog to validate widget types, choose default layout values, and provide mock content until snapshot-backed content is introduced.
 

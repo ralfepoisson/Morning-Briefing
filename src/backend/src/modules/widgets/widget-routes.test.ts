@@ -174,6 +174,11 @@ test('PATCH /api/v1/dashboards/:dashboardId/widgets/:widgetId updates widget lay
         assert.equal(input.widgetId, 'widget-1');
         assert.equal(input.x, 120);
         assert.equal(input.y, 160);
+        assert.deepEqual(input.config, {
+          location: {
+            displayName: 'Paris, Ile-de-France, FR'
+          }
+        });
 
         return createWidgetResponse({
           id: 'widget-1',
@@ -182,7 +187,12 @@ test('PATCH /api/v1/dashboards/:dashboardId/widgets/:widgetId updates widget lay
           x: 120,
           y: 160,
           width: 320,
-          height: 360
+          height: 360,
+          config: {
+            location: {
+              displayName: 'Paris, Ile-de-France, FR'
+            }
+          }
         });
       }
     }
@@ -196,7 +206,12 @@ test('PATCH /api/v1/dashboards/:dashboardId/widgets/:widgetId updates widget lay
         x: 120,
         y: 160,
         width: 320,
-        height: 360
+        height: 360,
+        config: {
+          location: {
+            displayName: 'Paris, Ile-de-France, FR'
+          }
+        }
       }
     });
 
@@ -221,6 +236,7 @@ function createWidgetResponse(overrides: Partial<DashboardWidgetResponse>): Dash
     minHeight: overrides.minHeight || 260,
     isVisible: overrides.isVisible !== false,
     sortOrder: overrides.sortOrder || 1,
+    config: overrides.config || {},
     data: overrides.data || {},
     createdAt: overrides.createdAt || '2026-03-19T07:00:00.000Z',
     updatedAt: overrides.updatedAt || '2026-03-19T07:00:00.000Z'

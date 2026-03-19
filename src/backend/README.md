@@ -21,6 +21,7 @@ Default values assume:
 - `npm run db:seed`
 - `npm run db:init`
 - `npm run db:reset`
+- `npm run reference:import:cities`
 
 ## Notes
 
@@ -28,6 +29,7 @@ Default values assume:
 - `db:init` is intended for first-time local setup.
 - Prisma CLI configuration, including the seed command, lives in `src/backend/prisma.config.ts`.
 - After the initial migration exists, future schema changes should be made by editing `prisma/schema.prisma` and generating a new named migration.
+- `reference:import:cities` downloads the GeoNames `cities5000` dataset and imports it into `reference_cities` for weather widget location search.
 
 ## Current API
 
@@ -39,3 +41,4 @@ Default values assume:
 - `GET /api/v1/dashboards/:dashboardId/widgets`
 - `POST /api/v1/dashboards/:dashboardId/widgets`
 - `PATCH /api/v1/dashboards/:dashboardId/widgets/:widgetId`
+- `GET /api/v1/reference/cities?q=<query>`

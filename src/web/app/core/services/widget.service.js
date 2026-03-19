@@ -3,9 +3,9 @@
 
   angular.module('morningBriefingApp').service('WidgetService', WidgetService);
 
-  WidgetService.$inject = ['WidgetRegistryService', '$http', 'ApiConfig'];
+  WidgetService.$inject = ['WidgetRegistryService', '$http', '$q', 'ApiConfig'];
 
-  function WidgetService(WidgetRegistryService, $http, ApiConfig) {
+  function WidgetService(WidgetRegistryService, $http, $q, ApiConfig) {
     var widgetsByDashboard = {};
     var loadingPromises = {};
 
@@ -16,7 +16,7 @@
 
     this.loadForDashboard = function loadForDashboard(dashboardId) {
       if (!dashboardId) {
-        return Promise.resolve([]);
+        return $q.resolve([]);
       }
 
       if (loadingPromises[dashboardId]) {
@@ -46,17 +46,20 @@
     };
 
     this.saveDashboardWidgets = function saveDashboardWidgets(dashboardId) {
-      return Promise.all(this.listForDashboard(dashboardId).map(function saveWidget(widget) {
+      return $q.all(this.listForDashboard(dashboardId).map(function saveWidget(widget) {
         return $http.patch(ApiConfig.baseUrl + '/dashboards/' + dashboardId + '/widgets/' + widget.id, {
           x: widget.x,
           y: widget.y,
           width: widget.width,
-          height: widget.height
+          height: widget.height,
+          config: widget.config || {}
         }).then(function handleResponse(response) {
           widget.x = response.data.x;
           widget.y = response.data.y;
           widget.width = response.data.width;
           widget.height = response.data.height;
+          widget.config = response.data.config || widget.config || {};
+          widget.data = response.data.data || widget.data;
           return widget;
         });
       }));
@@ -105,6 +108,7 @@
         height: widgetPayload.height,
         minWidth: widgetPayload.minWidth,
         minHeight: widgetPayload.minHeight,
+        config: widgetPayload.config || {},
         data: widgetPayload.data,
         location: widgetPayload.data && widgetPayload.data.location,
         temperature: widgetPayload.data && widgetPayload.data.temperature,

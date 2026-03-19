@@ -14,12 +14,14 @@
     "db:seed": "prisma db seed",
     "db:init": "npm run db:create && npm run db:migrate -- --name init && npm run db:seed",
     "db:reset": "prisma migrate reset --force",
+    "reference:import:cities": "tsx scripts/import-reference-cities.ts",
     "prisma:studio": "prisma studio",
     "test": "node --test --import tsx"
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",
     "@prisma/client": "^6.6.0",
+    "adm-zip": "^0.5.16",
     "dotenv": "^17.2.3",
     "fastify": "^5.8.2",
     "pg": "^8.16.3"

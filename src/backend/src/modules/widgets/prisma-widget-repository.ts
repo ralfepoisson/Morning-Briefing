@@ -101,6 +101,7 @@ export class PrismaWidgetRepository implements WidgetRepository {
         positionY: Math.max(0, Math.round(input.y)),
         width: Math.max(1, Math.round(input.width)),
         height: Math.max(widget.minHeight, Math.round(input.height)),
+        configJson: input.config || widget.configJson || {},
         version: {
           increment: 1
         }
@@ -145,11 +146,11 @@ function mapDashboardWidgetRecord(widget: {
     minHeight: widget.minHeight,
     isVisible: widget.isVisible,
     sortOrder: widget.sortOrder,
-    config: asObject(widget.configJson),
-    data: definition ? definition.createMockData() : {},
-    createdAt: widget.createdAt,
-    updatedAt: widget.updatedAt
-  };
+      config: asObject(widget.configJson),
+      data: definition ? definition.createMockData(asObject(widget.configJson)) : {},
+      createdAt: widget.createdAt,
+      updatedAt: widget.updatedAt
+    };
 }
 
 function asObject(value: unknown): Record<string, unknown> {

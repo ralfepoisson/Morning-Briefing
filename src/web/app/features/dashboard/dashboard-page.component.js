@@ -27,7 +27,7 @@
       '            <div class="widget-label">{{$ctrl.getWidgetLabel(widget)}}</div>' +
       '            <h3 class="widget-title">{{widget.title}}</h3>' +
       '          </div>' +
-      '          <span class="drag-pill" ng-if="$ctrl.isEditing">Drag</span>' +
+      '          <button type="button" class="btn btn-outline-light icon-button widget-config-button" ng-if="$ctrl.isEditing" ng-mousedown="$event.stopPropagation()" ng-click="$ctrl.openWidgetConfigModal(widget, $event)" aria-label="Configure widget"><i class="fa-solid fa-gear" aria-hidden="true"></i></button>' +
       '        </div>' +
       '        <div class="widget-content" widget-renderer widget="widget"></div>' +
       '        <div class="widget-resize-handle" ng-if="$ctrl.isEditing && $ctrl.isWidgetResizable(widget)" aria-hidden="true"></div>' +
@@ -55,6 +55,36 @@
       '          <button type="submit" class="btn btn-primary">{{ $ctrl.ui.dashboardModalMode === "create" ? "Create" : "Save" }}</button>' +
       '        </div>' +
       '      </form>' +
+      '    </div>' +
+      '  </div>' +
+      '  <div class="modal-shell" ng-if="$ctrl.widgetConfig.isOpen" ng-click="$ctrl.closeWidgetConfigModal()">' +
+      '    <div class="modal-card widget-config-modal" role="dialog" aria-modal="true" ng-click="$event.stopPropagation()">' +
+      '      <div class="eyebrow">Widget Settings</div>' +
+      '      <h2 class="modal-title">{{ $ctrl.getWidgetConfigTitle() }}</h2>' +
+      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'weather\'">Pick the city this weather widget should use. Search results come from our reference city catalog.</p>' +
+      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type !== \'weather\'">This widget type does not have configurable settings yet.</p>' +
+      '      <form ng-if="$ctrl.widgetConfig.widget.type === \'weather\'" ng-submit="$ctrl.searchCities()">' +
+      '        <label class="form-label" for="weatherLocationSearch">Location</label>' +
+      '        <div class="d-flex gap-2">' +
+      '          <input id="weatherLocationSearch" class="form-control form-control-lg" type="text" ng-model="$ctrl.widgetConfig.cityQuery" placeholder="Search for a city" required />' +
+      '          <button type="submit" class="btn btn-primary">Search</button>' +
+      '        </div>' +
+      '      </form>' +
+      '      <p class="widget-config-selected" ng-if="$ctrl.widgetConfig.selectedCity">Selected city: <strong>{{ $ctrl.getSelectedCityDisplayName($ctrl.widgetConfig.selectedCity) }}</strong></p>' +
+      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.isSearching">Searching cities...</p>' +
+      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.errorMessage">{{ $ctrl.widgetConfig.errorMessage }}</p>' +
+      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.hasSearched && !$ctrl.widgetConfig.isSearching && !$ctrl.widgetConfig.searchResults.length && !$ctrl.widgetConfig.errorMessage">No matching cities were found.</p>' +
+      '      <div class="widget-config-results" ng-if="$ctrl.widgetConfig.searchResults.length">' +
+      '        <button type="button" class="widget-config-result" ng-class="{\'widget-config-result--active\': $ctrl.isSelectedCity(city)}" ng-repeat="city in $ctrl.widgetConfig.searchResults track by city.id" ng-click="$ctrl.selectCity(city)">' +
+      '          <strong>{{ city.displayName }}</strong>' +
+      '          <span>{{ city.timezone }}</span>' +
+      '        </button>' +
+      '      </div>' +
+      '      <div class="modal-actions">' +
+      '        <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeWidgetConfigModal()">Cancel</button>' +
+      '        <button type="button" class="btn btn-primary" ng-if="$ctrl.widgetConfig.widget.type === \'weather\'" ng-disabled="!$ctrl.widgetConfig.selectedCity" ng-click="$ctrl.saveWidgetConfig()">Save</button>' +
+      '        <button type="button" class="btn btn-primary" ng-if="$ctrl.widgetConfig.widget.type !== \'weather\'" ng-click="$ctrl.closeWidgetConfigModal()">Close</button>' +
+      '      </div>' +
       '    </div>' +
       '  </div>' +
       '  <div class="drawer-shell" ng-if="$ctrl.isEditing && $ctrl.ui.widgetPanelOpen" ng-click="$ctrl.closeWidgetPanel()">' +
@@ -85,9 +115,9 @@
     controller: DashboardPageController
   });
 
-  DashboardPageController.$inject = ['DashboardService', 'WidgetService', 'WidgetRegistryService', 'UiShellService', '$scope'];
+  DashboardPageController.$inject = ['DashboardService', 'WidgetService', 'WidgetRegistryService', 'ReferenceDataService', 'UiShellService', '$scope'];
 
-  function DashboardPageController(DashboardService, WidgetService, WidgetRegistryService, UiShellService, $scope) {
+  function DashboardPageController(DashboardService, WidgetService, WidgetRegistryService, ReferenceDataService, UiShellService, $scope) {
     var $ctrl = this;
 
     $ctrl.ready = false;
@@ -96,6 +126,7 @@
     $ctrl.modalForm = {};
     $ctrl.widgetDefinitions = WidgetRegistryService.list();
     $ctrl.widgetCatalog = buildWidgetCatalog();
+    $ctrl.widgetConfig = buildEmptyWidgetConfigState();
 
     $ctrl.$onInit = function onInit() {
       bindUiWatchers();
@@ -155,6 +186,7 @@
     $ctrl.selectDashboard = function selectDashboard(dashboardId) {
       DashboardService.setActive(dashboardId);
       $ctrl.isEditing = false;
+      $ctrl.closeWidgetConfigModal();
       UiShellService.closeWidgetPanel();
       syncState();
     };
@@ -163,6 +195,7 @@
       if ($ctrl.isEditing) {
         persistDashboard().then(function handlePersistedDashboard() {
           $ctrl.isEditing = false;
+          $ctrl.closeWidgetConfigModal();
           UiShellService.closeWidgetPanel();
         });
         return;
@@ -181,6 +214,76 @@
 
     $ctrl.closeWidgetPanel = function closeWidgetPanel() {
       UiShellService.closeWidgetPanel();
+    };
+
+    $ctrl.openWidgetConfigModal = function openWidgetConfigModal(widget, $event) {
+      if ($event) {
+        $event.preventDefault();
+        $event.stopPropagation();
+      }
+
+      if (!$ctrl.isEditing || !widget) {
+        return;
+      }
+
+      $ctrl.widgetConfig = {
+        isOpen: true,
+        widget: widget,
+        cityQuery: getSelectedCityDisplayName(widget.config && widget.config.location),
+        searchResults: [],
+        selectedCity: widget.config && widget.config.location ? angular.copy(widget.config.location) : null,
+        isSearching: false,
+        hasSearched: false,
+        errorMessage: ''
+      };
+    };
+
+    $ctrl.closeWidgetConfigModal = function closeWidgetConfigModal() {
+      $ctrl.widgetConfig = buildEmptyWidgetConfigState();
+    };
+
+    $ctrl.searchCities = function searchCities() {
+      if ($ctrl.widgetConfig.widget.type !== 'weather') {
+        return;
+      }
+
+      $ctrl.widgetConfig.isSearching = true;
+      $ctrl.widgetConfig.errorMessage = '';
+      $ctrl.widgetConfig.hasSearched = false;
+
+      ReferenceDataService.searchCities($ctrl.widgetConfig.cityQuery).then(function handleResults(items) {
+        $ctrl.widgetConfig.searchResults = items;
+        $ctrl.widgetConfig.hasSearched = true;
+      }).catch(function handleError() {
+        $ctrl.widgetConfig.searchResults = [];
+        $ctrl.widgetConfig.hasSearched = true;
+        $ctrl.widgetConfig.errorMessage = 'Reference city search is currently unavailable.';
+      }).finally(function clearSearching() {
+        $ctrl.widgetConfig.isSearching = false;
+      });
+    };
+
+    $ctrl.selectCity = function selectCity(city) {
+      $ctrl.widgetConfig.selectedCity = angular.copy(city);
+    };
+
+    $ctrl.isSelectedCity = function isSelectedCity(city) {
+      return !!($ctrl.widgetConfig.selectedCity && city && $ctrl.widgetConfig.selectedCity.id === city.id);
+    };
+    $ctrl.getSelectedCityDisplayName = getSelectedCityDisplayName;
+    $ctrl.getWidgetConfigTitle = getWidgetConfigTitle;
+
+    $ctrl.saveWidgetConfig = function saveWidgetConfig() {
+      var widget = $ctrl.widgetConfig.widget;
+
+      if (!widget || widget.type !== 'weather' || !$ctrl.widgetConfig.selectedCity) {
+        return;
+      }
+
+      widget.config = widget.config || {};
+      widget.config.location = angular.copy($ctrl.widgetConfig.selectedCity);
+      applyWeatherWidgetPreview(widget);
+      $ctrl.closeWidgetConfigModal();
     };
 
     $ctrl.addWidget = function addWidget(type) {
@@ -225,6 +328,7 @@
       $ctrl.activeDashboard = DashboardService.getActive();
 
       if (!$ctrl.activeDashboard) {
+        $ctrl.closeWidgetConfigModal();
         $ctrl.widgets = [];
         return Promise.resolve([]);
       }
@@ -291,6 +395,76 @@
       }
 
       return placeholders;
+    }
+
+    function buildEmptyWidgetConfigState() {
+      return {
+        isOpen: false,
+        widget: null,
+        cityQuery: '',
+        searchResults: [],
+        selectedCity: null,
+        isSearching: false,
+        hasSearched: false,
+        errorMessage: ''
+      };
+    }
+
+    function applyWeatherWidgetPreview(widget) {
+      var location = widget.config && widget.config.location ? widget.config.location : null;
+      var locationLabel = getSelectedCityDisplayName(location);
+
+      widget.data = widget.data || {};
+      widget.data.location = locationLabel || 'Select a city';
+      widget.data.temperature = widget.data.temperature || '18°';
+      widget.data.condition = widget.data.condition || 'Partly sunny';
+      widget.data.highLow = widget.data.highLow || 'H: 20°  L: 11°';
+      widget.data.summary = locationLabel
+        ? 'Mock data for the MVP. This widget will later hydrate from a briefing snapshot.'
+        : 'Choose a city in edit mode to configure this widget.';
+      widget.data.details = locationLabel
+        ? [
+            { label: 'Feels like', value: '17°' },
+            { label: 'Rain', value: '10%' },
+            { label: 'UV', value: 'Moderate' }
+          ]
+        : [];
+    }
+
+    function getSelectedCityDisplayName(location) {
+      if (typeof location === 'string' && location.trim()) {
+        return location;
+      }
+
+      if (!location || typeof location !== 'object') {
+        return '';
+      }
+
+      if (typeof location.displayName === 'string' && location.displayName.trim()) {
+        return location.displayName;
+      }
+
+      if (typeof location.name === 'string' && location.name.trim()) {
+        if (typeof location.countryCode === 'string' && location.countryCode.trim()) {
+          return location.name + ', ' + location.countryCode;
+        }
+
+        return location.name;
+      }
+
+      return '';
+    }
+
+    function getWidgetConfigTitle() {
+      if (!$ctrl.widgetConfig.widget) {
+        return 'Configure Widget';
+      }
+
+      if ($ctrl.widgetConfig.widget.type === 'weather') {
+        return 'Configure Weather Widget';
+      }
+
+      return 'Configure ' + $ctrl.widgetConfig.widget.title;
     }
   }
 })();

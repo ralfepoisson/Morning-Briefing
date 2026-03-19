@@ -13,7 +13,7 @@ export type WidgetDefinition = {
   };
   refreshMode: 'SNAPSHOT' | 'LIVE' | 'HYBRID';
   createDefaultConfig(): Record<string, unknown>;
-  createMockData(): Record<string, unknown>;
+  createMockData(config: Record<string, unknown>): Record<string, unknown>;
 };
 
 const widgetDefinitions: WidgetDefinition[] = [
@@ -26,23 +26,26 @@ const widgetDefinitions: WidgetDefinition[] = [
     minSize: { width: 320, height: 360 },
     refreshMode: 'SNAPSHOT',
     createDefaultConfig: function createDefaultConfig() {
-      return {
-        location: 'Paris, France',
-        units: 'metric'
-      };
+      return {};
     },
-    createMockData: function createMockData() {
+    createMockData: function createMockData(config) {
+      const location = getWeatherLocationLabel(config);
+
       return {
-        location: 'Paris, France',
+        location: location || 'Select a city',
         temperature: '18°',
         condition: 'Partly sunny',
         highLow: 'H: 20°  L: 11°',
-        summary: 'Mock data for the MVP. This widget will later hydrate from a briefing snapshot.',
-        details: [
-          { label: 'Feels like', value: '17°' },
-          { label: 'Rain', value: '10%' },
-          { label: 'UV', value: 'Moderate' }
-        ]
+        summary: location
+          ? 'Mock data for the MVP. This widget will later hydrate from a briefing snapshot.'
+          : 'Choose a city in edit mode to configure this widget.',
+        details: location
+          ? [
+              { label: 'Feels like', value: '17°' },
+              { label: 'Rain', value: '10%' },
+              { label: 'UV', value: 'Moderate' }
+            ]
+          : []
       };
     }
   },
@@ -122,4 +125,34 @@ export function getWidgetDefinition(type: string): WidgetDefinition | null {
   return widgetDefinitions.find(function (definition) {
     return definition.type === type;
   }) || null;
+}
+
+function getWeatherLocationLabel(config: Record<string, unknown>): string {
+  if (typeof config.location === 'string' && config.location.trim()) {
+    return config.location;
+  }
+
+  if (!config.location || typeof config.location !== 'object') {
+    return '';
+  }
+
+  const location = config.location as {
+    displayName?: unknown;
+    name?: unknown;
+    countryCode?: unknown;
+  };
+
+  if (typeof location.displayName === 'string' && location.displayName.trim()) {
+    return location.displayName;
+  }
+
+  if (typeof location.name !== 'string' || !location.name.trim()) {
+    return '';
+  }
+
+  if (typeof location.countryCode === 'string' && location.countryCode.trim()) {
+    return location.name + ', ' + location.countryCode;
+  }
+
+  return location.name;
 }

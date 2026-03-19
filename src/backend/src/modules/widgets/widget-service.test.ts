@@ -46,7 +46,12 @@ test('WidgetService updates widget layout', async function () {
     createWidgetRecord({
       id: 'widget-1',
       dashboardId: 'dash-1',
-      ownerUserId: 'user-1'
+      ownerUserId: 'user-1',
+      config: {
+        location: {
+          displayName: 'Paris, Ile-de-France, FR'
+        }
+      }
     })
   ]);
   const service = new WidgetService(repository);
@@ -58,12 +63,22 @@ test('WidgetService updates widget layout', async function () {
     x: 120,
     y: 160,
     width: 360,
-    height: 420
+    height: 420,
+    config: {
+      location: {
+        displayName: 'London, England, GB'
+      }
+    }
   });
 
   assert.equal(widget && widget.x, 120);
   assert.equal(widget && widget.y, 160);
   assert.equal(widget && widget.height, 420);
+  assert.deepEqual(widget && widget.config, {
+    location: {
+      displayName: 'London, England, GB'
+    }
+  });
 });
 
 class InMemoryWidgetRepository implements WidgetRepository {
@@ -100,6 +115,7 @@ class InMemoryWidgetRepository implements WidgetRepository {
     widget.y = input.y;
     widget.width = input.width;
     widget.height = input.height;
+    widget.config = input.config || widget.config;
     widget.updatedAt = new Date();
     return widget;
   }

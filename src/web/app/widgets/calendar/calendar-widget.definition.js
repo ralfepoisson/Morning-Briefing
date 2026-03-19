@@ -35,6 +35,7 @@
           y: options.y,
           width: options.width || 360,
           height: options.height || 360,
+          config: options.config || {},
           data: {
             dateLabel: data.dateLabel || options.dateLabel || 'Today',
             appointments: data.appointments || options.appointments || [

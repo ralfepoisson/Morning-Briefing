@@ -41,6 +41,7 @@ function toResponse(widget: {
   isVisible: boolean;
   sortOrder: number;
   data: Record<string, unknown>;
+  config: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
 }): DashboardWidgetResponse {
@@ -57,6 +58,7 @@ function toResponse(widget: {
     minHeight: widget.minHeight,
     isVisible: widget.isVisible,
     sortOrder: widget.sortOrder,
+    config: widget.config,
     data: widget.data,
     createdAt: widget.createdAt.toISOString(),
     updatedAt: widget.updatedAt.toISOString()

@@ -32,6 +32,7 @@ export type UpdateDashboardWidgetInput = {
   y: number;
   width: number;
   height: number;
+  config?: Record<string, unknown>;
 };
 
 export type DashboardWidgetResponse = {
@@ -47,6 +48,7 @@ export type DashboardWidgetResponse = {
   minHeight: number;
   isVisible: boolean;
   sortOrder: number;
+  config: Record<string, unknown>;
   data: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;

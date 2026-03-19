@@ -4,6 +4,48 @@ import Fastify from 'fastify';
 import { registerDashboardRoutes } from './dashboard-routes.js';
 import type { DashboardResponse } from './dashboard-types.js';
 
+test('GET /api/v1/me returns the default user profile', async function () {
+  const app = Fastify();
+
+  await registerDashboardRoutes(app, {
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe'
+        };
+      }
+    },
+    dashboardService: {
+      async listForOwner() {
+        throw new Error('not used');
+      },
+      async create() {
+        throw new Error('not used');
+      },
+      async update() {
+        throw new Error('not used');
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/me'
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json(), {
+      id: 'user-1',
+      displayName: 'Ralfe'
+    });
+  } finally {
+    await app.close();
+  }
+});
+
 test('GET /api/v1/dashboards returns dashboards for the default user', async function () {
   const app = Fastify();
   const expectedDashboards = [
@@ -47,6 +89,62 @@ test('GET /api/v1/dashboards returns dashboards for the default user', async fun
     assert.deepEqual(response.json(), {
       items: expectedDashboards
     });
+  } finally {
+    await app.close();
+  }
+});
+
+test('PATCH /api/v1/dashboards/:dashboardId updates a dashboard', async function () {
+  const app = Fastify();
+
+  await registerDashboardRoutes(app, {
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe'
+        };
+      }
+    },
+    dashboardService: {
+      async listForOwner() {
+        throw new Error('not used');
+      },
+      async create() {
+        throw new Error('not used');
+      },
+      async update(input) {
+        assert.equal(input.dashboardId, 'dash-1');
+        assert.equal(input.ownerUserId, 'user-1');
+        assert.equal(input.name, 'Travel Briefing');
+        assert.equal(input.description, 'Flights and weather');
+
+        return createDashboardResponse({
+          id: 'dash-1',
+          name: 'Travel Briefing',
+          description: 'Flights and weather'
+        });
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/v1/dashboards/dash-1',
+      payload: {
+        name: 'Travel Briefing',
+        description: 'Flights and weather'
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json(), createDashboardResponse({
+      id: 'dash-1',
+      name: 'Travel Briefing',
+      description: 'Flights and weather'
+    }));
   } finally {
     await app.close();
   }
