@@ -91,6 +91,30 @@
       widget.height = Math.max(getMinHeight(widget.type, widget.height), Math.round(height));
     };
 
+    this.applySnapshot = function applySnapshot(dashboardId, snapshot) {
+      if (!snapshot || !snapshot.widgets || !snapshot.widgets.length) {
+        return this.listForDashboard(dashboardId);
+      }
+
+      this.listForDashboard(dashboardId).forEach(function applyWidgetSnapshot(widget) {
+        var snapshotWidget = snapshot.widgets.find(function findSnapshotWidget(item) {
+          return item.widgetId === widget.id;
+        });
+
+        if (!snapshotWidget || !snapshotWidget.content) {
+          return;
+        }
+
+        widget.data = snapshotWidget.content;
+
+        if (widget.type === 'weather') {
+          widget.title = 'Weather Outlook';
+        }
+      });
+
+      return this.listForDashboard(dashboardId);
+    };
+
     function hydrateWidget(widgetPayload) {
       var definition = WidgetRegistryService.get(widgetPayload.type);
 

@@ -137,7 +137,7 @@ function mapDashboardWidgetRecord(widget: {
     dashboardId: widget.dashboardId,
     ownerUserId: widget.dashboard ? widget.dashboard.ownerUserId : '',
     type: widget.widgetType,
-    title: widget.title,
+    title: definition && widget.widgetType === 'weather' ? definition.title : widget.title,
     x: widget.positionX,
     y: widget.positionY,
     width: widget.width,
@@ -146,11 +146,11 @@ function mapDashboardWidgetRecord(widget: {
     minHeight: widget.minHeight,
     isVisible: widget.isVisible,
     sortOrder: widget.sortOrder,
-      config: asObject(widget.configJson),
-      data: definition ? definition.createMockData(asObject(widget.configJson)) : {},
-      createdAt: widget.createdAt,
-      updatedAt: widget.updatedAt
-    };
+    config: asObject(widget.configJson),
+    data: definition ? definition.createMockData(asObject(widget.configJson)) : {},
+    createdAt: widget.createdAt,
+    updatedAt: widget.updatedAt
+  };
 }
 
 function asObject(value: unknown): Record<string, unknown> {

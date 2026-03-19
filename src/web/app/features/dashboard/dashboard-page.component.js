@@ -115,9 +115,9 @@
     controller: DashboardPageController
   });
 
-  DashboardPageController.$inject = ['DashboardService', 'WidgetService', 'WidgetRegistryService', 'ReferenceDataService', 'UiShellService', '$scope'];
+  DashboardPageController.$inject = ['DashboardService', 'DashboardSnapshotService', 'WidgetService', 'WidgetRegistryService', 'ReferenceDataService', 'UiShellService', '$scope'];
 
-  function DashboardPageController(DashboardService, WidgetService, WidgetRegistryService, ReferenceDataService, UiShellService, $scope) {
+  function DashboardPageController(DashboardService, DashboardSnapshotService, WidgetService, WidgetRegistryService, ReferenceDataService, UiShellService, $scope) {
     var $ctrl = this;
 
     $ctrl.ready = false;
@@ -337,7 +337,13 @@
 
       return WidgetService.loadForDashboard($ctrl.activeDashboard.id).then(function handleWidgetLoad(widgets) {
         $ctrl.widgets = widgets;
-        return widgets;
+        return DashboardSnapshotService.loadLatestForDashboard($ctrl.activeDashboard.id).then(function handleSnapshot(snapshot) {
+          WidgetService.applySnapshot($ctrl.activeDashboard.id, snapshot);
+          $ctrl.widgets = WidgetService.listForDashboard($ctrl.activeDashboard.id);
+          return $ctrl.widgets;
+        }).catch(function ignoreSnapshotFailure() {
+          return widgets;
+        });
       });
     }
 
