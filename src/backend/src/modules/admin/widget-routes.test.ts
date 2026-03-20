@@ -81,6 +81,11 @@ test('GET /api/v1/admin/widgets returns widgets with latest snapshot state', asy
       async publishGenerateWidgetSnapshot() {
         throw new Error('not used');
       }
+    },
+    snapshotService: {
+      async generateForWidget() {
+        throw new Error('not used');
+      }
     }
   });
 
@@ -197,6 +202,11 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual
           requestedAt: '2026-03-20T07:30:00.000Z'
         };
       }
+    },
+    snapshotService: {
+      async generateForWidget() {
+        throw new Error('not used');
+      }
     }
   });
 
@@ -216,6 +226,84 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual
         snapshotDate: '2026-03-20',
         triggerSource: 'manual_refresh',
         requestedAt: '2026-03-20T07:30:00.000Z'
+      }
+    });
+  } finally {
+    await app.close();
+  }
+});
+
+test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot falls back to direct generation when queue publishing fails', async function () {
+  const app = Fastify();
+  let generatedInput = null;
+
+  await registerAdminWidgetRoutes(app, {
+    prisma: {
+      dashboardWidget: {
+        findMany: async function findMany() {
+          return [];
+        },
+        findFirst: async function findFirst() {
+          return {
+            id: 'widget-1',
+            tenantId: 'tenant-1',
+            dashboardId: 'dash-1',
+            widgetType: 'news',
+            title: 'News Briefing',
+            refreshMode: 'SNAPSHOT',
+            version: 4,
+            configHash: 'hash-news',
+            dashboard: {
+              id: 'dash-1',
+              ownerUserId: 'user-1'
+            }
+          };
+        }
+      }
+    } as never,
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
+        };
+      }
+    },
+    snapshotJobPublisher: {
+      async publishGenerateWidgetSnapshot() {
+        throw new Error('connect ECONNREFUSED 127.0.0.1:4566');
+      }
+    },
+    snapshotService: {
+      async generateForWidget(input) {
+        generatedInput = input;
+
+        return {
+          status: 'generated'
+        };
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/widgets/widget-1/regenerate-snapshot'
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal((generatedInput as { triggerSource: string }).triggerSource, 'manual_refresh');
+    assert.equal((generatedInput as { snapshotDate: string }).snapshotDate, '2026-03-20');
+    assert.deepEqual(response.json(), {
+      status: 'generated',
+      mode: 'direct',
+      message: 'connect ECONNREFUSED 127.0.0.1:4566',
+      job: {
+        widgetId: 'widget-1',
+        snapshotDate: '2026-03-20',
+        triggerSource: 'manual_refresh'
       }
     });
   } finally {

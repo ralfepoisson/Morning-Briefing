@@ -18,10 +18,16 @@
       '  <section class="message-broker-panel logs-toolbar">' +
       '    <div class="logs-toolbar__search">' +
       '      <label class="form-label logs-toolbar__label" for="admin-log-search">Search logs</label>' +
-      '      <div class="input-group">' +
-      '        <span class="input-group-text logs-toolbar__icon"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></span>' +
-      '        <input id="admin-log-search" type="search" class="form-control" ng-model="$ctrl.filters.q" ng-keydown="$ctrl.handleSearchKeydown($event)" placeholder="Search message, event, scope, or JSON context" />' +
-      '        <button type="button" class="btn btn-outline-light" ng-click="$ctrl.refresh()" ng-disabled="$ctrl.isLoading">Search</button>' +
+      '      <div class="logs-toolbar__controls">' +
+      '        <div class="input-group">' +
+      '          <span class="input-group-text logs-toolbar__icon"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></span>' +
+      '          <input id="admin-log-search" type="search" class="form-control" ng-model="$ctrl.filters.q" ng-keydown="$ctrl.handleSearchKeydown($event)" placeholder="Search message, event, scope, or JSON context" />' +
+      '          <button type="button" class="btn btn-outline-light" ng-click="$ctrl.refresh()" ng-disabled="$ctrl.isLoading">Search</button>' +
+      '        </div>' +
+      '        <div class="logs-toolbar__range">' +
+      '          <label class="form-label logs-toolbar__label" for="admin-log-range">Time range</label>' +
+      '          <select id="admin-log-range" class="form-select" ng-model="$ctrl.filters.range" ng-options="option.value as option.label for option in $ctrl.rangeOptions" ng-change="$ctrl.refresh()"></select>' +
+      '        </div>' +
       '      </div>' +
       '    </div>' +
       '    <div>' +
@@ -116,10 +122,18 @@
       { value: 'warn', label: 'Warn' },
       { value: 'error', label: 'Error' }
     ];
+    $ctrl.rangeOptions = [
+      { value: '30m', label: 'Last 30 minutes' },
+      { value: '2h', label: 'Last 2 hours' },
+      { value: '1d', label: 'Last day' },
+      { value: '1w', label: 'Last week' },
+      { value: 'all', label: 'All available logs' }
+    ];
     $ctrl.filters = {
       q: '',
       levels: ['info', 'warn', 'error'],
-      limit: 200
+      limit: 200,
+      range: '30m'
     };
     $ctrl.data = null;
     $ctrl.errorMessage = '';

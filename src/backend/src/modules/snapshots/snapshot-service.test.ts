@@ -14,7 +14,7 @@ import type {
 } from './snapshot-repository.js';
 import type { DashboardSnapshotRecord, WeatherSnapshotData } from './snapshot-types.js';
 import type { WeatherClient } from './open-meteo-weather-client.js';
-import type { NewsSummarizer } from './lm-studio-client.js';
+import type { OpenAiNewsSummarizer } from './openai-news-summarizer.js';
 import type { RssFeedClient } from './rss-feed-client.js';
 import type { TodoistTaskClient } from './todoist-task-client.js';
 import type { GenerateWidgetSnapshotRequested } from './snapshot-job-types.js';
@@ -89,7 +89,7 @@ test('SnapshotService generates and persists a weather snapshot for the dashboar
     unusedGoogleCalendarClient(),
     unusedGoogleCalendarOAuthClient(),
     unusedRssFeedClient(),
-    unusedNewsSummarizer()
+    unusedOpenAiNewsSummarizer()
   );
 
   const snapshot = await service.getLatestForDashboard('dash-1', {
@@ -167,7 +167,7 @@ test('SnapshotService returns a failed weather widget snapshot when location con
     unusedGoogleCalendarClient(),
     unusedGoogleCalendarOAuthClient(),
     unusedRssFeedClient(),
-    unusedNewsSummarizer()
+    unusedOpenAiNewsSummarizer()
   );
 
   const snapshot = await service.getLatestForDashboard('dash-1', {
@@ -286,7 +286,7 @@ test('SnapshotService generates a Todoist task snapshot for the dashboard', asyn
     unusedGoogleCalendarClient(),
     unusedGoogleCalendarOAuthClient(),
     unusedRssFeedClient(),
-    unusedNewsSummarizer()
+    unusedOpenAiNewsSummarizer()
   );
 
   const snapshot = await service.getLatestForDashboard('dash-1', {
@@ -344,7 +344,7 @@ test('SnapshotService generates a Todoist task snapshot for the dashboard', asyn
   });
 });
 
-test('SnapshotService generates a news snapshot from RSS feeds and the local summarizer', async function () {
+test('SnapshotService generates a news snapshot from RSS feeds and an OpenAI connection', async function () {
   const repository = new InMemorySnapshotRepository({
     id: 'dash-1',
     tenantId: 'tenant-1',
@@ -369,10 +369,35 @@ test('SnapshotService generates a news snapshot from RSS feeds and the local sum
         sortOrder: 1,
         refreshMode: 'SNAPSHOT',
         version: 1,
-        config: {},
+        config: {
+          connectionId: 'connection-openai',
+          connectionName: 'OpenAI',
+          provider: 'openai'
+        },
         configHash: 'hash-news',
         data: {},
-        connections: [],
+        connections: [
+          {
+            id: 'connection-openai',
+            usageRole: 'llm',
+            connector: {
+              id: 'connection-openai',
+              type: 'openai',
+              name: 'OpenAI',
+              status: 'ACTIVE',
+              authType: 'API_KEY',
+              baseUrl: 'https://api.openai.com',
+              config: {
+                apiKey: 'openai-secret',
+                model: 'gpt-5-mini',
+                baseUrl: 'https://api.openai.com'
+              },
+              lastSyncAt: null,
+              createdAt: new Date('2026-03-19T07:00:00.000Z'),
+              updatedAt: new Date('2026-03-19T07:00:00.000Z')
+            }
+          }
+        ],
         createdAt: new Date('2026-03-19T07:00:00.000Z'),
         updatedAt: new Date('2026-03-19T07:00:00.000Z')
       }
@@ -429,6 +454,9 @@ test('SnapshotService generates a news snapshot from RSS feeds and the local sum
     },
     {
       async summarize(input) {
+        assert.equal(input.apiKey, 'openai-secret');
+        assert.equal(input.model, 'gpt-5-mini');
+        assert.equal(input.baseUrl, 'https://api.openai.com');
         assert.equal(input.categories.length, 1);
         assert.equal(input.categories[0].articles.length, 1);
 
@@ -581,7 +609,7 @@ test('SnapshotService generates a Google Calendar snapshot for the dashboard', a
     googleCalendarClient,
     googleCalendarOAuthClient,
     unusedRssFeedClient(),
-    unusedNewsSummarizer()
+    unusedOpenAiNewsSummarizer()
   );
 
   const snapshot = await service.getLatestForDashboard('dash-1', {
@@ -702,7 +730,7 @@ test('SnapshotService logs Google Calendar snapshot failures for troubleshooting
       }
     },
     unusedRssFeedClient(),
-    unusedNewsSummarizer()
+    unusedOpenAiNewsSummarizer()
   );
 
   const snapshot = await service.getLatestForDashboard('dash-1', {
@@ -760,7 +788,7 @@ test('SnapshotService skips stale widget generation messages', async function ()
     unusedGoogleCalendarClient(),
     unusedGoogleCalendarOAuthClient(),
     unusedRssFeedClient(),
-    unusedNewsSummarizer()
+    unusedOpenAiNewsSummarizer()
   );
 
   const result = await service.generateForWidget({
@@ -788,9 +816,56 @@ test('SnapshotService skips stale widget generation messages', async function ()
   assert.equal(repository.lastWidgetUpsertInput, null);
 });
 
+test('SnapshotService returns the latest persisted dashboard snapshot without regenerating', async function () {
+  const repository = new InMemorySnapshotRepository(null);
+  repository.persistedSnapshot = {
+    id: 'snapshot-1',
+    dashboardId: 'dash-1',
+    userId: 'user-1',
+    snapshotDate: '2026-03-20',
+    generationStatus: 'READY',
+    summary: {
+      headline: 'Persisted snapshot'
+    },
+    generatedAt: new Date('2026-03-20T10:00:00.000Z'),
+    widgets: []
+  };
+  const service = new SnapshotService(
+    repository,
+    unusedRssFeedRepository(),
+    unusedWeatherClient(),
+    unusedTodoistClient(),
+    unusedGoogleCalendarClient(),
+    unusedGoogleCalendarOAuthClient(),
+    unusedRssFeedClient(),
+    unusedOpenAiNewsSummarizer()
+  );
+
+  const snapshot = await service.getPersistedLatestForDashboard('dash-1', {
+    tenantId: 'tenant-1',
+    userId: 'user-1',
+    displayName: 'Ralfe',
+    timezone: 'Europe/Paris'
+  });
+
+  assert.deepEqual(snapshot, {
+    id: 'snapshot-1',
+    dashboardId: 'dash-1',
+    snapshotDate: '2026-03-20',
+    generationStatus: 'READY',
+    summary: {
+      headline: 'Persisted snapshot'
+    },
+    generatedAt: '2026-03-20T10:00:00.000Z',
+    widgets: []
+  });
+  assert.equal(repository.lastUpsertInput, null);
+});
+
 class InMemorySnapshotRepository implements SnapshotRepository {
   public lastUpsertInput: UpsertDashboardSnapshotInput | null = null;
   public lastWidgetUpsertInput: UpsertWidgetSnapshotInput | null = null;
+  public persistedSnapshot: DashboardSnapshotRecord | null = null;
 
   constructor(private readonly dashboard: SnapshotDashboardRecord | null) {}
 
@@ -815,6 +890,10 @@ class InMemorySnapshotRepository implements SnapshotRepository {
       generatedAt: new Date('2026-03-19T08:00:00.000Z'),
       widgets: input.widgets
     };
+  }
+
+  async findLatestDashboardSnapshot() {
+    return this.persistedSnapshot;
   }
 
   async findWidgetForSnapshotGeneration(widgetId: string) {
@@ -894,7 +973,7 @@ function unusedRssFeedClient(): Pick<RssFeedClient, 'fetchFeed'> {
   };
 }
 
-function unusedNewsSummarizer(): Pick<NewsSummarizer, 'summarize'> {
+function unusedOpenAiNewsSummarizer(): Pick<OpenAiNewsSummarizer, 'summarize'> {
   return {
     async summarize() {
       throw new Error('not used');

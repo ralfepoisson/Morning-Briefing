@@ -4,7 +4,7 @@ import type { DefaultUserContext } from '../default-user/default-user-service.js
 import type { RssFeedRepository } from '../rss-feeds/rss-feed-repository.js';
 import type { DashboardWidgetRecord } from '../widgets/widget-types.js';
 import type { GoogleCalendarClient, GoogleCalendarEvent } from './google-calendar-client.js';
-import type { NewsSummarizer } from './lm-studio-client.js';
+import type { OpenAiNewsSummarizer } from './openai-news-summarizer.js';
 import type { WeatherClient } from './open-meteo-weather-client.js';
 import type { ParsedRssArticle, RssFeedClient } from './rss-feed-client.js';
 import type { GenerateWidgetSnapshotRequested } from './snapshot-job-types.js';
@@ -25,7 +25,7 @@ export class SnapshotService {
     private readonly googleCalendarClient: GoogleCalendarClient,
     private readonly googleCalendarOAuthClient: Pick<GoogleCalendarOAuthClient, 'refreshAccessToken'>,
     private readonly rssFeedClient: Pick<RssFeedClient, 'fetchFeed'>,
-    private readonly newsSummarizer: Pick<NewsSummarizer, 'summarize'>
+    private readonly openAiNewsSummarizer: Pick<OpenAiNewsSummarizer, 'summarize'>
   ) {}
 
   async generateForWidget(message: GenerateWidgetSnapshotRequested): Promise<{
@@ -76,10 +76,29 @@ export class SnapshotService {
       snapshotDate: message.snapshotDate,
       widgetSnapshot
     });
+    this.logSnapshotProgress('widget_snapshot_persisted', 'Widget snapshot stored.', {
+      widgetId: widget.id,
+      widgetType: widget.type,
+      widgetTitle: widget.title,
+      dashboardId: widget.dashboardId,
+      tenantId: widget.tenantId,
+      snapshotDate: message.snapshotDate,
+      triggerSource: message.triggerSource,
+      status: widgetSnapshot.status
+    });
 
     return {
       status: 'generated'
     };
+  }
+
+  async getPersistedLatestForDashboard(
+    dashboardId: string,
+    user: DefaultUserContext
+  ): Promise<DashboardSnapshotResponse | null> {
+    const snapshot = await this.repository.findLatestDashboardSnapshot(dashboardId, user.userId);
+
+    return snapshot ? toResponse(snapshot) : null;
   }
 
   async getLatestForDashboard(dashboardId: string, user: DefaultUserContext): Promise<DashboardSnapshotResponse | null> {
@@ -123,6 +142,13 @@ export class SnapshotService {
       },
       widgets: widgetSnapshots
     });
+    this.logSnapshotProgress('dashboard_snapshot_persisted', 'Dashboard snapshot stored.', {
+      dashboardId: dashboard.id,
+      tenantId: dashboard.tenantId,
+      userId: user.userId,
+      generationStatus,
+      widgetCount: widgetSnapshots.length
+    });
 
     return toResponse(snapshot);
   }
@@ -155,6 +181,16 @@ export class SnapshotService {
         errorMessage: widgetSnapshot.errorMessage,
         ...extraContext
       }
+    });
+  }
+
+  private logSnapshotProgress(event: string, message: string, context: Record<string, unknown>): void {
+    logApplicationEvent({
+      level: 'info',
+      scope: 'snapshot-service',
+      event,
+      message,
+      context
     });
   }
 
@@ -246,6 +282,15 @@ export class SnapshotService {
     const configuredCategories = categories.filter(function hasFeeds(category) {
       return category.feeds.length > 0;
     });
+    this.logSnapshotProgress('news_rss_categories_loaded', 'Loaded RSS feed categories for news snapshot.', {
+      widgetId: widget.id,
+      widgetType: widget.type,
+      widgetTitle: widget.title,
+      dashboardId: widget.dashboardId,
+      tenantId: widget.tenantId,
+      categoryCount: categories.length,
+      configuredCategoryCount: configuredCategories.length
+    });
 
     if (!configuredCategories.length) {
       return {
@@ -264,6 +309,68 @@ export class SnapshotService {
       };
     }
 
+    const connector = widget.connections.find(function findConnector(item) {
+      return item.usageRole === 'llm';
+    });
+
+    if (!connector) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          headline: 'LLM configuration required.',
+          markdown: '# LLM configuration required.\n\nChoose an OpenAI connection in the News widget settings to generate a news snapshot.',
+          categories: [],
+          emptyMessage: 'Choose an OpenAI connection in edit mode to configure this widget.',
+          sourceErrors: []
+        },
+        errorMessage: 'News widget is missing a configured LLM connection.',
+        generatedAt
+      };
+    }
+
+    if (connector.connector.type !== 'openai') {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          headline: 'Unsupported news summarization provider.',
+          markdown: '# Unsupported news summarization provider.\n\nThe selected News widget connection is not supported yet.',
+          categories: [],
+          emptyMessage: 'The selected LLM provider is not supported yet.',
+          sourceErrors: []
+        },
+        errorMessage: 'News widget is configured with an unsupported LLM provider.',
+        generatedAt
+      };
+    }
+
+    const apiKey = getConnectorApiKey(connector.connector.config);
+    const model = getOpenAiModel(connector.connector.config);
+    const baseUrl = getOpenAiBaseUrl(connector.connector.config);
+
+    if (!apiKey) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          headline: 'OpenAI API key required.',
+          markdown: '# OpenAI API key required.\n\nThe selected OpenAI connection is missing its API key.',
+          categories: [],
+          emptyMessage: 'The selected OpenAI connection is missing its API key.',
+          sourceErrors: []
+        },
+        errorMessage: 'OpenAI connection is missing an API key.',
+        generatedAt
+      };
+    }
+
     const sourceErrors: string[] = [];
     const preparedCategories: Array<{
       name: string;
@@ -277,6 +384,17 @@ export class SnapshotService {
       for (const feed of category.feeds) {
         try {
           const result = await this.rssFeedClient.fetchFeed(feed.url);
+          this.logSnapshotProgress('news_rss_feed_loaded', 'Loaded RSS feed items for news snapshot.', {
+            widgetId: widget.id,
+            widgetType: widget.type,
+            widgetTitle: widget.title,
+            dashboardId: widget.dashboardId,
+            tenantId: widget.tenantId,
+            categoryName: category.name,
+            feedName: feed.name,
+            feedUrl: feed.url,
+            itemCount: result.items.length
+          });
 
           result.items.slice(0, 4).forEach(function pushItem(item) {
             categoryArticles.push({
@@ -288,7 +406,19 @@ export class SnapshotService {
             });
           });
         } catch (error) {
-          sourceErrors.push(feed.name + ': ' + (error instanceof Error ? error.message : 'Feed request failed.'));
+          const errorMessage = feed.name + ': ' + (error instanceof Error ? error.message : 'Feed request failed.');
+          sourceErrors.push(errorMessage);
+          this.logSnapshotProgress('news_rss_feed_failed', 'RSS feed could not be loaded for news snapshot.', {
+            widgetId: widget.id,
+            widgetType: widget.type,
+            widgetTitle: widget.title,
+            dashboardId: widget.dashboardId,
+            tenantId: widget.tenantId,
+            categoryName: category.name,
+            feedName: feed.name,
+            feedUrl: feed.url,
+            errorMessage
+          });
         }
       }
 
@@ -324,9 +454,45 @@ export class SnapshotService {
     }
 
     try {
-      const summary = await this.newsSummarizer.summarize({
+      this.logSnapshotProgress('news_prompt_prepared', 'Prepared news summarization context.', {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        widgetTitle: widget.title,
+        dashboardId: widget.dashboardId,
+        tenantId: widget.tenantId,
+        provider: connector.connector.type,
+        connectionId: connector.connector.id,
+        connectionName: connector.connector.name,
+        model,
+        baseUrl,
+        categoryCount: preparedCategories.length,
+        articleCount: preparedCategories.reduce(function countArticles(total, category) {
+          return total + category.articles.length;
+        }, 0),
+        sourceErrorCount: sourceErrors.length
+      });
+      const summary = await this.openAiNewsSummarizer.summarize({
+        apiKey,
+        model,
+        baseUrl,
         snapshotDate: formatDateKey(generatedAt),
         categories: preparedCategories
+      });
+      this.logSnapshotProgress('news_summary_completed', 'News summary generated successfully.', {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        widgetTitle: widget.title,
+        dashboardId: widget.dashboardId,
+        tenantId: widget.tenantId,
+        provider: connector.connector.type,
+        connectionId: connector.connector.id,
+        connectionName: connector.connector.name,
+        model,
+        baseUrl,
+        summaryCategoryCount: summary.categories.length,
+        summaryBulletCount: summary.categories.reduce(function countBullets(total, category) {
+          return total + category.bullets.length;
+        }, 0)
       });
 
       return {
@@ -345,6 +511,20 @@ export class SnapshotService {
         generatedAt
       };
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'News snapshot generation failed.';
+      this.logSnapshotProgress('news_summary_failed', 'News summary generation failed.', {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        widgetTitle: widget.title,
+        dashboardId: widget.dashboardId,
+        tenantId: widget.tenantId,
+        provider: connector.connector.type,
+        connectionId: connector.connector.id,
+        connectionName: connector.connector.name,
+        model,
+        baseUrl,
+        errorMessage
+      });
       return {
         widgetId: widget.id,
         widgetType: widget.type,
@@ -352,12 +532,12 @@ export class SnapshotService {
         status: 'FAILED',
         content: {
           headline: 'News summarization failed.',
-          markdown: '# News summarization failed.\n\nThe RSS feeds were loaded, but the local LLM could not produce a summary.',
+          markdown: '# News summarization failed.\n\nThe RSS feeds were loaded, but OpenAI could not produce a summary.',
           categories: [],
-          emptyMessage: 'The local LLM could not summarize the configured feeds.',
+          emptyMessage: 'OpenAI could not summarize the configured feeds.',
           sourceErrors
         },
-        errorMessage: error instanceof Error ? error.message : 'News snapshot generation failed.',
+        errorMessage,
         generatedAt
       };
     }
@@ -714,6 +894,22 @@ function getConnectorApiKey(config: Record<string, unknown>): string {
   }
 
   return '';
+}
+
+function getOpenAiModel(config: Record<string, unknown>): string {
+  if (typeof config.model === 'string' && config.model.trim()) {
+    return config.model.trim();
+  }
+
+  return 'gpt-5-mini';
+}
+
+function getOpenAiBaseUrl(config: Record<string, unknown>): string {
+  if (typeof config.baseUrl === 'string' && config.baseUrl.trim()) {
+    return config.baseUrl.trim().replace(/\/$/, '');
+  }
+
+  return 'https://api.openai.com';
 }
 
 function getGoogleCalendarId(config: Record<string, unknown>): string {

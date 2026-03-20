@@ -48,7 +48,7 @@ export class ConnectionService {
 }
 
 function validateCreateInput(input: CreateConnectionInput) {
-  if (input.type !== 'todoist' && input.type !== 'google-calendar') {
+  if (input.type !== 'todoist' && input.type !== 'google-calendar' && input.type !== 'openai') {
     throw new Error('Connection provider is not supported.');
   }
 
@@ -59,10 +59,14 @@ function validateCreateInput(input: CreateConnectionInput) {
   if (input.type === 'google-calendar') {
     validateGoogleCalendarOAuthCredentials(input.credentials);
   }
+
+  if (input.type === 'openai') {
+    validateOpenAiCredentials(input.credentials);
+  }
 }
 
 function validateUpdateInput(type: string, name: string, credentials: Record<string, unknown>) {
-  if (type !== 'todoist' && type !== 'google-calendar') {
+  if (type !== 'todoist' && type !== 'google-calendar' && type !== 'openai') {
     throw new Error('Connection provider is not supported.');
   }
 
@@ -76,6 +80,10 @@ function validateUpdateInput(type: string, name: string, credentials: Record<str
 
   if (type === 'google-calendar') {
     validateGoogleCalendarStoredCredentials(credentials);
+  }
+
+  if (type === 'openai') {
+    validateOpenAiCredentials(credentials);
   }
 }
 
@@ -167,5 +175,20 @@ function sanitizeConnectionConfig(type: string, config: Record<string, unknown>)
     };
   }
 
+  if (type === 'openai') {
+    return {
+      model: typeof config.model === 'string' ? config.model : 'gpt-5-mini',
+      baseUrl: typeof config.baseUrl === 'string' ? config.baseUrl : 'https://api.openai.com'
+    };
+  }
+
   return {};
+}
+
+function validateOpenAiCredentials(credentials: Record<string, unknown>) {
+  const apiKey = typeof credentials.apiKey === 'string' ? credentials.apiKey.trim() : '';
+
+  if (!apiKey) {
+    throw new Error('OpenAI API key is required.');
+  }
 }

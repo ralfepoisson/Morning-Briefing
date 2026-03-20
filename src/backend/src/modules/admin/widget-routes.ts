@@ -4,12 +4,14 @@ import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
 import { DefaultUserService } from '../default-user/default-user-service.js';
 import { formatSnapshotDateForTimezone } from '../snapshots/snapshot-date.js';
 import type { SnapshotJobPublisher } from '../snapshots/snapshot-job-publisher.js';
-import { createSnapshotJobPublisherFromEnvironment } from '../snapshots/snapshot-runtime.js';
+import { createSnapshotJobPublisherFromEnvironment, createSnapshotService } from '../snapshots/snapshot-runtime.js';
+import type { SnapshotService } from '../snapshots/snapshot-service.js';
 
 type AdminWidgetRouteDependencies = {
   prisma: Pick<PrismaClient, 'dashboardWidget'>;
   defaultUserService: Pick<DefaultUserService, 'getDefaultUser'>;
   snapshotJobPublisher: Pick<SnapshotJobPublisher, 'publishGenerateWidgetSnapshot'> | null;
+  snapshotService: Pick<SnapshotService, 'generateForWidget'>;
 };
 
 type WidgetListRecord = {
@@ -169,7 +171,7 @@ export async function registerAdminWidgetRoutes(
     }
 
     const snapshotDate = formatSnapshotDateForTimezone(new Date(), user.timezone || 'UTC');
-    const published = await dependencies.snapshotJobPublisher.publishGenerateWidgetSnapshot({
+    const jobInput = {
       widgetId: widget.id,
       dashboardId: widget.dashboardId,
       tenantId: widget.tenantId,
@@ -177,21 +179,55 @@ export async function registerAdminWidgetRoutes(
       widgetConfigVersion: widget.version,
       widgetConfigHash: widget.configHash,
       snapshotDate,
-      triggerSource: 'manual_refresh',
+      triggerSource: 'manual_refresh' as const,
       correlationId: request.id,
       causationId: request.id
-    });
-
-    reply.code(202);
-    return {
-      status: 'queued',
-      job: {
-        widgetId: widget.id,
-        snapshotDate: published.snapshotDate,
-        triggerSource: published.triggerSource,
-        requestedAt: published.requestedAt
-      }
     };
+
+    try {
+      const published = await dependencies.snapshotJobPublisher.publishGenerateWidgetSnapshot(jobInput);
+
+      reply.code(202);
+      return {
+        status: 'queued',
+        job: {
+          widgetId: widget.id,
+          snapshotDate: published.snapshotDate,
+          triggerSource: published.triggerSource,
+          requestedAt: published.requestedAt
+        }
+      };
+    } catch (error) {
+      await dependencies.snapshotService.generateForWidget({
+        schemaVersion: 1,
+        jobId: 'manual-refresh-' + widget.id + '-' + snapshotDate,
+        idempotencyKey: widget.id + ':' + snapshotDate + ':' + widget.configHash,
+        widgetId: widget.id,
+        dashboardId: widget.dashboardId,
+        tenantId: widget.tenantId,
+        userId: user.userId,
+        widgetConfigVersion: widget.version,
+        widgetConfigHash: widget.configHash,
+        snapshotDate,
+        snapshotPeriod: 'day',
+        triggerSource: 'manual_refresh',
+        correlationId: request.id,
+        causationId: request.id,
+        requestedAt: new Date().toISOString()
+      });
+
+      reply.code(200);
+      return {
+        status: 'generated',
+        mode: 'direct',
+        message: error instanceof Error ? error.message : 'Snapshot queue unavailable. Generated directly instead.',
+        job: {
+          widgetId: widget.id,
+          snapshotDate,
+          triggerSource: 'manual_refresh'
+        }
+      };
+    }
   });
 }
 
@@ -201,7 +237,8 @@ function createAdminWidgetRouteDependencies(): AdminWidgetRouteDependencies {
   return {
     prisma,
     defaultUserService: new DefaultUserService(prisma),
-    snapshotJobPublisher: createSnapshotJobPublisherFromEnvironment()
+    snapshotJobPublisher: createSnapshotJobPublisherFromEnvironment(),
+    snapshotService: createSnapshotService()
   };
 }
 

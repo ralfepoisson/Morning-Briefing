@@ -23,20 +23,25 @@ export async function registerLogRoutes(
       q?: string;
       levels?: string;
       limit?: string | number;
+      range?: string;
     };
     const levels = parseLevels(query.levels);
     const limit = parseLimit(query.limit);
+    const range = parseRange(query.range);
+    const since = range ? new Date(Date.now() - (range.minutes * 60 * 1000)).toISOString() : undefined;
     const entries = dependencies.listLogs({
       search: query.q,
       levels,
-      limit
+      limit,
+      since
     });
 
     return {
       filters: {
         q: (query.q || '').trim(),
         levels,
-        limit
+        limit,
+        range: range ? range.value : 'all'
       },
       totals: {
         stored: dependencies.summarizeLogs(),
@@ -69,6 +74,41 @@ function parseLimit(value?: string | number): number {
   }
 
   return Math.max(1, Math.min(Math.floor(numericValue), 500));
+}
+
+function parseRange(value?: string): {
+  value: '30m' | '2h' | '1d' | '1w';
+  minutes: number;
+} | null {
+  if (value === '30m') {
+    return {
+      value: '30m',
+      minutes: 30
+    };
+  }
+
+  if (value === '2h') {
+    return {
+      value: '2h',
+      minutes: 120
+    };
+  }
+
+  if (value === '1d') {
+    return {
+      value: '1d',
+      minutes: 1440
+    };
+  }
+
+  if (value === '1w') {
+    return {
+      value: '1w',
+      minutes: 10080
+    };
+  }
+
+  return null;
 }
 
 function summarizeEntries(entries: ApplicationLogEntry[]): Record<ApplicationLogLevel, number> {

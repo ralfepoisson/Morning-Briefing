@@ -60,9 +60,16 @@
       '        <input id="connectorName" class="form-control form-control-lg" type="text" ng-model="$ctrl.form.name" placeholder="Connection name" required />' +
       '        <label class="form-label mt-3" for="connectorApiKey" ng-if="$ctrl.selectedConnection.type === \'todoist\'">API Key</label>' +
       '        <input id="connectorApiKey" class="form-control form-control-lg" type="password" ng-if="$ctrl.selectedConnection.type === \'todoist\'" ng-model="$ctrl.form.apiKey" placeholder="Leave blank to keep the current API key" />' +
+      '        <label class="form-label mt-3" for="connectorOpenAiApiKey" ng-if="$ctrl.selectedConnection.type === \'openai\'">API Key</label>' +
+      '        <input id="connectorOpenAiApiKey" class="form-control form-control-lg" type="password" ng-if="$ctrl.selectedConnection.type === \'openai\'" ng-model="$ctrl.form.apiKey" placeholder="Leave blank to keep the current API key" />' +
+      '        <label class="form-label mt-3" for="connectorOpenAiModel" ng-if="$ctrl.selectedConnection.type === \'openai\'">Model</label>' +
+      '        <input id="connectorOpenAiModel" class="form-control form-control-lg" type="text" ng-if="$ctrl.selectedConnection.type === \'openai\'" ng-model="$ctrl.form.model" placeholder="gpt-5-mini" />' +
+      '        <label class="form-label mt-3" for="connectorOpenAiBaseUrl" ng-if="$ctrl.selectedConnection.type === \'openai\'">Base URL</label>' +
+      '        <input id="connectorOpenAiBaseUrl" class="form-control form-control-lg" type="text" ng-if="$ctrl.selectedConnection.type === \'openai\'" ng-model="$ctrl.form.baseUrl" placeholder="https://api.openai.com" />' +
       '        <label class="form-label mt-3" for="connectorCalendarId" ng-if="$ctrl.selectedConnection.type === \'google-calendar\'">Google Calendar ID</label>' +
       '        <input id="connectorCalendarId" class="form-control form-control-lg" type="text" ng-if="$ctrl.selectedConnection.type === \'google-calendar\'" ng-model="$ctrl.form.calendarId" placeholder="team@example.com" />' +
       '        <p class="connectors-panel-copy" ng-if="$ctrl.selectedConnection.type === \'todoist\'">Enter a new API key only when you want to replace the current Todoist credential.</p>' +
+      '        <p class="connectors-panel-copy" ng-if="$ctrl.selectedConnection.type === \'openai\'">Update the model or base URL here, and enter a new API key only when you want to replace the saved credential.</p>' +
       '        <p class="connectors-panel-copy" ng-if="$ctrl.selectedConnection.type === \'google-calendar\'">This connection uses OAuth. You can change the calendar id here or reconnect the Google account.</p>' +
       '        <p class="connectors-panel-copy connectors-panel-copy--success" ng-if="$ctrl.successMessage">{{$ctrl.successMessage}}</p>' +
       '        <p class="connectors-panel-copy connectors-panel-copy--error" ng-if="$ctrl.saveErrorMessage">{{$ctrl.saveErrorMessage}}</p>' +
@@ -229,7 +236,9 @@
     return {
       name: '',
       apiKey: '',
-      calendarId: ''
+      calendarId: '',
+      model: '',
+      baseUrl: ''
     };
   }
 
@@ -237,7 +246,9 @@
     return {
       name: connection && connection.name ? connection.name : '',
       apiKey: '',
-      calendarId: connection && connection.config && connection.config.calendarId ? connection.config.calendarId : ''
+      calendarId: connection && connection.config && connection.config.calendarId ? connection.config.calendarId : '',
+      model: connection && connection.config && connection.config.model ? connection.config.model : '',
+      baseUrl: connection && connection.config && connection.config.baseUrl ? connection.config.baseUrl : ''
     };
   }
 
@@ -250,6 +261,14 @@
 
     if (form && form.calendarId) {
       credentials.calendarId = form.calendarId;
+    }
+
+    if (form && form.model) {
+      credentials.model = form.model;
+    }
+
+    if (form && form.baseUrl) {
+      credentials.baseUrl = form.baseUrl;
     }
 
     return credentials;

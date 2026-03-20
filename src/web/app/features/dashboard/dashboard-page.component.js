@@ -78,7 +78,8 @@
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'weather\'">Pick the city this weather widget should use. Search results come from our reference city catalog.</p>' +
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'tasks\'">Choose which connection should power this task list. The selection is staged here and persisted when you click Save Dashboard.</p>' +
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'calendar\'">Choose which connection should power this calendar. The selection is staged here and persisted when you click Save Dashboard.</p>' +
-      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type !== \'weather\' && $ctrl.widgetConfig.widget.type !== \'tasks\' && $ctrl.widgetConfig.widget.type !== \'calendar\'">This widget type does not have configurable settings yet.</p>' +
+      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'news\'">Choose which LLM connection should summarize the configured RSS feeds for this widget. The selection is staged here and persisted when you click Save Dashboard.</p>' +
+      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type !== \'weather\' && $ctrl.widgetConfig.widget.type !== \'tasks\' && $ctrl.widgetConfig.widget.type !== \'calendar\' && $ctrl.widgetConfig.widget.type !== \'news\'">This widget type does not have configurable settings yet.</p>' +
       '      <form ng-if="$ctrl.widgetConfig.widget.type === \'weather\'" ng-submit="$ctrl.searchCities()">' +
       '        <label class="form-label" for="weatherLocationSearch">Location</label>' +
       '        <div class="d-flex gap-2">' +
@@ -122,10 +123,11 @@
       '      <h2 class="modal-title">New connection</h2>' +
       '      <p class="modal-copy" ng-if="$ctrl.connectionModal.provider === \'todoist\'">Create a Todoist connection by entering its API key.</p>' +
       '      <p class="modal-copy" ng-if="$ctrl.connectionModal.provider === \'google-calendar\'">Connect Google Calendar with OAuth so private calendars can be read securely.</p>' +
+      '      <p class="modal-copy" ng-if="$ctrl.connectionModal.provider === \'openai\'">Create an OpenAI connection with an API key, model, and optional base URL.</p>' +
       '      <form ng-submit="$ctrl.saveNewConnection()" ng-if="$ctrl.connectionModal.provider === \'todoist\'">' +
-      '        <label class="form-label" for="connectionApiKey">Todoist API Key</label>' +
-      '        <input id="connectionApiKey" class="form-control form-control-lg" type="password" ng-model="$ctrl.connectionModal.apiKey" placeholder="Enter your Todoist API Key" required />' +
-      '        <p class="widget-config-helper" ng-if="$ctrl.connectionModal.errorMessage">{{$ctrl.connectionModal.errorMessage}}</p>' +
+        '        <label class="form-label" for="connectionApiKey">Todoist API Key</label>' +
+        '        <input id="connectionApiKey" class="form-control form-control-lg" type="password" ng-model="$ctrl.connectionModal.apiKey" placeholder="Enter your Todoist API Key" required />' +
+        '        <p class="widget-config-helper" ng-if="$ctrl.connectionModal.errorMessage">{{$ctrl.connectionModal.errorMessage}}</p>' +
       '        <div class="modal-actions">' +
       '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeCreateConnectionModal()">Cancel</button>' +
       '          <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.connectionModal.isSaving || !$ctrl.canSaveConnection()">Save</button>' +
@@ -139,8 +141,21 @@
       '          <button type="button" class="btn btn-primary" ng-click="$ctrl.startGoogleCalendarOAuth()">Continue with Google</button>' +
       '        </div>' +
       '      </div>' +
-      '    </div>' +
-      '  </div>' +
+      '      <form ng-submit="$ctrl.saveNewConnection()" ng-if="$ctrl.connectionModal.provider === \'openai\'">' +
+      '        <label class="form-label" for="openAiApiKey">OpenAI API Key</label>' +
+      '        <input id="openAiApiKey" class="form-control form-control-lg" type="password" ng-model="$ctrl.connectionModal.apiKey" placeholder="sk-..." required />' +
+      '        <label class="form-label mt-3" for="openAiModel">Model</label>' +
+      '        <input id="openAiModel" class="form-control form-control-lg" type="text" ng-model="$ctrl.connectionModal.model" placeholder="gpt-5-mini" required />' +
+      '        <label class="form-label mt-3" for="openAiBaseUrl">Base URL</label>' +
+      '        <input id="openAiBaseUrl" class="form-control form-control-lg" type="text" ng-model="$ctrl.connectionModal.baseUrl" placeholder="https://api.openai.com" />' +
+      '        <p class="widget-config-helper" ng-if="$ctrl.connectionModal.errorMessage">{{$ctrl.connectionModal.errorMessage}}</p>' +
+      '        <div class="modal-actions">' +
+      '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeCreateConnectionModal()">Cancel</button>' +
+      '          <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.connectionModal.isSaving || !$ctrl.canSaveConnection()">Save</button>' +
+      '        </div>' +
+      '      </form>' +
+    '    </div>' +
+  '  </div>' +
       '  <div class="drawer-shell" ng-if="$ctrl.isEditing && $ctrl.ui.widgetPanelOpen" ng-click="$ctrl.closeWidgetPanel()">' +
       '    <aside class="widget-drawer" ng-click="$event.stopPropagation()">' +
       '      <div class="d-flex align-items-start justify-content-between gap-3">' +
@@ -633,6 +648,8 @@
         isOpen: false,
         provider: nextProvider,
         apiKey: '',
+        model: nextProvider === 'openai' ? 'gpt-5-mini' : '',
+        baseUrl: nextProvider === 'openai' ? 'https://api.openai.com' : '',
         isSaving: false,
         errorMessage: ''
       };
@@ -730,6 +747,23 @@
       };
     }
 
+    function applyNewsWidgetPreview(widget, connection) {
+      if (!connection) {
+        return;
+      }
+
+      widget.config.connectionId = connection.id;
+      widget.config.connectionName = connection.name;
+      widget.config.provider = connection.type;
+      widget.data = {
+        headline: 'News Briefing',
+        markdown: '# News Briefing\n\nHeadlines will appear after you save the dashboard and refresh the snapshot.',
+        categories: [],
+        emptyMessage: 'The selected LLM connection will summarize your configured RSS feeds after the next snapshot.',
+        sourceErrors: []
+      };
+    }
+
     function applyConnectionWidgetPreview(widget, connection) {
       if (widget.type === 'tasks') {
         applyTasksWidgetPreview(widget, connection);
@@ -738,6 +772,11 @@
 
       if (widget.type === 'calendar') {
         applyCalendarWidgetPreview(widget, connection);
+        return;
+      }
+
+      if (widget.type === 'news') {
+        applyNewsWidgetPreview(widget, connection);
       }
     }
 
@@ -802,13 +841,17 @@
         return 'Configure Calendar';
       }
 
+      if ($ctrl.widgetConfig.widget.type === 'news') {
+        return 'Configure News Widget';
+      }
+
       return 'Configure ' + $ctrl.widgetConfig.widget.title;
     }
 
     function widgetSupportsConnections(widgetType) {
       var type = widgetType || ($ctrl.widgetConfig.widget && $ctrl.widgetConfig.widget.type);
 
-      return type === 'tasks' || type === 'calendar';
+      return type === 'tasks' || type === 'calendar' || type === 'news';
     }
 
     function getConnectionProviderForWidgetType(widgetType) {
@@ -820,6 +863,10 @@
         return 'google-calendar';
       }
 
+      if (widgetType === 'news') {
+        return 'openai';
+      }
+
       return '';
     }
 
@@ -828,13 +875,27 @@
         return true;
       }
 
+      if ($ctrl.connectionModal.provider === 'openai') {
+        return !!($ctrl.connectionModal.apiKey && $ctrl.connectionModal.model);
+      }
+
       return !!$ctrl.connectionModal.apiKey;
     }
 
     function buildConnectionCredentials(connectionModal) {
-      var credentials = {
-        apiKey: connectionModal.apiKey
-      };
+      var credentials = {};
+
+      if (connectionModal.apiKey) {
+        credentials.apiKey = connectionModal.apiKey;
+      }
+
+      if (connectionModal.provider === 'openai') {
+        credentials.model = connectionModal.model || 'gpt-5-mini';
+
+        if (connectionModal.baseUrl) {
+          credentials.baseUrl = connectionModal.baseUrl;
+        }
+      }
 
       return credentials;
     }

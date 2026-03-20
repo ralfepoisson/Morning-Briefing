@@ -20,7 +20,7 @@ test('GET /api/v1/dashboards/:dashboardId/snapshots/latest returns the latest sn
       }
     },
     snapshotService: {
-      async getLatestForDashboard(dashboardId, user) {
+      async getPersistedLatestForDashboard(dashboardId, user) {
         assert.equal(dashboardId, 'dash-1');
         assert.equal(user.userId, 'user-1');
         return expectedSnapshot;
@@ -56,7 +56,7 @@ test('GET /api/v1/dashboards/:dashboardId/snapshots/latest returns 404 when dash
       }
     },
     snapshotService: {
-      async getLatestForDashboard() {
+      async getPersistedLatestForDashboard() {
         return null;
       }
     }

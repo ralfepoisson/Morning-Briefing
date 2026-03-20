@@ -144,7 +144,9 @@ export class PrismaWidgetRepository implements WidgetRepository {
             where: {
               id: normalizedConfig.connectionId,
               tenantId: widget.tenantId,
-              connectorType: connectorBinding.connectorType
+              connectorType: {
+                in: connectorBinding.connectorTypes
+              }
             }
           });
 
@@ -285,25 +287,33 @@ function withConnectionConfig(
   const nextConfig = { ...config };
   applyConnectorConfig(nextConfig, connectors, 'tasks');
   applyConnectorConfig(nextConfig, connectors, 'calendar');
+  applyConnectorConfig(nextConfig, connectors, 'llm');
 
   return nextConfig;
 }
 
 function getWidgetConnectorBinding(widgetType: string): {
   usageRole: string;
-  connectorType: string;
+  connectorTypes: string[];
 } | null {
   if (widgetType === 'tasks') {
     return {
       usageRole: 'tasks',
-      connectorType: 'todoist'
+      connectorTypes: ['todoist']
     };
   }
 
   if (widgetType === 'calendar') {
     return {
       usageRole: 'calendar',
-      connectorType: 'google-calendar'
+      connectorTypes: ['google-calendar']
+    };
+  }
+
+  if (widgetType === 'news') {
+    return {
+      usageRole: 'llm',
+      connectorTypes: ['openai']
     };
   }
 

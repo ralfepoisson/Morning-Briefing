@@ -34,6 +34,7 @@ export type UpsertWidgetSnapshotInput = {
 
 export interface SnapshotRepository {
   findDashboardWithWidgets(dashboardId: string, ownerUserId: string): Promise<SnapshotDashboardRecord | null>;
+  findLatestDashboardSnapshot(dashboardId: string, userId: string): Promise<DashboardSnapshotRecord | null>;
   upsertDashboardSnapshot(input: UpsertDashboardSnapshotInput): Promise<DashboardSnapshotRecord>;
   findWidgetForSnapshotGeneration(widgetId: string): Promise<DashboardWidgetRecord | null>;
   listWidgetsForScheduledRefresh(): Promise<DashboardWidgetRecord[]>;

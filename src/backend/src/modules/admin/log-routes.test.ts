@@ -54,7 +54,8 @@ test('GET /api/v1/admin/logs returns stored logs with default filters', async fu
       filters: {
         q: '',
         levels: ['info', 'warn', 'error'],
-        limit: 200
+        limit: 200,
+        range: 'all'
       },
       totals: {
         stored: {
@@ -102,6 +103,11 @@ test('GET /api/v1/admin/logs returns stored logs with default filters', async fu
 test('GET /api/v1/admin/logs normalizes filters', async function () {
   const app = Fastify();
   let receivedFilters = null;
+  const originalDateNow = Date.now;
+
+  Date.now = function mockDateNow() {
+    return Date.parse('2026-03-20T12:00:00.000Z');
+  };
 
   await registerLogRoutes(app, {
     listLogs: function listLogs(filters) {
@@ -120,21 +126,24 @@ test('GET /api/v1/admin/logs normalizes filters', async function () {
   try {
     const response = await app.inject({
       method: 'GET',
-      url: '/api/v1/admin/logs?q=failed%20job&levels=warn,error,invalid&limit=999'
+      url: '/api/v1/admin/logs?q=failed%20job&levels=warn,error,invalid&limit=999&range=2h'
     });
 
     assert.equal(response.statusCode, 200);
     assert.deepEqual(receivedFilters, {
       search: 'failed job',
       levels: ['warn', 'error'],
-      limit: 500
+      limit: 500,
+      since: new Date(Date.now() - (120 * 60 * 1000)).toISOString()
     });
     assert.deepEqual(response.json().filters, {
       q: 'failed job',
       levels: ['warn', 'error'],
-      limit: 500
+      limit: 500,
+      range: '2h'
     });
   } finally {
+    Date.now = originalDateNow;
     await app.close();
   }
 });

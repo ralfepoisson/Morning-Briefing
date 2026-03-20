@@ -61,6 +61,7 @@ export async function registerConnectionRoutes(
         (
           error.message === 'Connection provider is not supported.' ||
           error.message === 'Todoist API key is required.' ||
+          error.message === 'OpenAI API key is required.' ||
           error.message === 'Google Calendar access token is required.' ||
           error.message === 'Google Calendar refresh token is required.' ||
           error.message === 'Google Calendar calendar id is required.'
@@ -108,6 +109,7 @@ export async function registerConnectionRoutes(
           error.message === 'Connection provider is not supported.' ||
           error.message === 'Connection name is required.' ||
           error.message === 'Todoist API key is required.' ||
+          error.message === 'OpenAI API key is required.' ||
           error.message === 'Google Calendar refresh token is required.' ||
           error.message === 'Google Calendar calendar id is required.'
         )

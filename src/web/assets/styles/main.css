@@ -496,7 +496,18 @@ body.theme-light::before {
 
 .logs-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: end;
+}
+
+.logs-toolbar__search {
+  min-width: 0;
+}
+
+.logs-toolbar__controls {
+  display: grid;
+  grid-template-columns: minmax(360px, 520px) 240px;
   gap: 1rem;
   align-items: end;
 }
@@ -530,9 +541,17 @@ body.theme-light::before {
   justify-content: center;
 }
 
+.logs-toolbar__range {
+  min-width: 0;
+}
+
+.logs-toolbar > div:last-child {
+  justify-self: end;
+}
+
 .logs-filter-group {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.65rem;
 }
 
@@ -1813,6 +1832,18 @@ body.theme-light .widget-card {
   .message-broker-summary,
   .message-broker-grid {
     grid-template-columns: 1fr;
+  }
+
+  .logs-toolbar__controls {
+    grid-template-columns: 1fr;
+  }
+
+  .logs-toolbar > div:last-child {
+    justify-self: stretch;
+  }
+
+  .logs-filter-group {
+    flex-wrap: wrap;
   }
 
   .logs-page .message-broker-summary {

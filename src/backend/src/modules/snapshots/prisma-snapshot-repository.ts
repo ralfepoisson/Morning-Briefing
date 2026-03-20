@@ -62,6 +62,42 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
     };
   }
 
+  async findLatestDashboardSnapshot(dashboardId: string, userId: string): Promise<DashboardSnapshotRecord | null> {
+    const snapshot = await this.prisma.briefingSnapshot.findFirst({
+      where: {
+        dashboardId,
+        userId
+      },
+      include: {
+        widgetSnapshots: {
+          orderBy: [
+            { generatedAt: 'desc' },
+            { id: 'asc' }
+          ]
+        }
+      },
+      orderBy: [
+        { snapshotDate: 'desc' },
+        { generatedAt: 'desc' }
+      ]
+    });
+
+    if (!snapshot) {
+      return null;
+    }
+
+    return {
+      id: snapshot.id,
+      dashboardId: snapshot.dashboardId,
+      userId: snapshot.userId,
+      snapshotDate: snapshot.snapshotDate.toISOString().slice(0, 10),
+      generationStatus: snapshot.generationStatus,
+      summary: asObject(snapshot.summaryJson),
+      generatedAt: snapshot.generatedAt,
+      widgets: snapshot.widgetSnapshots.map(mapWidgetSnapshotRecord)
+    };
+  }
+
   async upsertDashboardSnapshot(input: UpsertDashboardSnapshotInput): Promise<DashboardSnapshotRecord> {
     const snapshot = await this.prisma.briefingSnapshot.upsert({
       where: {

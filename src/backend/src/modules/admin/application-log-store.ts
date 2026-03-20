@@ -32,14 +32,20 @@ export function listApplicationLogs(filters: {
   search?: string;
   levels?: ApplicationLogLevel[];
   limit?: number;
+  since?: string;
 } = {}): ApplicationLogEntry[] {
   const normalizedSearch = normalizeSearch(filters.search);
   const includedLevels = new Set(filters.levels && filters.levels.length ? filters.levels : ['info', 'warn', 'error']);
   const limit = Math.max(1, Math.min(filters.limit || 200, MAX_LOG_ENTRIES));
+  const sinceTimestamp = filters.since ? Date.parse(filters.since) : Number.NaN;
 
   return logEntries
     .filter(function filterEntry(entry) {
       if (!includedLevels.has(entry.level)) {
+        return false;
+      }
+
+      if (Number.isFinite(sinceTimestamp) && Date.parse(entry.timestamp) < sinceTimestamp) {
         return false;
       }
 

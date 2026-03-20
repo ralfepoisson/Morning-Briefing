@@ -5,7 +5,7 @@ import { createSnapshotService } from './snapshot-runtime.js';
 import type { SnapshotService } from './snapshot-service.js';
 
 export type SnapshotRouteDependencies = {
-  snapshotService: Pick<SnapshotService, 'getLatestForDashboard'>;
+  snapshotService: Pick<SnapshotService, 'getPersistedLatestForDashboard'>;
   defaultUserService: Pick<DefaultUserService, 'getDefaultUser'>;
 };
 
@@ -27,7 +27,7 @@ export async function registerSnapshotRoutes(
     }
 
     const user = await defaultUserService.getDefaultUser();
-    const snapshot = await snapshotService.getLatestForDashboard(params.dashboardId, user);
+    const snapshot = await snapshotService.getPersistedLatestForDashboard(params.dashboardId, user);
 
     if (!snapshot) {
       reply.code(404);
