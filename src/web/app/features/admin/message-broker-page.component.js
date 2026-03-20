@@ -15,7 +15,6 @@
       '      <span>Refresh</span>' +
       '    </button>' +
       '  </div>' +
-      '  <p class="connectors-panel-copy connectors-panel-copy--error" ng-if="$ctrl.errorMessage">{{$ctrl.errorMessage}}</p>' +
       '  <div class="message-broker-summary" ng-if="$ctrl.data">' +
       '    <article class="message-broker-card">' +
       '      <span class="message-broker-card__label">Queue status</span>' +
@@ -153,14 +152,13 @@
     controller: MessageBrokerPageController
   });
 
-  MessageBrokerPageController.$inject = ['MessageBrokerService'];
+  MessageBrokerPageController.$inject = ['MessageBrokerService', 'NotificationService'];
 
-  function MessageBrokerPageController(MessageBrokerService) {
+  function MessageBrokerPageController(MessageBrokerService, NotificationService) {
     var $ctrl = this;
 
     $ctrl.data = null;
     $ctrl.chart = buildEmptyChart();
-    $ctrl.errorMessage = '';
     $ctrl.isLoading = false;
 
     $ctrl.$onInit = function onInit() {
@@ -209,7 +207,6 @@
 
     function loadOverview() {
       $ctrl.isLoading = true;
-      $ctrl.errorMessage = '';
 
       return MessageBrokerService.getOverview().then(function handleOverviewLoaded(data) {
         $ctrl.data = data;
@@ -217,7 +214,7 @@
       }).catch(function handleError(error) {
         $ctrl.data = null;
         $ctrl.chart = buildEmptyChart();
-        $ctrl.errorMessage = getErrorMessage(error, 'Message broker metrics are currently unavailable.');
+        NotificationService.error(getErrorMessage(error, 'Message broker metrics are currently unavailable.'), 'Unable to load broker metrics');
       }).finally(function clearLoading() {
         $ctrl.isLoading = false;
       });

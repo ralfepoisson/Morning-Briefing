@@ -41,7 +41,6 @@
       '      </div>' +
       '    </div>' +
       '  </section>' +
-      '  <p class="connectors-panel-copy connectors-panel-copy--error" ng-if="$ctrl.errorMessage">{{$ctrl.errorMessage}}</p>' +
       '  <div class="message-broker-summary" ng-if="$ctrl.data">' +
       '    <article class="message-broker-card">' +
       '      <span class="message-broker-card__label">Matching logs</span>' +
@@ -112,9 +111,9 @@
     controller: LogsPageController
   });
 
-  LogsPageController.$inject = ['LogService'];
+  LogsPageController.$inject = ['LogService', 'NotificationService'];
 
-  function LogsPageController(LogService) {
+  function LogsPageController(LogService, NotificationService) {
     var $ctrl = this;
 
     $ctrl.levelOptions = [
@@ -136,7 +135,6 @@
       range: '30m'
     };
     $ctrl.data = null;
-    $ctrl.errorMessage = '';
     $ctrl.isLoading = false;
     $ctrl.expandedEntries = {};
 
@@ -217,13 +215,12 @@
 
     function loadLogs() {
       $ctrl.isLoading = true;
-      $ctrl.errorMessage = '';
 
       return LogService.getLogs($ctrl.filters).then(function handleLogsLoaded(data) {
         $ctrl.data = data;
       }).catch(function handleError(error) {
         $ctrl.data = null;
-        $ctrl.errorMessage = getErrorMessage(error, 'Application logs are currently unavailable.');
+        NotificationService.error(getErrorMessage(error, 'Application logs are currently unavailable.'), 'Unable to load logs');
       }).finally(function clearLoading() {
         $ctrl.isLoading = false;
       });

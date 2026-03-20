@@ -18,6 +18,29 @@ export type WidgetDefinition = {
 
 const widgetDefinitions: WidgetDefinition[] = [
   {
+    type: 'xkcd',
+    name: 'xkcd',
+    title: 'Latest xkcd',
+    description: 'The newest comic from xkcd.com',
+    defaultSize: { width: 420, height: 420 },
+    minSize: { width: 360, height: 320 },
+    refreshMode: 'SNAPSHOT',
+    createDefaultConfig: function createDefaultConfig() {
+      return {};
+    },
+    createMockData: function createMockData() {
+      return {
+        comicId: 0,
+        title: 'Latest xkcd',
+        altText: 'The latest xkcd comic will appear here after the snapshot refresh completes.',
+        imageUrl: '',
+        permalink: 'https://xkcd.com/',
+        publishedAt: '',
+        emptyMessage: 'The latest xkcd comic will load automatically after the snapshot refresh completes.'
+      };
+    }
+  },
+  {
     type: 'news',
     name: 'News',
     title: 'News Briefing',

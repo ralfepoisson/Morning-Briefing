@@ -28,8 +28,6 @@
       '        <label class="form-label mt-3" for="rssCategoryDescription">Description</label>' +
       '        <textarea id="rssCategoryDescription" class="form-control rss-feeds-textarea" ng-model="$ctrl.categoryForm.description" placeholder="What kind of stories belong here?"></textarea>' +
       '        <p class="connectors-panel-copy" ng-if="$ctrl.isLoading">Loading categories...</p>' +
-      '        <p class="connectors-panel-copy connectors-panel-copy--success" ng-if="$ctrl.categorySuccessMessage">{{$ctrl.categorySuccessMessage}}</p>' +
-      '        <p class="connectors-panel-copy connectors-panel-copy--error" ng-if="$ctrl.categoryErrorMessage">{{$ctrl.categoryErrorMessage}}</p>' +
       '        <div class="modal-actions modal-actions--page rss-feeds-actions">' +
       '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.startNewCategory()">New category</button>' +
       '          <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.isSavingCategory || !$ctrl.categoryForm.name">{{$ctrl.categoryForm.id ? "Save category" : "Add category"}}</button>' +
@@ -71,8 +69,6 @@
       '              <input id="rssFeedUrl" class="form-control" type="url" ng-model="$ctrl.feedForm.url" placeholder="https://example.com/rss.xml" required />' +
       '            </div>' +
       '          </div>' +
-      '          <p class="connectors-panel-copy connectors-panel-copy--success" ng-if="$ctrl.feedSuccessMessage">{{$ctrl.feedSuccessMessage}}</p>' +
-      '          <p class="connectors-panel-copy connectors-panel-copy--error" ng-if="$ctrl.feedErrorMessage">{{$ctrl.feedErrorMessage}}</p>' +
       '          <div class="modal-actions modal-actions--page rss-feeds-actions">' +
       '            <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.clearFeedForm()">Clear</button>' +
       '            <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.isSavingFeed || !$ctrl.feedForm.name || !$ctrl.feedForm.url">Add feed</button>' +
@@ -99,19 +95,15 @@
     controller: RssFeedsPageController
   });
 
-  RssFeedsPageController.$inject = ['RssFeedService'];
+  RssFeedsPageController.$inject = ['RssFeedService', 'NotificationService'];
 
-  function RssFeedsPageController(RssFeedService) {
+  function RssFeedsPageController(RssFeedService, NotificationService) {
     var $ctrl = this;
 
     $ctrl.categories = [];
     $ctrl.selectedCategory = null;
     $ctrl.categoryForm = buildEmptyCategoryForm();
     $ctrl.feedForm = buildEmptyFeedForm();
-    $ctrl.categoryErrorMessage = '';
-    $ctrl.categorySuccessMessage = '';
-    $ctrl.feedErrorMessage = '';
-    $ctrl.feedSuccessMessage = '';
     $ctrl.isLoading = false;
     $ctrl.isSavingCategory = false;
     $ctrl.isSavingFeed = false;
@@ -128,7 +120,7 @@
         $ctrl.categories = categories;
         syncSelectedCategory(selectedCategoryId);
       }).catch(function handleError(error) {
-        $ctrl.categoryErrorMessage = getErrorMessage(error, 'RSS feeds are currently unavailable.');
+        NotificationService.error(getErrorMessage(error, 'RSS feeds are currently unavailable.'), 'Unable to load RSS feeds');
       }).finally(function clearLoading() {
         $ctrl.isLoading = false;
       });
@@ -141,8 +133,6 @@
         name: category.name,
         description: category.description || ''
       };
-      clearCategoryMessages();
-      clearFeedMessages();
     };
 
     $ctrl.isSelectedCategory = function isSelectedCategory(category) {
@@ -152,7 +142,6 @@
     $ctrl.startNewCategory = function startNewCategory() {
       $ctrl.selectedCategory = null;
       $ctrl.categoryForm = buildEmptyCategoryForm();
-      clearCategoryMessages();
     };
 
     $ctrl.saveCategory = function saveCategory() {
@@ -163,18 +152,17 @@
       }
 
       $ctrl.isSavingCategory = true;
-      clearCategoryMessages();
 
       request = $ctrl.categoryForm.id
         ? RssFeedService.updateCategory($ctrl.categoryForm.id, $ctrl.categoryForm)
         : RssFeedService.createCategory($ctrl.categoryForm);
 
       request.then(function handleSaved(category) {
-        $ctrl.categorySuccessMessage = $ctrl.categoryForm.id ? 'Category updated.' : 'Category created.';
+        NotificationService.success($ctrl.categoryForm.id ? 'Category updated.' : 'Category created.', 'RSS category saved');
         $ctrl.categoryForm = buildEmptyCategoryForm();
         return $ctrl.loadCategories(category.id);
       }).catch(function handleError(error) {
-        $ctrl.categoryErrorMessage = getErrorMessage(error, 'Unable to save category.');
+        NotificationService.error(getErrorMessage(error, 'Unable to save category.'), 'Unable to save category');
       }).finally(function clearSaving() {
         $ctrl.isSavingCategory = false;
       });
@@ -186,14 +174,13 @@
       }
 
       $ctrl.isSavingFeed = true;
-      clearFeedMessages();
 
       RssFeedService.addFeed($ctrl.selectedCategory.id, $ctrl.feedForm).then(function handleAdded(category) {
         $ctrl.feedForm = buildEmptyFeedForm();
-        $ctrl.feedSuccessMessage = 'Feed added.';
+        NotificationService.success('Feed added.', 'RSS feed saved');
         return $ctrl.loadCategories(category.id);
       }).catch(function handleError(error) {
-        $ctrl.feedErrorMessage = getErrorMessage(error, 'Unable to add feed.');
+        NotificationService.error(getErrorMessage(error, 'Unable to add feed.'), 'Unable to add feed');
       }).finally(function clearSaving() {
         $ctrl.isSavingFeed = false;
       });
@@ -205,13 +192,12 @@
       }
 
       $ctrl.isSavingFeed = true;
-      clearFeedMessages();
 
       RssFeedService.removeFeed($ctrl.selectedCategory.id, feedId).then(function handleRemoved(category) {
-        $ctrl.feedSuccessMessage = 'Feed removed.';
+        NotificationService.success('Feed removed.', 'RSS feed removed');
         return $ctrl.loadCategories(category.id);
       }).catch(function handleError(error) {
-        $ctrl.feedErrorMessage = getErrorMessage(error, 'Unable to remove feed.');
+        NotificationService.error(getErrorMessage(error, 'Unable to remove feed.'), 'Unable to remove feed');
       }).finally(function clearSaving() {
         $ctrl.isSavingFeed = false;
       });
@@ -226,16 +212,14 @@
 
       currentCategoryId = $ctrl.selectedCategory.id;
       $ctrl.isDeletingCategory = true;
-      clearCategoryMessages();
-      clearFeedMessages();
 
       RssFeedService.deleteCategory(currentCategoryId).then(function handleDeleted() {
-        $ctrl.categorySuccessMessage = 'Category deleted.';
+        NotificationService.success('Category deleted.', 'RSS category removed');
         $ctrl.categoryForm = buildEmptyCategoryForm();
         $ctrl.feedForm = buildEmptyFeedForm();
         return $ctrl.loadCategories();
       }).catch(function handleError(error) {
-        $ctrl.categoryErrorMessage = getErrorMessage(error, 'Unable to delete category.');
+        NotificationService.error(getErrorMessage(error, 'Unable to delete category.'), 'Unable to delete category');
       }).finally(function clearDeleting() {
         $ctrl.isDeletingCategory = false;
       });
@@ -243,7 +227,6 @@
 
     $ctrl.clearFeedForm = function clearFeedForm() {
       $ctrl.feedForm = buildEmptyFeedForm();
-      clearFeedMessages();
     };
 
     function syncSelectedCategory(selectedCategoryId) {
@@ -268,15 +251,6 @@
       }
     }
 
-    function clearCategoryMessages() {
-      $ctrl.categoryErrorMessage = '';
-      $ctrl.categorySuccessMessage = '';
-    }
-
-    function clearFeedMessages() {
-      $ctrl.feedErrorMessage = '';
-      $ctrl.feedSuccessMessage = '';
-    }
   }
 
   function buildEmptyCategoryForm() {

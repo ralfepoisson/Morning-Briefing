@@ -7,9 +7,11 @@
     <link rel="icon" type="image/x-icon" href="./favicon.ico?v=2" />
     <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="./node_modules/@fortawesome/fontawesome-free/css/all.min.css" />
+    <link rel="stylesheet" href="./node_modules/angularjs-toaster/toaster.min.css" />
     <link rel="stylesheet" href="./assets/styles/main.css" />
   </head>
   <body>
+    <toaster-container toaster-options="{'position-class': 'toast-top-right', 'close-button': true, 'time-out': 4000, 'newest-on-top': true}"></toaster-container>
     <mb-top-nav></mb-top-nav>
 
     <main class="app-shell container-fluid px-3 px-lg-4 py-4">
@@ -17,12 +19,15 @@
     </main>
 
     <script src="./node_modules/angular/angular.min.js"></script>
+    <script src="./node_modules/angular-animate/angular-animate.min.js"></script>
     <script src="./node_modules/angular-route/angular-route.min.js"></script>
+    <script src="./node_modules/angularjs-toaster/toaster.min.js"></script>
     <script src="./node_modules/interactjs/dist/interact.min.js"></script>
 
     <script src="./app/app.module.js"></script>
     <script src="./app/app.routes.js"></script>
     <script src="./app/core/services/local-storage.service.js"></script>
+    <script src="./app/core/services/notification.service.js"></script>
     <script src="./app/core/services/ui-shell.service.js"></script>
     <script src="./app/core/services/dashboard.service.js"></script>
     <script src="./app/core/services/dashboard-snapshot.service.js"></script>
@@ -43,6 +48,7 @@
     <script src="./app/widgets/tasks/tasks-widget.definition.js"></script>
     <script src="./app/core/services/widget.service.js"></script>
     <script src="./app/shared/directives/draggable-widget.directive.js"></script>
+    <script src="./app/shared/directives/overflow-autopan.directive.js"></script>
     <script src="./app/shared/directives/widget-renderer.directive.js"></script>
     <script src="./app/features/shell/top-nav.component.js"></script>
     <script src="./app/features/dashboard/dashboard-page.component.js"></script>

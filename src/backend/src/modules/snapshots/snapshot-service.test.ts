@@ -18,6 +18,7 @@ import type { OpenAiNewsSummarizer } from './openai-news-summarizer.js';
 import type { RssFeedClient } from './rss-feed-client.js';
 import type { TodoistTaskClient } from './todoist-task-client.js';
 import type { GenerateWidgetSnapshotRequested } from './snapshot-job-types.js';
+import type { XkcdClient } from './xkcd-client.js';
 
 test('SnapshotService generates and persists a weather snapshot for the dashboard', async function () {
   const repository = new InMemorySnapshotRepository({
@@ -492,6 +493,163 @@ test('SnapshotService generates a news snapshot from RSS feeds and an OpenAI con
   assert.equal(snapshot && snapshot.widgets[0].status, 'READY');
   assert.equal(snapshot && snapshot.widgets[0].content.headline, 'Local AI tooling leads the morning briefing.');
   assert.equal(snapshot && snapshot.widgets[0].content.categories[0].bullets.length, 1);
+});
+
+test('SnapshotService generates an xkcd snapshot for the dashboard', async function () {
+  const repository = new InMemorySnapshotRepository({
+    id: 'dash-1',
+    tenantId: 'tenant-1',
+    ownerUserId: 'user-1',
+    name: 'Morning Focus',
+    description: 'Seed dashboard',
+    widgets: [
+      {
+        id: 'widget-xkcd',
+        tenantId: 'tenant-1',
+        dashboardId: 'dash-1',
+        ownerUserId: 'user-1',
+        type: 'xkcd',
+        title: 'Latest xkcd',
+        x: 0,
+        y: 0,
+        width: 420,
+        height: 420,
+        minWidth: 360,
+        minHeight: 320,
+        isVisible: true,
+        sortOrder: 1,
+        refreshMode: 'SNAPSHOT',
+        version: 1,
+        config: {},
+        configHash: 'hash-xkcd',
+        data: {},
+        connections: [],
+        createdAt: new Date('2026-03-19T07:00:00.000Z'),
+        updatedAt: new Date('2026-03-19T07:00:00.000Z')
+      }
+    ]
+  });
+  const service = new SnapshotService(
+    repository,
+    unusedRssFeedRepository(),
+    unusedWeatherClient(),
+    unusedTodoistClient(),
+    unusedGoogleCalendarClient(),
+    unusedGoogleCalendarOAuthClient(),
+    unusedRssFeedClient(),
+    unusedOpenAiNewsSummarizer(),
+    {
+      async getLatestComic() {
+        return {
+          id: 3221,
+          title: 'Landscape Features',
+          altText: 'Alt text',
+          imageUrl: 'https://imgs.xkcd.com/comics/landscape_features.png',
+          permalink: 'https://xkcd.com/3221/',
+          publishedAt: '2026-03-20'
+        };
+      }
+    }
+  );
+
+  const snapshot = await service.getLatestForDashboard('dash-1', {
+    tenantId: 'tenant-1',
+    userId: 'user-1',
+    displayName: 'Ralfe',
+    timezone: 'Europe/Paris'
+  });
+
+  assert.ok(snapshot);
+  assert.equal(snapshot && snapshot.generationStatus, 'READY');
+  assert.equal(snapshot && snapshot.summary.headline, 'Latest xkcd: Landscape Features.');
+  assert.deepEqual(snapshot && snapshot.widgets[0].content, {
+    comicId: 3221,
+    title: 'Landscape Features',
+    altText: 'Alt text',
+    imageUrl: 'https://imgs.xkcd.com/comics/landscape_features.png',
+    permalink: 'https://xkcd.com/3221/',
+    publishedAt: '2026-03-20',
+    emptyMessage: ''
+  });
+});
+
+test('SnapshotService returns a failed xkcd snapshot when the upstream request fails', async function () {
+  resetApplicationLogs();
+
+  const repository = new InMemorySnapshotRepository({
+    id: 'dash-1',
+    tenantId: 'tenant-1',
+    ownerUserId: 'user-1',
+    name: 'Morning Focus',
+    description: 'Seed dashboard',
+    widgets: [
+      {
+        id: 'widget-xkcd',
+        tenantId: 'tenant-1',
+        dashboardId: 'dash-1',
+        ownerUserId: 'user-1',
+        type: 'xkcd',
+        title: 'Latest xkcd',
+        x: 0,
+        y: 0,
+        width: 420,
+        height: 420,
+        minWidth: 360,
+        minHeight: 320,
+        isVisible: true,
+        sortOrder: 1,
+        refreshMode: 'SNAPSHOT',
+        version: 1,
+        config: {},
+        configHash: 'hash-xkcd',
+        data: {},
+        connections: [],
+        createdAt: new Date('2026-03-19T07:00:00.000Z'),
+        updatedAt: new Date('2026-03-19T07:00:00.000Z')
+      }
+    ]
+  });
+  const service = new SnapshotService(
+    repository,
+    unusedRssFeedRepository(),
+    unusedWeatherClient(),
+    unusedTodoistClient(),
+    unusedGoogleCalendarClient(),
+    unusedGoogleCalendarOAuthClient(),
+    unusedRssFeedClient(),
+    unusedOpenAiNewsSummarizer(),
+    {
+      async getLatestComic() {
+        throw new Error('xkcd request failed with status 503.');
+      }
+    }
+  );
+
+  const snapshot = await service.getLatestForDashboard('dash-1', {
+    tenantId: 'tenant-1',
+    userId: 'user-1',
+    displayName: 'Ralfe',
+    timezone: 'Europe/Paris'
+  });
+  const logs = listApplicationLogs({
+    levels: ['warn', 'error']
+  });
+
+  assert.ok(snapshot);
+  assert.equal(snapshot && snapshot.generationStatus, 'FAILED');
+  assert.equal(snapshot && snapshot.widgets[0].errorMessage, 'xkcd request failed with status 503.');
+  assert.deepEqual(snapshot && snapshot.widgets[0].content, {
+    comicId: 0,
+    title: 'Latest xkcd unavailable',
+    altText: 'The latest xkcd comic could not be loaded right now.',
+    imageUrl: '',
+    permalink: 'https://xkcd.com/',
+    publishedAt: '',
+    emptyMessage: 'The latest xkcd comic could not be loaded right now. Please try again.'
+  });
+  assert.equal(logs.length, 1);
+  assert.equal(logs[0].event, 'widget_snapshot_failed');
+  resetApplicationLogs();
 });
 
 test('SnapshotService generates a Google Calendar snapshot for the dashboard', async function () {
@@ -976,6 +1134,14 @@ function unusedRssFeedClient(): Pick<RssFeedClient, 'fetchFeed'> {
 function unusedOpenAiNewsSummarizer(): Pick<OpenAiNewsSummarizer, 'summarize'> {
   return {
     async summarize() {
+      throw new Error('not used');
+    }
+  };
+}
+
+function unusedXkcdClient(): Pick<XkcdClient, 'getLatestComic'> {
+  return {
+    async getLatestComic() {
       throw new Error('not used');
     }
   };

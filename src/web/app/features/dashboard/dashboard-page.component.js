@@ -62,7 +62,6 @@
       '        <input id="modalDashboardName" class="form-control form-control-lg" type="text" ng-model="$ctrl.modalForm.name" placeholder="Weekend Reset" required />' +
       '        <label class="form-label mt-3" for="modalDashboardDescription">Description</label>' +
       '        <textarea id="modalDashboardDescription" class="form-control" rows="4" ng-model="$ctrl.modalForm.description" placeholder="A slower view with weather, errands, and family plans."></textarea>' +
-      '        <p class="modal-copy text-danger mt-3 mb-0" ng-if="$ctrl.modalForm.errorMessage">{{$ctrl.modalForm.errorMessage}}</p>' +
       '        <div class="modal-actions">' +
       '          <button type="button" class="btn btn-outline-danger me-auto" ng-if="$ctrl.ui.dashboardModalMode === \'edit\'" ng-click="$ctrl.archiveDashboard()">Delete dashboard</button>' +
       '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeModal()">Cancel</button>' +
@@ -96,13 +95,11 @@
       '          <button type="button" class="btn btn-outline-light" ng-click="$ctrl.openCreateConnectionModal()">Create new connection</button>' +
       '        </div>' +
       '        <p class="widget-config-helper" ng-if="$ctrl.widgetConfig.isLoadingConnections">Loading connections...</p>' +
-      '        <p class="widget-config-helper" ng-if="$ctrl.widgetConfig.connectionErrorMessage">{{$ctrl.widgetConfig.connectionErrorMessage}}</p>' +
       '      </div>' +
       '      <p class="widget-config-selected" ng-if="$ctrl.widgetConfig.selectedCity">Selected city: <strong>{{ $ctrl.getSelectedCityDisplayName($ctrl.widgetConfig.selectedCity) }}</strong></p>' +
       '      <p class="widget-config-selected" ng-if="$ctrl.widgetSupportsConnections() && $ctrl.getSelectedConnection()">Selected connection: <strong>{{ $ctrl.getSelectedConnection().name }}</strong></p>' +
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.isSearching">Searching cities...</p>' +
-      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.errorMessage">{{ $ctrl.widgetConfig.errorMessage }}</p>' +
-      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.hasSearched && !$ctrl.widgetConfig.isSearching && !$ctrl.widgetConfig.searchResults.length && !$ctrl.widgetConfig.errorMessage">No matching cities were found.</p>' +
+      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.hasSearched && !$ctrl.widgetConfig.isSearching && !$ctrl.widgetConfig.searchResults.length">No matching cities were found.</p>' +
       '      <div class="widget-config-results" ng-if="$ctrl.widgetConfig.searchResults.length">' +
       '        <button type="button" class="widget-config-result" ng-class="{\'widget-config-result--active\': $ctrl.isSelectedCity(city)}" ng-repeat="city in $ctrl.widgetConfig.searchResults track by city.id" ng-click="$ctrl.selectCity(city)">' +
       '          <strong>{{ city.displayName }}</strong>' +
@@ -127,7 +124,6 @@
       '      <form ng-submit="$ctrl.saveNewConnection()" ng-if="$ctrl.connectionModal.provider === \'todoist\'">' +
         '        <label class="form-label" for="connectionApiKey">Todoist API Key</label>' +
         '        <input id="connectionApiKey" class="form-control form-control-lg" type="password" ng-model="$ctrl.connectionModal.apiKey" placeholder="Enter your Todoist API Key" required />' +
-        '        <p class="widget-config-helper" ng-if="$ctrl.connectionModal.errorMessage">{{$ctrl.connectionModal.errorMessage}}</p>' +
       '        <div class="modal-actions">' +
       '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeCreateConnectionModal()">Cancel</button>' +
       '          <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.connectionModal.isSaving || !$ctrl.canSaveConnection()">Save</button>' +
@@ -135,7 +131,6 @@
       '      </form>' +
       '      <div ng-if="$ctrl.connectionModal.provider === \'google-calendar\'">' +
       '        <p class="widget-config-helper">You will be redirected to Google, then returned here after access is granted.</p>' +
-      '        <p class="widget-config-helper" ng-if="$ctrl.connectionModal.errorMessage">{{$ctrl.connectionModal.errorMessage}}</p>' +
       '        <div class="modal-actions">' +
       '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeCreateConnectionModal()">Cancel</button>' +
       '          <button type="button" class="btn btn-primary" ng-click="$ctrl.startGoogleCalendarOAuth()">Continue with Google</button>' +
@@ -148,7 +143,6 @@
       '        <input id="openAiModel" class="form-control form-control-lg" type="text" ng-model="$ctrl.connectionModal.model" placeholder="gpt-5-mini" required />' +
       '        <label class="form-label mt-3" for="openAiBaseUrl">Base URL</label>' +
       '        <input id="openAiBaseUrl" class="form-control form-control-lg" type="text" ng-model="$ctrl.connectionModal.baseUrl" placeholder="https://api.openai.com" />' +
-      '        <p class="widget-config-helper" ng-if="$ctrl.connectionModal.errorMessage">{{$ctrl.connectionModal.errorMessage}}</p>' +
       '        <div class="modal-actions">' +
       '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeCreateConnectionModal()">Cancel</button>' +
       '          <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.connectionModal.isSaving || !$ctrl.canSaveConnection()">Save</button>' +
@@ -184,9 +178,9 @@
     controller: DashboardPageController
   });
 
-  DashboardPageController.$inject = ['DashboardService', 'DashboardSnapshotService', 'ConnectionService', 'WidgetService', 'WidgetRegistryService', 'ReferenceDataService', 'UiShellService', '$scope', '$window'];
+  DashboardPageController.$inject = ['DashboardService', 'DashboardSnapshotService', 'ConnectionService', 'WidgetService', 'WidgetRegistryService', 'ReferenceDataService', 'UiShellService', 'NotificationService', '$scope', '$window'];
 
-  function DashboardPageController(DashboardService, DashboardSnapshotService, ConnectionService, WidgetService, WidgetRegistryService, ReferenceDataService, UiShellService, $scope, $window) {
+  function DashboardPageController(DashboardService, DashboardSnapshotService, ConnectionService, WidgetService, WidgetRegistryService, ReferenceDataService, UiShellService, NotificationService, $scope, $window) {
     var $ctrl = this;
 
     $ctrl.ready = false;
@@ -204,6 +198,8 @@
       DashboardService.load().then(function handleDashboardLoad() {
         $ctrl.ready = true;
         return syncState();
+      }).catch(function handleDashboardLoadError(error) {
+        NotificationService.error(getErrorMessage(error, 'Unable to load dashboards right now.'), 'Unable to load dashboard');
       }).finally(function markReady() {
         $ctrl.ready = true;
       });
@@ -222,7 +218,6 @@
     };
 
     $ctrl.closeModal = function closeModal() {
-      $ctrl.modalForm.errorMessage = '';
       UiShellService.closeDashboardModal();
     };
 
@@ -233,8 +228,6 @@
       if (!$ctrl.modalForm.name) {
         return;
       }
-
-      $ctrl.modalForm.errorMessage = '';
 
       if (isCreateMode) {
         request = DashboardService.create({
@@ -260,7 +253,7 @@
           });
         });
       }).catch(function handleDashboardSaveError(error) {
-        $ctrl.modalForm.errorMessage = getErrorMessage(error, 'Unable to save the dashboard right now.');
+        NotificationService.error(getErrorMessage(error, 'Unable to save the dashboard right now.'), 'Unable to save dashboard');
       });
     };
 
@@ -268,8 +261,6 @@
       if (!$ctrl.activeDashboard || $ctrl.ui.dashboardModalMode !== 'edit') {
         return;
       }
-
-      $ctrl.modalForm.errorMessage = '';
 
       if (!window.confirm('Archive this dashboard? Its widgets will be archived too, but existing data will be kept.')) {
         return;
@@ -282,7 +273,7 @@
         $ctrl.closeModal();
         return syncState();
       }).catch(function handleArchiveDashboardError(error) {
-        $ctrl.modalForm.errorMessage = getErrorMessage(error, 'Unable to archive the dashboard right now.');
+        NotificationService.error(getErrorMessage(error, 'Unable to archive the dashboard right now.'), 'Unable to archive dashboard');
       });
     };
 
@@ -301,6 +292,8 @@
           $ctrl.closeWidgetConfigModal();
           UiShellService.closeWidgetPanel();
           syncState();
+        }).catch(function handlePersistError(error) {
+          NotificationService.error(getErrorMessage(error, 'Unable to save dashboard layout right now.'), 'Unable to save dashboard');
         });
         return;
       }
@@ -339,10 +332,8 @@
         availableConnections: [],
         selectedConnectionId: widget.config && widget.config.connectionId ? widget.config.connectionId : '',
         isLoadingConnections: false,
-        connectionErrorMessage: '',
         isSearching: false,
-        hasSearched: false,
-        errorMessage: ''
+        hasSearched: false
       };
 
       if (widgetSupportsConnections(widget.type)) {
@@ -361,7 +352,6 @@
       }
 
       $ctrl.widgetConfig.isSearching = true;
-      $ctrl.widgetConfig.errorMessage = '';
       $ctrl.widgetConfig.hasSearched = false;
 
       ReferenceDataService.searchCities($ctrl.widgetConfig.cityQuery).then(function handleResults(items) {
@@ -370,7 +360,7 @@
       }).catch(function handleError() {
         $ctrl.widgetConfig.searchResults = [];
         $ctrl.widgetConfig.hasSearched = true;
-        $ctrl.widgetConfig.errorMessage = 'Reference city search is currently unavailable.';
+        NotificationService.error('Reference city search is currently unavailable.', 'City search failed');
       }).finally(function clearSearching() {
         $ctrl.widgetConfig.isSearching = false;
       });
@@ -440,7 +430,6 @@
       }
 
       $ctrl.connectionModal.isSaving = true;
-      $ctrl.connectionModal.errorMessage = '';
 
       ConnectionService.create({
         type: $ctrl.connectionModal.provider,
@@ -449,8 +438,9 @@
         $ctrl.widgetConfig.availableConnections = [connection].concat($ctrl.widgetConfig.availableConnections);
         $ctrl.widgetConfig.selectedConnectionId = connection.id;
         $ctrl.closeCreateConnectionModal();
+        NotificationService.success('Connection created and selected for this widget.', 'Connection created');
       }).catch(function handleCreateConnectionError(error) {
-        $ctrl.connectionModal.errorMessage = getErrorMessage(error, 'Unable to create the connection right now.');
+        NotificationService.error(getErrorMessage(error, 'Unable to create the connection right now.'), 'Unable to create connection');
       }).finally(function clearCreateConnectionLoading() {
         $ctrl.connectionModal.isSaving = false;
       });
@@ -468,6 +458,8 @@
       WidgetService.addWidget($ctrl.activeDashboard.id, type).then(function handleWidgetAdded() {
         UiShellService.closeWidgetPanel();
         syncState();
+      }).catch(function handleAddWidgetError(error) {
+        NotificationService.error(getErrorMessage(error, 'Unable to add that widget right now.'), 'Unable to add widget');
       });
     };
 
@@ -495,9 +487,10 @@
       DashboardSnapshotService.loadLatestForDashboard($ctrl.activeDashboard.id).then(function handleSnapshot(snapshot) {
         WidgetService.applySnapshot($ctrl.activeDashboard.id, snapshot);
         $ctrl.widgets = WidgetService.listForDashboard($ctrl.activeDashboard.id);
-      }).catch(function handleSnapshotRefreshError() {
+      }).catch(function handleSnapshotRefreshError(error) {
         WidgetService.applySnapshot($ctrl.activeDashboard.id, null);
         $ctrl.widgets = WidgetService.listForDashboard($ctrl.activeDashboard.id);
+        NotificationService.error(getErrorMessage(error, 'Unable to refresh the widget right now.'), 'Widget refresh failed');
       }).finally(function clearRefreshingWidget() {
         $ctrl.refreshingWidgetId = '';
       });
@@ -563,6 +556,10 @@
           $ctrl.widgets = WidgetService.listForDashboard(activeDashboardId);
           return $ctrl.widgets;
         });
+      }).catch(function handleWidgetLoadError(error) {
+        $ctrl.widgets = [];
+        NotificationService.error(getErrorMessage(error, 'Unable to load dashboard widgets right now.'), 'Unable to load dashboard');
+        return [];
       });
     }
 
@@ -592,16 +589,14 @@
           if (mode === 'create') {
             $ctrl.modalForm = {
               name: '',
-              description: '',
-              errorMessage: ''
+              description: ''
             };
           }
 
           if (mode === 'edit' && $ctrl.activeDashboard) {
             $ctrl.modalForm = {
               name: $ctrl.activeDashboard.name,
-              description: $ctrl.activeDashboard.description,
-              errorMessage: ''
+              description: $ctrl.activeDashboard.description
             };
           }
         }
@@ -634,10 +629,8 @@
         availableConnections: [],
         selectedConnectionId: '',
         isLoadingConnections: false,
-        connectionErrorMessage: '',
         isSearching: false,
-        hasSearched: false,
-        errorMessage: ''
+        hasSearched: false
       };
     }
 
@@ -650,8 +643,7 @@
         apiKey: '',
         model: nextProvider === 'openai' ? 'gpt-5-mini' : '',
         baseUrl: nextProvider === 'openai' ? 'https://api.openai.com' : '',
-        isSaving: false,
-        errorMessage: ''
+        isSaving: false
       };
     }
 
@@ -782,13 +774,12 @@
 
     function loadConnectionsForWidget(widgetType) {
       $ctrl.widgetConfig.isLoadingConnections = true;
-      $ctrl.widgetConfig.connectionErrorMessage = '';
 
       ConnectionService.list(getConnectionProviderForWidgetType(widgetType)).then(function handleConnections(connections) {
         $ctrl.widgetConfig.availableConnections = connections;
       }).catch(function handleConnectionLoadError(error) {
         $ctrl.widgetConfig.availableConnections = [];
-        $ctrl.widgetConfig.connectionErrorMessage = getErrorMessage(error, 'Connections are currently unavailable.');
+        NotificationService.error(getErrorMessage(error, 'Connections are currently unavailable.'), 'Unable to load connections');
       }).finally(function clearConnectionLoading() {
         $ctrl.widgetConfig.isLoadingConnections = false;
       });

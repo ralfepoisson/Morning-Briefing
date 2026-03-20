@@ -57,6 +57,12 @@ enum SnapshotJobStatus {
   SKIPPED
 }
 
+enum ApplicationLogLevel {
+  INFO
+  WARN
+  ERROR
+}
+
 model Tenant {
   id          String             @id @default(uuid()) @db.Uuid
   name        String             @map("tenant_name")
@@ -257,6 +263,21 @@ model BriefingSnapshot {
   @@index([tenantId])
   @@index([dashboardId])
   @@map("briefing_snapshots")
+}
+
+model ApplicationLogEvent {
+  id          String              @id
+  timestamp   DateTime            @db.Timestamptz(6)
+  level       ApplicationLogLevel
+  scope       String
+  event       String
+  message     String
+  contextJson Json?               @map("context_json")
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([timestamp])
+  @@index([level, timestamp])
+  @@map("application_log_events")
 }
 
 

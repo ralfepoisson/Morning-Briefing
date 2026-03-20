@@ -6,7 +6,7 @@
       widget: '<'
     },
     template:
-      '<div class="news-card">' +
+      '<div class="news-card" overflow-autopan>' +
       '  <p class="news-headline">{{$ctrl.widget.data.headline}}</p>' +
       '  <div class="news-empty" ng-if="!$ctrl.hasCategories()">{{$ctrl.widget.data.emptyMessage}}</div>' +
       '  <section class="news-section" ng-repeat="category in $ctrl.widget.data.categories track by category.name">' +

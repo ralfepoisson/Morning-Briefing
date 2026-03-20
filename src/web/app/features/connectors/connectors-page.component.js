@@ -22,8 +22,7 @@
       '        <h2 class="connectors-panel-title">Your connectors</h2>' +
       '      </div>' +
       '      <p class="connectors-panel-copy" ng-if="$ctrl.isLoading">Loading connectors...</p>' +
-      '      <p class="connectors-panel-copy connectors-panel-copy--error" ng-if="$ctrl.errorMessage">{{$ctrl.errorMessage}}</p>' +
-      '      <div class="connectors-empty-state" ng-if="!$ctrl.isLoading && !$ctrl.errorMessage && !$ctrl.connections.length">' +
+      '      <div class="connectors-empty-state" ng-if="!$ctrl.isLoading && !$ctrl.connections.length">' +
       '        <strong>No connectors yet</strong>' +
       '        <span>Create a task connection from a widget first, then you can manage it here.</span>' +
       '      </div>' +
@@ -71,8 +70,6 @@
       '        <p class="connectors-panel-copy" ng-if="$ctrl.selectedConnection.type === \'todoist\'">Enter a new API key only when you want to replace the current Todoist credential.</p>' +
       '        <p class="connectors-panel-copy" ng-if="$ctrl.selectedConnection.type === \'openai\'">Update the model or base URL here, and enter a new API key only when you want to replace the saved credential.</p>' +
       '        <p class="connectors-panel-copy" ng-if="$ctrl.selectedConnection.type === \'google-calendar\'">This connection uses OAuth. You can change the calendar id here or reconnect the Google account.</p>' +
-      '        <p class="connectors-panel-copy connectors-panel-copy--success" ng-if="$ctrl.successMessage">{{$ctrl.successMessage}}</p>' +
-      '        <p class="connectors-panel-copy connectors-panel-copy--error" ng-if="$ctrl.saveErrorMessage">{{$ctrl.saveErrorMessage}}</p>' +
       '        <div class="modal-actions modal-actions--page">' +
       '          <button type="button" class="btn btn-outline-light" ng-if="$ctrl.selectedConnection.type === \'google-calendar\'" ng-click="$ctrl.reconnectGoogleCalendar()" ng-disabled="$ctrl.isSaving">Reconnect Google</button>' +
       '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.resetForm()" ng-disabled="$ctrl.isSaving">Reset</button>' +
@@ -85,9 +82,9 @@
     controller: ConnectorsPageController
   });
 
-  ConnectorsPageController.$inject = ['ConnectionService', '$window'];
+  ConnectorsPageController.$inject = ['ConnectionService', 'NotificationService', '$window'];
 
-  function ConnectorsPageController(ConnectionService, $window) {
+  function ConnectorsPageController(ConnectionService, NotificationService, $window) {
     var $ctrl = this;
 
     $ctrl.ready = false;
@@ -96,9 +93,6 @@
     $ctrl.connections = [];
     $ctrl.selectedConnection = null;
     $ctrl.form = buildEmptyForm();
-    $ctrl.errorMessage = '';
-    $ctrl.saveErrorMessage = '';
-    $ctrl.successMessage = '';
 
     $ctrl.$onInit = function onInit() {
       loadConnections().finally(function markReady() {
@@ -113,8 +107,6 @@
     $ctrl.selectConnection = function selectConnection(connection) {
       $ctrl.selectedConnection = connection;
       $ctrl.form = buildForm(connection);
-      $ctrl.saveErrorMessage = '';
-      $ctrl.successMessage = '';
     };
 
     $ctrl.isSelected = function isSelected(connection) {
@@ -127,8 +119,6 @@
       }
 
       $ctrl.form = buildForm($ctrl.selectedConnection);
-      $ctrl.saveErrorMessage = '';
-      $ctrl.successMessage = '';
     };
 
     $ctrl.reconnectGoogleCalendar = function reconnectGoogleCalendar() {
@@ -145,8 +135,6 @@
       }
 
       $ctrl.isSaving = true;
-      $ctrl.saveErrorMessage = '';
-      $ctrl.successMessage = '';
 
       ConnectionService.update($ctrl.selectedConnection.id, {
         name: $ctrl.form.name,
@@ -154,9 +142,9 @@
       }).then(function handleConnectionUpdated(connection) {
         replaceConnection(connection);
         $ctrl.selectConnection(connection);
-        $ctrl.successMessage = 'Connector details saved.';
+        NotificationService.success('Connector details saved.', 'Connector updated');
       }).catch(function handleSaveError(error) {
-        $ctrl.saveErrorMessage = getErrorMessage(error, 'Unable to save connector changes right now.');
+        NotificationService.error(getErrorMessage(error, 'Unable to save connector changes right now.'), 'Unable to save connector');
       }).finally(function clearSaving() {
         $ctrl.isSaving = false;
       });
@@ -184,7 +172,6 @@
 
     function loadConnections() {
       $ctrl.isLoading = true;
-      $ctrl.errorMessage = '';
 
       return ConnectionService.list().then(function handleConnections(connections) {
         $ctrl.connections = connections;
@@ -209,7 +196,7 @@
         $ctrl.connections = [];
         $ctrl.selectedConnection = null;
         $ctrl.form = buildEmptyForm();
-        $ctrl.errorMessage = getErrorMessage(error, 'Connectors are currently unavailable.');
+        NotificationService.error(getErrorMessage(error, 'Connectors are currently unavailable.'), 'Unable to load connectors');
       }).finally(function clearLoading() {
         $ctrl.isLoading = false;
       });

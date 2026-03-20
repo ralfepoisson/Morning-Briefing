@@ -10,6 +10,7 @@ import type { ParsedRssArticle, RssFeedClient } from './rss-feed-client.js';
 import type { GenerateWidgetSnapshotRequested } from './snapshot-job-types.js';
 import type { TodoistTask, TodoistTaskClient } from './todoist-task-client.js';
 import type { SnapshotRepository } from './snapshot-repository.js';
+import { XkcdClientImpl, type XkcdClient } from './xkcd-client.js';
 import type {
   DashboardSnapshotRecord,
   DashboardSnapshotResponse,
@@ -25,7 +26,8 @@ export class SnapshotService {
     private readonly googleCalendarClient: GoogleCalendarClient,
     private readonly googleCalendarOAuthClient: Pick<GoogleCalendarOAuthClient, 'refreshAccessToken'>,
     private readonly rssFeedClient: Pick<RssFeedClient, 'fetchFeed'>,
-    private readonly openAiNewsSummarizer: Pick<OpenAiNewsSummarizer, 'summarize'>
+    private readonly openAiNewsSummarizer: Pick<OpenAiNewsSummarizer, 'summarize'>,
+    private readonly xkcdClient: Pick<XkcdClient, 'getLatestComic'> = new XkcdClientImpl()
   ) {}
 
   async generateForWidget(message: GenerateWidgetSnapshotRequested): Promise<{
@@ -199,6 +201,10 @@ export class SnapshotService {
       return this.buildNewsWidgetSnapshot(widget, generatedAt);
     }
 
+    if (widget.type === 'xkcd') {
+      return this.buildXkcdWidgetSnapshot(widget, generatedAt);
+    }
+
     if (widget.type === 'calendar') {
       return this.buildCalendarWidgetSnapshot(widget, generatedAt);
     }
@@ -273,6 +279,48 @@ export class SnapshotService {
         },
         errorMessage: error instanceof Error ? error.message : 'Weather snapshot generation failed.',
         generatedAt: generatedAt
+      };
+    }
+  }
+
+  private async buildXkcdWidgetSnapshot(widget: DashboardWidgetRecord, generatedAt: Date): Promise<DashboardSnapshotWidgetRecord> {
+    try {
+      const comic = await this.xkcdClient.getLatestComic();
+
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'READY',
+        content: {
+          comicId: comic.id,
+          title: comic.title,
+          altText: comic.altText,
+          imageUrl: comic.imageUrl,
+          permalink: comic.permalink,
+          publishedAt: comic.publishedAt,
+          emptyMessage: ''
+        },
+        errorMessage: null,
+        generatedAt
+      };
+    } catch (error) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          comicId: 0,
+          title: 'Latest xkcd unavailable',
+          altText: 'The latest xkcd comic could not be loaded right now.',
+          imageUrl: '',
+          permalink: 'https://xkcd.com/',
+          publishedAt: '',
+          emptyMessage: 'The latest xkcd comic could not be loaded right now. Please try again.'
+        },
+        errorMessage: error instanceof Error ? error.message : 'xkcd snapshot generation failed.',
+        generatedAt
       };
     }
   }
@@ -861,6 +909,14 @@ function buildSummary(widgets: DashboardSnapshotWidgetRecord[]): string {
     return appointmentCount
       ? `${appointmentCount} appointments loaded from Google Calendar.`
       : 'No Google Calendar appointments are scheduled for today.';
+  }
+
+  const xkcdWidget = widgets.find(function findXkcdWidget(widget) {
+    return widget.widgetType === 'xkcd' && widget.status === 'READY';
+  });
+
+  if (xkcdWidget && typeof xkcdWidget.content.title === 'string' && xkcdWidget.content.title.trim()) {
+    return `Latest xkcd: ${xkcdWidget.content.title}.`;
   }
 
   return 'Latest dashboard snapshot generated.';

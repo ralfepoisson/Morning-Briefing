@@ -6,7 +6,7 @@
       widget: '<'
     },
     template:
-      '<div class="tasks-card">' +
+      '<div class="tasks-card" overflow-autopan>' +
       '  <div class="widget-config-selected mt-0" ng-if="$ctrl.widget.data.connectionLabel">Connection: <strong>{{$ctrl.widget.data.connectionLabel}}</strong></div>' +
       '  <p class="tasks-empty" ng-if="!$ctrl.hasItems()">{{$ctrl.widget.data.emptyMessage || "No tasks available."}}</p>' +
       '  <section class="task-group" ng-repeat="group in $ctrl.widget.data.groups track by group.label">' +

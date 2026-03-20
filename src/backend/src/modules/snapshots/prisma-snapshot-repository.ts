@@ -544,6 +544,24 @@ function buildDashboardSummary(
     };
   }
 
+  const xkcdSummary = widgetSnapshots.find(function findXkcd(snapshot) {
+    return snapshot.widgetType === 'xkcd' && snapshot.status === 'READY';
+  });
+
+  if (xkcdSummary) {
+    const content = asObject(xkcdSummary.contentJson);
+
+    if (typeof content.title === 'string' && content.title.trim()) {
+      return {
+        headline: `Latest xkcd: ${content.title}.`
+      };
+    }
+
+    return {
+      headline: 'Your latest widget snapshots are ready.'
+    };
+  }
+
   return {
     headline: widgetSnapshots.some(function hasFailures(snapshot) {
       return snapshot.status === 'FAILED';

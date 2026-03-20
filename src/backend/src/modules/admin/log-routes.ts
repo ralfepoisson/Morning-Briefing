@@ -6,7 +6,7 @@ import {
 import {
   listPersistedApplicationLogs,
   summarizePersistedApplicationLogs
-} from './application-log-file.js';
+} from './application-log-repository.js';
 
 type LogRouteDependencies = {
   listLogs: typeof listPersistedApplicationLogs;
@@ -20,7 +20,7 @@ export async function registerLogRoutes(
     summarizeLogs: summarizePersistedApplicationLogs
   }
 ): Promise<void> {
-  app.get('/api/v1/admin/logs', async function handleGetLogs(request) {
+  app.get('/api/v1/admin/logs', async function handleGetLogs(request, reply) {
     const query = request.query as {
       q?: string;
       levels?: string;
@@ -31,26 +31,33 @@ export async function registerLogRoutes(
     const limit = parseLimit(query.limit);
     const range = parseRange(query.range);
     const since = range ? new Date(Date.now() - (range.minutes * 60 * 1000)).toISOString() : undefined;
-    const entries = await dependencies.listLogs({
-      search: query.q,
-      levels,
-      limit,
-      since
-    });
-
-    return {
-      filters: {
-        q: (query.q || '').trim(),
+    try {
+      const entries = await dependencies.listLogs({
+        search: query.q,
         levels,
         limit,
-        range: range ? range.value : 'all'
-      },
-      totals: {
-        stored: await dependencies.summarizeLogs(),
-        filtered: summarizeEntries(entries)
-      },
-      entries: entries.map(serializeEntry)
-    };
+        since
+      });
+
+      return {
+        filters: {
+          q: (query.q || '').trim(),
+          levels,
+          limit,
+          range: range ? range.value : 'all'
+        },
+        totals: {
+          stored: await dependencies.summarizeLogs(),
+          filtered: summarizeEntries(entries)
+        },
+        entries: entries.map(serializeEntry)
+      };
+    } catch (error) {
+      reply.code(503);
+      return {
+        message: getLogAccessErrorMessage(error)
+      };
+    }
   });
 }
 
@@ -134,4 +141,19 @@ function serializeEntry(entry: ApplicationLogEntry) {
     message: entry.message,
     context: entry.context
   };
+}
+
+function getLogAccessErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes('application logs are not ready yet') ||
+    normalized.includes('does not exist') ||
+    normalized.includes('findmany')
+  ) {
+    return 'Application logs are not ready yet. Apply the latest database migration and restart the backend, then refresh this page.';
+  }
+
+  return 'Application logs are currently unavailable.';
 }

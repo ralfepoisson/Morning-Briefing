@@ -15,8 +15,6 @@
       '      <span>Refresh</span>' +
       '    </button>' +
       '  </div>' +
-      '  <p class="connectors-panel-copy connectors-panel-copy--error" ng-if="$ctrl.errorMessage">{{$ctrl.errorMessage}}</p>' +
-      '  <p class="connectors-panel-copy" ng-if="$ctrl.successMessage">{{$ctrl.successMessage}}</p>' +
       '  <div class="message-broker-summary" ng-if="$ctrl.data">' +
       '    <article class="message-broker-card">' +
       '      <span class="message-broker-card__label">Total widgets</span>' +
@@ -102,14 +100,12 @@
     controller: WidgetsPageController
   });
 
-  WidgetsPageController.$inject = ['AdminWidgetService'];
+  WidgetsPageController.$inject = ['AdminWidgetService', 'NotificationService'];
 
-  function WidgetsPageController(AdminWidgetService) {
+  function WidgetsPageController(AdminWidgetService, NotificationService) {
     var $ctrl = this;
 
     $ctrl.data = null;
-    $ctrl.errorMessage = '';
-    $ctrl.successMessage = '';
     $ctrl.isLoading = false;
     $ctrl.regeneratingById = {};
     $ctrl.snapshotModal = buildSnapshotModalState();
@@ -127,15 +123,13 @@
         return;
       }
 
-      $ctrl.errorMessage = '';
-      $ctrl.successMessage = '';
       $ctrl.regeneratingById[widget.id] = true;
 
       return AdminWidgetService.regenerateSnapshot(widget.id).then(function handleQueued() {
-        $ctrl.successMessage = 'Snapshot regeneration was queued for ' + widget.title + '.';
-        return loadWidgets(false);
+        NotificationService.success('Snapshot regeneration was queued for ' + widget.title + '.', 'Snapshot queued');
+        return loadWidgets();
       }).catch(function handleError(error) {
-        $ctrl.errorMessage = getErrorMessage(error, 'Widget snapshot regeneration is currently unavailable.');
+        NotificationService.error(getErrorMessage(error, 'Widget snapshot regeneration is currently unavailable.'), 'Snapshot failed');
       }).finally(function clearPending() {
         delete $ctrl.regeneratingById[widget.id];
       });
@@ -198,13 +192,8 @@
       return 'message-broker-status-pill--processing';
     };
 
-    function loadWidgets(clearFlashMessage) {
+    function loadWidgets() {
       $ctrl.isLoading = true;
-      $ctrl.errorMessage = '';
-
-      if (clearFlashMessage !== false) {
-        $ctrl.successMessage = '';
-      }
 
       return AdminWidgetService.list().then(function handleWidgetsLoaded(data) {
         var items = data && data.items ? data.items : [];
@@ -223,7 +212,7 @@
         };
       }).catch(function handleError(error) {
         $ctrl.data = null;
-        $ctrl.errorMessage = getErrorMessage(error, 'Widgets are currently unavailable.');
+        NotificationService.error(getErrorMessage(error, 'Widgets are currently unavailable.'), 'Unable to load widgets');
       }).finally(function clearLoading() {
         $ctrl.isLoading = false;
       });

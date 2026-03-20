@@ -6,7 +6,7 @@
       widget: '<'
     },
     template:
-      '<div class="calendar-card">' +
+      '<div class="calendar-card" overflow-autopan>' +
       '  <div class="widget-config-selected mt-0" ng-if="$ctrl.widget.data.connectionLabel">Connection: <strong>{{$ctrl.widget.data.connectionLabel}}</strong></div>' +
       '  <div class="calendar-date-label">{{$ctrl.widget.data.dateLabel}}</div>' +
       '  <p class="tasks-empty" ng-if="!$ctrl.hasAppointments()">{{$ctrl.widget.data.emptyMessage || "No appointments scheduled."}}</p>' +

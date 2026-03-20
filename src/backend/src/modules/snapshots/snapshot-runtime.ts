@@ -14,6 +14,7 @@ import { SnapshotService } from './snapshot-service.js';
 import { SqsSnapshotJobPublisher, NoopSnapshotJobPublisher } from './sqs-snapshot-job-publisher.js';
 import { TodoistTaskClientImpl } from './todoist-task-client.js';
 import { NightlyRefreshService } from './nightly-refresh-service.js';
+import { XkcdClientImpl } from './xkcd-client.js';
 
 export function createSnapshotService(): SnapshotService {
   const prisma = getPrismaClient();
@@ -37,7 +38,8 @@ export function createSnapshotService(): SnapshotService {
     new GoogleCalendarClientImpl(),
     googleCalendarOAuthClient,
     new HttpRssFeedClient(),
-    new OpenAiNewsSummarizer()
+    new OpenAiNewsSummarizer(),
+    new XkcdClientImpl()
   );
 }
 
