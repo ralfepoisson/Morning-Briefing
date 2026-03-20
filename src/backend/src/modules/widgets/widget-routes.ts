@@ -6,7 +6,7 @@ import { PrismaWidgetRepository } from './prisma-widget-repository.js';
 import { WidgetService } from './widget-service.js';
 
 export type WidgetRouteDependencies = {
-  widgetService: Pick<WidgetService, 'listForDashboard' | 'create' | 'update'>;
+  widgetService: Pick<WidgetService, 'listForDashboard' | 'create' | 'update' | 'archive'>;
   defaultUserService: Pick<DefaultUserService, 'getDefaultUser'>;
 };
 
@@ -153,6 +153,44 @@ export async function registerWidgetRoutes(
 
       throw error;
     }
+  });
+
+  app.delete('/api/v1/dashboards/:dashboardId/widgets/:widgetId', async function handleArchiveWidget(request, reply) {
+    const params = request.params as {
+      dashboardId?: string;
+      widgetId?: string;
+    };
+
+    if (!params.dashboardId) {
+      reply.code(400);
+      return {
+        message: 'Dashboard id is required.'
+      };
+    }
+
+    if (!params.widgetId) {
+      reply.code(400);
+      return {
+        message: 'Widget id is required.'
+      };
+    }
+
+    const user = await defaultUserService.getDefaultUser();
+    const archived = await widgetService.archive({
+      dashboardId: params.dashboardId,
+      widgetId: params.widgetId,
+      ownerUserId: user.userId
+    });
+
+    if (!archived) {
+      reply.code(404);
+      return {
+        message: 'Widget not found.'
+      };
+    }
+
+    reply.code(204);
+    return null;
   });
 }
 

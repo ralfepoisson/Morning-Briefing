@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import type { WidgetRepository } from './widget-repository.js';
 import type {
+  ArchiveDashboardWidgetInput,
   CreateDashboardWidgetInput,
   DashboardWidgetRecord,
   UpdateDashboardWidgetInput
@@ -184,6 +185,36 @@ export class PrismaWidgetRepository implements WidgetRepository {
       ...mapDashboardWidgetRecord(updatedWidget),
       shouldRefreshSnapshot: currentConfigHash !== nextConfigHash
     };
+  }
+
+  async archive(input: ArchiveDashboardWidgetInput): Promise<boolean> {
+    const widget = await this.prisma.dashboardWidget.findFirst({
+      where: {
+        id: input.widgetId,
+        dashboardId: input.dashboardId,
+        archivedAt: null,
+        dashboard: {
+          ownerUserId: input.ownerUserId,
+          archivedAt: null
+        }
+      }
+    });
+
+    if (!widget) {
+      return false;
+    }
+
+    await this.prisma.dashboardWidget.update({
+      where: {
+        id: widget.id
+      },
+      data: {
+        archivedAt: new Date(),
+        isVisible: false
+      }
+    });
+
+    return true;
   }
 }
 

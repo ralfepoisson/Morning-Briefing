@@ -64,6 +64,12 @@ export type UpdateDashboardWidgetInput = {
   config?: Record<string, unknown>;
 };
 
+export type ArchiveDashboardWidgetInput = {
+  dashboardId: string;
+  widgetId: string;
+  ownerUserId: string;
+};
+
 export type DashboardWidgetResponse = {
   id: string;
   dashboardId: string;

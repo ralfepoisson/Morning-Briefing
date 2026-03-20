@@ -3,20 +3,21 @@
 
   angular.module('morningBriefingApp').directive('overflowAutopan', overflowAutopan);
 
-  overflowAutopan.$inject = ['$window', '$timeout'];
+  overflowAutopan.$inject = ['$window', '$timeout', '$interval'];
 
-  function overflowAutopan($window, $timeout) {
+  function overflowAutopan($window, $timeout, $interval) {
     return {
       restrict: 'A',
       link: function link(scope, element) {
         var host = element[0];
         var animationFrameId = null;
+        var refreshIntervalId = null;
         var resizeObserver = null;
         var mutationObserver = null;
         var pausedUntil = 0;
         var direction = 1;
         var lastTimestamp = 0;
-        var speed = 0.02;
+        var speed = 0.03;
         var threshold = 50;
 
         function getMaxScrollTop() {
@@ -98,6 +99,9 @@
             refresh();
           });
           resizeObserver.observe(host);
+          if (host.parentElement) {
+            resizeObserver.observe(host.parentElement);
+          }
         }
 
         if ($window.MutationObserver) {
@@ -111,10 +115,18 @@
           });
         }
 
+        refreshIntervalId = $interval(refresh, 1500, 0, false);
+
         $timeout(refresh, 0, false);
+        $timeout(refresh, 250, false);
+        $timeout(refresh, 1000, false);
 
         scope.$on('$destroy', function destroy() {
           stop();
+
+          if (refreshIntervalId) {
+            $interval.cancel(refreshIntervalId);
+          }
 
           if (resizeObserver) {
             resizeObserver.disconnect();

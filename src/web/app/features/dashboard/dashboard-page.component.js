@@ -38,7 +38,7 @@
       '      <div class="canvas-empty-state" ng-if="!$ctrl.widgets.length">' +
       '        <div>' +
       '          <h3>Blank dashboard</h3>' +
-      '          <p>Add a weather widget to start shaping this personal briefing.</p>' +
+      '          <p>Add a widget to start shaping this personal briefing.</p>' +
       '        </div>' +
       '      </div>' +
       '    </div>' +
@@ -107,6 +107,7 @@
       '        </button>' +
       '      </div>' +
       '      <div class="modal-actions">' +
+      '        <button type="button" class="btn btn-outline-danger me-auto" ng-if="$ctrl.widgetConfig.widget" ng-click="$ctrl.removeWidget()">Remove widget</button>' +
       '        <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeWidgetConfigModal()">Cancel</button>' +
       '        <button type="button" class="btn btn-primary" ng-if="$ctrl.widgetConfig.widget.type === \'weather\'" ng-disabled="!$ctrl.widgetConfig.selectedCity" ng-click="$ctrl.saveWidgetConfig()">Save</button>' +
       '        <button type="button" class="btn btn-primary" ng-if="$ctrl.widgetSupportsConnections()" ng-disabled="!$ctrl.widgetConfig.selectedConnectionId" ng-click="$ctrl.saveWidgetConfig()">Save</button>' +
@@ -156,7 +157,7 @@
       '        <div>' +
       '          <div class="eyebrow">Widget Library</div>' +
       '          <h2 class="modal-title mb-2">Add a widget</h2>' +
-      '          <p class="modal-copy mb-0">Weather, news, tasks, and calendar are ready to place. More widgets can slot into this same library later.</p>' +
+      '          <p class="modal-copy mb-0">Weather, news, tasks, calendar, and xkcd are ready to place. More widgets can slot into this same library later.</p>' +
       '        </div>' +
       '        <button type="button" class="btn btn-outline-secondary icon-button" ng-click="$ctrl.closeWidgetPanel()" aria-label="Close widget panel"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>' +
       '      </div>' +
@@ -408,6 +409,29 @@
         applyConnectionWidgetPreview(widget, getSelectedConnection());
         $ctrl.closeWidgetConfigModal();
       }
+    };
+
+    $ctrl.removeWidget = function removeWidget() {
+      var widget = $ctrl.widgetConfig.widget;
+
+      if (!$ctrl.activeDashboard || !$ctrl.isEditing || !widget) {
+        return;
+      }
+
+      if (!window.confirm('Remove this widget from the dashboard?')) {
+        return;
+      }
+
+      WidgetService.removeWidget($ctrl.activeDashboard.id, widget.id).then(function handleWidgetRemoved() {
+        if ($ctrl.refreshingWidgetId === widget.id) {
+          $ctrl.refreshingWidgetId = '';
+        }
+
+        $ctrl.closeWidgetConfigModal();
+        $ctrl.widgets = WidgetService.listForDashboard($ctrl.activeDashboard.id);
+      }).catch(function handleRemoveWidgetError(error) {
+        NotificationService.error(getErrorMessage(error, 'Unable to remove the widget right now.'), 'Unable to remove widget');
+      });
     };
 
     $ctrl.openCreateConnectionModal = function openCreateConnectionModal() {
@@ -834,6 +858,10 @@
 
       if ($ctrl.widgetConfig.widget.type === 'news') {
         return 'Configure News Widget';
+      }
+
+      if ($ctrl.widgetConfig.widget.type === 'xkcd') {
+        return 'Latest xkcd';
       }
 
       return 'Configure ' + $ctrl.widgetConfig.widget.title;

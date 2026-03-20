@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
 import { createSnapshotSqsClient } from '../snapshots/snapshot-sqs-client.js';
 import { getSnapshotQueueConfig } from '../snapshots/snapshot-queue-config.js';
+import { getWidgetDefinition } from '../widgets/widget-definitions.js';
 
 type MessageBrokerRouteDependencies = {
   prisma: Pick<
@@ -35,6 +36,10 @@ type RecentJobRecord = {
   completedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  widget?: {
+    widgetType: string;
+    title: string;
+  } | null;
 };
 
 export async function registerMessageBrokerRoutes(
@@ -54,6 +59,14 @@ export async function registerMessageBrokerRoutes(
         }
       }),
       dependencies.prisma.snapshotGenerationJob.findMany({
+        include: {
+          widget: {
+            select: {
+              widgetType: true,
+              title: true
+            }
+          }
+        },
         orderBy: {
           createdAt: 'desc'
         },
@@ -264,10 +277,16 @@ function buildQueueStats(
 }
 
 function mapRecentJob(job: RecentJobRecord) {
+  const widgetType = job.widget ? job.widget.widgetType : null;
+  const definition = widgetType ? getWidgetDefinition(widgetType) : null;
+
   return {
     id: job.id,
     widgetId: job.widgetId,
     dashboardId: job.dashboardId,
+    widgetType,
+    widgetTypeLabel: definition ? definition.name : humanizeWidgetType(widgetType),
+    widgetTitle: job.widget ? job.widget.title : null,
     snapshotDate: job.snapshotDate.toISOString().slice(0, 10),
     triggerSource: job.triggerSource,
     idempotencyKey: job.idempotencyKey,
@@ -280,4 +299,18 @@ function mapRecentJob(job: RecentJobRecord) {
     createdAt: job.createdAt.toISOString(),
     updatedAt: job.updatedAt.toISOString()
   };
+}
+
+function humanizeWidgetType(widgetType: string | null): string {
+  if (!widgetType) {
+    return 'Unknown widget';
+  }
+
+  return widgetType
+    .split(/[-_]/g)
+    .filter(Boolean)
+    .map(function capitalizeWord(word) {
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
 }

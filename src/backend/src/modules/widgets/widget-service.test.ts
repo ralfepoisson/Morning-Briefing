@@ -118,6 +118,26 @@ test('WidgetService does not enqueue a snapshot job when config is unchanged', a
   assert.equal(publisher.items.length, 0);
 });
 
+test('WidgetService archives a widget through the repository', async function () {
+  const repository = new InMemoryWidgetRepository([
+    createWidgetRecord({
+      id: 'widget-1',
+      dashboardId: 'dash-1',
+      ownerUserId: 'user-1'
+    })
+  ]);
+  const service = new WidgetService(repository);
+
+  const archived = await service.archive({
+    dashboardId: 'dash-1',
+    widgetId: 'widget-1',
+    ownerUserId: 'user-1'
+  });
+
+  assert.equal(archived, true);
+  assert.equal((await repository.listForDashboard('dash-1', 'user-1')).length, 0);
+});
+
 class InMemoryWidgetRepository implements WidgetRepository {
   constructor(private readonly items: DashboardWidgetRecord[]) {}
 
@@ -159,6 +179,19 @@ class InMemoryWidgetRepository implements WidgetRepository {
     widget.version += 1;
     widget.updatedAt = new Date();
     return widget;
+  }
+
+  async archive(input: { dashboardId: string; widgetId: string; ownerUserId: string }): Promise<boolean> {
+    const widgetIndex = this.items.findIndex(function (item) {
+      return item.id === input.widgetId && item.dashboardId === input.dashboardId && item.ownerUserId === input.ownerUserId;
+    });
+
+    if (widgetIndex === -1) {
+      return false;
+    }
+
+    this.items.splice(widgetIndex, 1);
+    return true;
   }
 }
 

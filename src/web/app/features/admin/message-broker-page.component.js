@@ -131,8 +131,8 @@
       '          <tr ng-repeat="message in $ctrl.data.recentMessages track by message.id">' +
       '            <td><span class="message-broker-status-pill" ng-class="$ctrl.getStatusClass(message.status)">{{message.status}}</span></td>' +
       '            <td>' +
-      '              <div class="message-broker-table__primary">{{message.widgetId}}</div>' +
-      '              <div class="message-broker-table__secondary">{{message.dashboardId}}</div>' +
+      '              <div class="message-broker-table__primary">{{message.widgetTypeLabel || "Unknown widget"}}</div>' +
+      '              <div class="message-broker-table__secondary" ng-if="message.widgetTitle">{{message.widgetTitle}}</div>' +
       '            </td>' +
       '            <td>{{message.snapshotDate}}</td>' +
       '            <td>{{message.triggerSource}}</td>' +

@@ -21,6 +21,7 @@
 #toast-container {
   top: 84px;
   right: 20px;
+  z-index: 2000;
 }
 
 #toast-container > div {
@@ -1302,6 +1303,14 @@ body.theme-light .widget-card {
   background: linear-gradient(180deg, #8ac6ff, rgba(138, 198, 255, 0.15));
 }
 
+.widget-card--xkcd::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--accent), rgba(121, 224, 192, 0.15));
+}
+
 .widget-handle {
   display: flex;
   align-items: flex-start;
@@ -1536,6 +1545,71 @@ body.theme-light .widget-card {
   min-height: 0;
   overflow-y: auto;
   padding-right: 0.25rem;
+}
+
+.xkcd-card {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 0.25rem;
+  padding-bottom: 0.9rem;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.xkcd-card__link {
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.xkcd-card__image {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  background: #fff;
+}
+
+.xkcd-card__empty {
+  padding: 1rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: 18px;
+  color: var(--muted);
+  background: var(--chip);
+}
+
+.xkcd-card__title {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.xkcd-card__title:hover,
+.xkcd-card__title:focus {
+  color: var(--accent);
+}
+
+.xkcd-card__meta,
+.xkcd-card__alt {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.xkcd-card__meta {
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.xkcd-card__alt {
+  font-size: 0.92rem;
 }
 
 .news-headline {

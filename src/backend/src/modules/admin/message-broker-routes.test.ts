@@ -48,6 +48,10 @@ test('GET /api/v1/admin/message-broker returns queue metrics, chart data, and re
               id: 'job-1',
               widgetId: 'widget-1',
               dashboardId: 'dash-1',
+              widget: {
+                widgetType: 'weather',
+                title: 'Weather Outlook'
+              },
               snapshotDate: new Date('2026-03-19T00:00:00.000Z'),
               triggerSource: 'widget_updated',
               idempotencyKey: 'widget-1:2026-03-19:hash',
@@ -133,6 +137,9 @@ test('GET /api/v1/admin/message-broker returns queue metrics, chart data, and re
           id: 'job-1',
           widgetId: 'widget-1',
           dashboardId: 'dash-1',
+          widgetType: 'weather',
+          widgetTypeLabel: 'Weather',
+          widgetTitle: 'Weather Outlook',
           snapshotDate: '2026-03-19',
           triggerSource: 'widget_updated',
           idempotencyKey: 'widget-1:2026-03-19:hash',

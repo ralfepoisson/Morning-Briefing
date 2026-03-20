@@ -1,5 +1,6 @@
 import type { WidgetRepository } from './widget-repository.js';
 import type {
+  ArchiveDashboardWidgetInput,
   CreateDashboardWidgetInput,
   DashboardWidgetResponse,
   UpdateDashboardWidgetInput
@@ -59,6 +60,10 @@ export class WidgetService {
     }
 
     return widget ? toResponse(widget) : null;
+  }
+
+  async archive(input: ArchiveDashboardWidgetInput): Promise<boolean> {
+    return this.repository.archive(input);
   }
 }
 

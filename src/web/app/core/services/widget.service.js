@@ -45,6 +45,19 @@
       }.bind(this));
     };
 
+    this.removeWidget = function removeWidget(dashboardId, widgetId) {
+      return $http.delete(ApiConfig.baseUrl + '/dashboards/' + dashboardId + '/widgets/' + widgetId).then(function handleDelete() {
+        var currentWidgets = this.listForDashboard(dashboardId);
+        var widgetIndex = currentWidgets.findIndex(function findWidget(item) {
+          return item.id === widgetId;
+        });
+
+        if (widgetIndex !== -1) {
+          currentWidgets.splice(widgetIndex, 1);
+        }
+      }.bind(this));
+    };
+
     this.saveDashboardWidgets = function saveDashboardWidgets(dashboardId) {
       return $q.all(this.listForDashboard(dashboardId).map(function saveWidget(widget) {
         return $http.patch(ApiConfig.baseUrl + '/dashboards/' + dashboardId + '/widgets/' + widget.id, {
@@ -122,6 +135,10 @@
         if (widget.type === 'calendar') {
           widget.title = 'Today on Calendar';
         }
+
+        if (widget.type === 'xkcd') {
+          widget.title = 'Latest xkcd';
+        }
       });
 
       return this.listForDashboard(dashboardId);
@@ -158,6 +175,11 @@
         dateLabel: widgetPayload.data && widgetPayload.data.dateLabel,
         appointments: widgetPayload.data && widgetPayload.data.appointments,
         groups: widgetPayload.data && widgetPayload.data.groups,
+        comicId: widgetPayload.data && widgetPayload.data.comicId,
+        altText: widgetPayload.data && widgetPayload.data.altText,
+        imageUrl: widgetPayload.data && widgetPayload.data.imageUrl,
+        permalink: widgetPayload.data && widgetPayload.data.permalink,
+        publishedAt: widgetPayload.data && widgetPayload.data.publishedAt,
         isLoading: widgetPayload.isLoading !== undefined ? widgetPayload.isLoading : true
       });
     }

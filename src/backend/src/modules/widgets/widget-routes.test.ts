@@ -36,6 +36,9 @@ test('GET /api/v1/dashboards/:dashboardId/widgets returns widget instances', asy
       },
       async update() {
         throw new Error('not used');
+      },
+      async archive() {
+        throw new Error('not used');
       }
     }
   });
@@ -88,6 +91,9 @@ test('POST /api/v1/dashboards/:dashboardId/widgets creates a widget', async func
       },
       async update() {
         throw new Error('not used');
+      },
+      async archive() {
+        throw new Error('not used');
       }
     }
   });
@@ -103,6 +109,76 @@ test('POST /api/v1/dashboards/:dashboardId/widgets creates a widget', async func
 
     assert.equal(response.statusCode, 201);
     assert.equal(response.json().type, 'calendar');
+  } finally {
+    await app.close();
+  }
+});
+
+test('POST /api/v1/dashboards/:dashboardId/widgets creates an xkcd widget', async function () {
+  const app = Fastify();
+
+  await registerWidgetRoutes(app, {
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
+        };
+      }
+    },
+    widgetService: {
+      async listForDashboard() {
+        throw new Error('not used');
+      },
+      async create(input) {
+        assert.equal(input.dashboardId, 'dash-1');
+        assert.equal(input.ownerUserId, 'user-1');
+        assert.equal(input.type, 'xkcd');
+        assert.equal(input.timezone, 'Europe/Paris');
+
+        return createWidgetResponse({
+          id: 'widget-xkcd',
+          dashboardId: 'dash-1',
+          type: 'xkcd',
+          title: 'Latest xkcd',
+          width: 420,
+          height: 420,
+          minWidth: 360,
+          minHeight: 320,
+          data: {
+            comicId: 0,
+            title: 'Latest xkcd',
+            altText: 'The latest xkcd comic will appear here after the snapshot refresh completes.',
+            imageUrl: '',
+            permalink: 'https://xkcd.com/',
+            publishedAt: '',
+            emptyMessage: 'The latest xkcd comic will load automatically after the snapshot refresh completes.'
+          }
+        });
+      },
+      async update() {
+        throw new Error('not used');
+      },
+      async archive() {
+        throw new Error('not used');
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/dashboards/dash-1/widgets',
+      payload: {
+        type: 'xkcd'
+      }
+    });
+
+    assert.equal(response.statusCode, 201);
+    assert.equal(response.json().type, 'xkcd');
+    assert.equal(response.json().title, 'Latest xkcd');
   } finally {
     await app.close();
   }
@@ -130,6 +206,9 @@ test('POST /api/v1/dashboards/:dashboardId/widgets rejects blank widget type', a
         throw new Error('not used');
       },
       async update() {
+        throw new Error('not used');
+      },
+      async archive() {
         throw new Error('not used');
       }
     }
@@ -199,6 +278,9 @@ test('PATCH /api/v1/dashboards/:dashboardId/widgets/:widgetId updates widget lay
             }
           }
         });
+      },
+      async archive() {
+        throw new Error('not used');
       }
     }
   });
@@ -222,6 +304,51 @@ test('PATCH /api/v1/dashboards/:dashboardId/widgets/:widgetId updates widget lay
 
     assert.equal(response.statusCode, 200);
     assert.equal(response.json().x, 120);
+  } finally {
+    await app.close();
+  }
+});
+
+test('DELETE /api/v1/dashboards/:dashboardId/widgets/:widgetId archives a widget', async function () {
+  const app = Fastify();
+
+  await registerWidgetRoutes(app, {
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
+        };
+      }
+    },
+    widgetService: {
+      async listForDashboard() {
+        throw new Error('not used');
+      },
+      async create() {
+        throw new Error('not used');
+      },
+      async update() {
+        throw new Error('not used');
+      },
+      async archive(input) {
+        assert.equal(input.dashboardId, 'dash-1');
+        assert.equal(input.widgetId, 'widget-1');
+        assert.equal(input.ownerUserId, 'user-1');
+        return true;
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'DELETE',
+      url: '/api/v1/dashboards/dash-1/widgets/widget-1'
+    });
+
+    assert.equal(response.statusCode, 204);
   } finally {
     await app.close();
   }
