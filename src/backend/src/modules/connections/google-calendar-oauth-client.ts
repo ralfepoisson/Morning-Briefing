@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { describeFetchFailure } from '../../shared/fetch-error.js';
 
 const GOOGLE_AUTH_BASE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -53,19 +54,25 @@ export class GoogleCalendarOAuthClient {
   }
 
   async exchangeAuthorizationCode(code: string): Promise<GoogleCalendarTokenSet> {
-    const response = await fetch(GOOGLE_TOKEN_URL, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        code,
-        client_id: this.config.clientId,
-        client_secret: this.config.clientSecret,
-        redirect_uri: this.config.redirectUri,
-        grant_type: 'authorization_code'
-      })
-    });
+    let response: Response;
+
+    try {
+      response = await fetch(GOOGLE_TOKEN_URL, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          code,
+          client_id: this.config.clientId,
+          client_secret: this.config.clientSecret,
+          redirect_uri: this.config.redirectUri,
+          grant_type: 'authorization_code'
+        })
+      });
+    } catch (error) {
+      throw new Error(describeFetchFailure('Google OAuth token exchange', GOOGLE_TOKEN_URL, error));
+    }
 
     if (!response.ok) {
       throw new Error('Google OAuth token exchange failed.');
@@ -90,18 +97,24 @@ export class GoogleCalendarOAuthClient {
   }
 
   async refreshAccessToken(refreshToken: string): Promise<Pick<GoogleCalendarTokenSet, 'accessToken' | 'expiresAt' | 'scope' | 'tokenType'>> {
-    const response = await fetch(GOOGLE_TOKEN_URL, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        refresh_token: refreshToken,
-        client_id: this.config.clientId,
-        client_secret: this.config.clientSecret,
-        grant_type: 'refresh_token'
-      })
-    });
+    let response: Response;
+
+    try {
+      response = await fetch(GOOGLE_TOKEN_URL, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          refresh_token: refreshToken,
+          client_id: this.config.clientId,
+          client_secret: this.config.clientSecret,
+          grant_type: 'refresh_token'
+        })
+      });
+    } catch (error) {
+      throw new Error(describeFetchFailure('Google OAuth token refresh', GOOGLE_TOKEN_URL, error));
+    }
 
     if (!response.ok) {
       throw new Error('Google OAuth token refresh failed.');
@@ -124,11 +137,18 @@ export class GoogleCalendarOAuthClient {
   }
 
   async getPrimaryCalendar(accessToken: string): Promise<GoogleCalendarAccount> {
-    const response = await fetch(`${GOOGLE_CALENDAR_BASE_URL}/users/me/calendarList/primary`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
+    const url = `${GOOGLE_CALENDAR_BASE_URL}/users/me/calendarList/primary`;
+    let response: Response;
+
+    try {
+      response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      });
+    } catch (error) {
+      throw new Error(describeFetchFailure('Google Calendar account lookup', url, error));
+    }
 
     if (!response.ok) {
       throw new Error('Google Calendar account lookup failed.');

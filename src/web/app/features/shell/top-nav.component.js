@@ -34,6 +34,10 @@
       '          <i class="fa-solid" ng-class="$ctrl.isAdminMenuOpen ? \'fa-chevron-up\' : \'fa-chevron-down\'" aria-hidden="true"></i>' +
       '        </button>' +
       '        <div class="dashboard-menu__panel dashboard-menu__panel--compact" ng-if="$ctrl.isAdminMenuOpen">' +
+      '          <a class="dashboard-menu__item dashboard-menu__item--link" ng-class="{\'dashboard-menu__item--active\': $ctrl.isActiveRoute(\'/admin/widgets\')}" href="#/admin/widgets" ng-click="$ctrl.closeAdminMenu()">' +
+      '            <span class="dashboard-menu__item-title">Widgets</span>' +
+      '            <span class="dashboard-menu__item-copy">Snapshot status and manual regeneration</span>' +
+      '          </a>' +
       '          <a class="dashboard-menu__item dashboard-menu__item--link" ng-class="{\'dashboard-menu__item--active\': $ctrl.isActiveRoute(\'/admin/logs\')}" href="#/admin/logs" ng-click="$ctrl.closeAdminMenu()">' +
       '            <span class="dashboard-menu__item-title">Logs</span>' +
       '            <span class="dashboard-menu__item-copy">Search recent backend events and filter by level</span>' +

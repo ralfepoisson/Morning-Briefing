@@ -1,8 +1,11 @@
 import { getGoogleCalendarOAuthClientFromEnvironment } from '../connections/google-calendar-oauth-client.js';
+import { PrismaRssFeedRepository } from '../rss-feeds/prisma-rss-feed-repository.js';
 import { GoogleCalendarClientImpl } from './google-calendar-client.js';
+import { LmStudioNewsSummarizer } from './lm-studio-client.js';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
 import { OpenMeteoWeatherClient } from './open-meteo-weather-client.js';
 import { PrismaSnapshotRepository } from './prisma-snapshot-repository.js';
+import { HttpRssFeedClient } from './rss-feed-client.js';
 import { getSnapshotQueueConfig } from './snapshot-queue-config.js';
 import { createSnapshotSqsClient } from './snapshot-sqs-client.js';
 import { SnapshotJobProcessor } from './snapshot-job-processor.js';
@@ -28,10 +31,13 @@ export function createSnapshotService(): SnapshotService {
 
   return new SnapshotService(
     new PrismaSnapshotRepository(prisma),
+    new PrismaRssFeedRepository(prisma),
     new OpenMeteoWeatherClient(),
     new TodoistTaskClientImpl(),
     new GoogleCalendarClientImpl(),
-    googleCalendarOAuthClient
+    googleCalendarOAuthClient,
+    new HttpRssFeedClient(),
+    new LmStudioNewsSummarizer()
   );
 }
 

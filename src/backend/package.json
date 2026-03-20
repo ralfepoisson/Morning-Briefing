@@ -19,7 +19,8 @@
     "snapshot:worker": "tsx scripts/run-snapshot-worker.ts",
     "snapshot:refresh:nightly": "tsx scripts/run-nightly-refresh.ts",
     "prisma:studio": "prisma studio",
-    "test": "node --test --import tsx"
+    "test": "node --test --import tsx",
+    "watch": "watch 'npm run build' ./"
   },
   "dependencies": {
     "@aws-sdk/client-sqs": "^3.1012.0",

@@ -1,8 +1,12 @@
 import type { GoogleCalendarOAuthClient } from '../connections/google-calendar-oauth-client.js';
+import { logApplicationEvent } from '../admin/application-logger.js';
 import type { DefaultUserContext } from '../default-user/default-user-service.js';
+import type { RssFeedRepository } from '../rss-feeds/rss-feed-repository.js';
 import type { DashboardWidgetRecord } from '../widgets/widget-types.js';
 import type { GoogleCalendarClient, GoogleCalendarEvent } from './google-calendar-client.js';
+import type { NewsSummarizer } from './lm-studio-client.js';
 import type { WeatherClient } from './open-meteo-weather-client.js';
+import type { ParsedRssArticle, RssFeedClient } from './rss-feed-client.js';
 import type { GenerateWidgetSnapshotRequested } from './snapshot-job-types.js';
 import type { TodoistTask, TodoistTaskClient } from './todoist-task-client.js';
 import type { SnapshotRepository } from './snapshot-repository.js';
@@ -15,10 +19,13 @@ import type {
 export class SnapshotService {
   constructor(
     private readonly repository: SnapshotRepository,
+    private readonly rssFeedRepository: Pick<RssFeedRepository, 'listCategories'>,
     private readonly weatherClient: WeatherClient,
     private readonly todoistTaskClient: TodoistTaskClient,
     private readonly googleCalendarClient: GoogleCalendarClient,
-    private readonly googleCalendarOAuthClient: Pick<GoogleCalendarOAuthClient, 'refreshAccessToken'>
+    private readonly googleCalendarOAuthClient: Pick<GoogleCalendarOAuthClient, 'refreshAccessToken'>,
+    private readonly rssFeedClient: Pick<RssFeedClient, 'fetchFeed'>,
+    private readonly newsSummarizer: Pick<NewsSummarizer, 'summarize'>
   ) {}
 
   async generateForWidget(message: GenerateWidgetSnapshotRequested): Promise<{
@@ -58,6 +65,12 @@ export class SnapshotService {
     const generatedAt = new Date();
     const widgetSnapshot = await this.buildWidgetSnapshot(widget, generatedAt);
 
+    this.logWidgetSnapshotFailureIfNeeded(widget, widgetSnapshot, {
+      snapshotDate: message.snapshotDate,
+      triggerSource: message.triggerSource,
+      source: 'queue'
+    });
+
     await this.repository.upsertWidgetSnapshot({
       widget,
       snapshotDate: message.snapshotDate,
@@ -83,6 +96,18 @@ export class SnapshotService {
       widgetSnapshots.push(await this.buildWidgetSnapshot(widget, generatedAt));
     }
 
+    widgetSnapshots.forEach((widgetSnapshot) => {
+      const widget = dashboard.widgets.find(function findWidget(candidate) {
+        return candidate.id === widgetSnapshot.widgetId;
+      });
+
+      if (widget) {
+        this.logWidgetSnapshotFailureIfNeeded(widget, widgetSnapshot, {
+          source: 'dashboard_refresh'
+        });
+      }
+    });
+
     const generationStatus = widgetSnapshots.every(function isReady(widgetSnapshot) {
       return widgetSnapshot.status === 'READY';
     }) ? 'READY' : 'FAILED';
@@ -102,7 +127,42 @@ export class SnapshotService {
     return toResponse(snapshot);
   }
 
+  private logWidgetSnapshotFailureIfNeeded(
+    widget: DashboardWidgetRecord,
+    widgetSnapshot: DashboardSnapshotWidgetRecord,
+    extraContext: Record<string, unknown>
+  ): void {
+    if (widgetSnapshot.status !== 'FAILED') {
+      return;
+    }
+
+    const connector = widget.connections[0];
+
+    logApplicationEvent({
+      level: classifySnapshotFailureLevel(widgetSnapshot.errorMessage),
+      scope: 'snapshot-service',
+      event: 'widget_snapshot_failed',
+      message: widgetSnapshot.errorMessage || widget.type + ' widget snapshot generation failed.',
+      context: {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        widgetTitle: widget.title,
+        dashboardId: widget.dashboardId,
+        tenantId: widget.tenantId,
+        provider: typeof widget.config.provider === 'string' ? widget.config.provider : null,
+        connectionId: connector ? connector.connector.id : null,
+        connectionName: connector ? connector.connector.name : null,
+        errorMessage: widgetSnapshot.errorMessage,
+        ...extraContext
+      }
+    });
+  }
+
   private async buildWidgetSnapshot(widget: DashboardWidgetRecord, generatedAt: Date): Promise<DashboardSnapshotWidgetRecord> {
+    if (widget.type === 'news') {
+      return this.buildNewsWidgetSnapshot(widget, generatedAt);
+    }
+
     if (widget.type === 'calendar') {
       return this.buildCalendarWidgetSnapshot(widget, generatedAt);
     }
@@ -177,6 +237,128 @@ export class SnapshotService {
         },
         errorMessage: error instanceof Error ? error.message : 'Weather snapshot generation failed.',
         generatedAt: generatedAt
+      };
+    }
+  }
+
+  private async buildNewsWidgetSnapshot(widget: DashboardWidgetRecord, generatedAt: Date): Promise<DashboardSnapshotWidgetRecord> {
+    const categories = await this.rssFeedRepository.listCategories(widget.tenantId);
+    const configuredCategories = categories.filter(function hasFeeds(category) {
+      return category.feeds.length > 0;
+    });
+
+    if (!configuredCategories.length) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          headline: 'News source configuration required.',
+          markdown: '# News source configuration required.\n\nAdd RSS feeds on the RSS Feeds page to generate a news snapshot.',
+          categories: [],
+          emptyMessage: 'Add RSS feeds on the RSS Feeds page to start generating news summaries.'
+        },
+        errorMessage: 'News widget cannot generate a snapshot without configured RSS feeds.',
+        generatedAt
+      };
+    }
+
+    const sourceErrors: string[] = [];
+    const preparedCategories: Array<{
+      name: string;
+      description: string;
+      articles: ParsedRssArticle[];
+    }> = [];
+
+    for (const category of configuredCategories) {
+      const categoryArticles: ParsedRssArticle[] = [];
+
+      for (const feed of category.feeds) {
+        try {
+          const result = await this.rssFeedClient.fetchFeed(feed.url);
+
+          result.items.slice(0, 4).forEach(function pushItem(item) {
+            categoryArticles.push({
+              title: item.title,
+              url: item.url,
+              summary: item.summary,
+              publishedAt: item.publishedAt,
+              sourceName: item.sourceName || feed.name
+            });
+          });
+        } catch (error) {
+          sourceErrors.push(feed.name + ': ' + (error instanceof Error ? error.message : 'Feed request failed.'));
+        }
+      }
+
+      const deduplicatedArticles = dedupeArticlesByUrl(categoryArticles)
+        .sort(compareArticlesByDateDesc)
+        .slice(0, 10);
+
+      if (deduplicatedArticles.length) {
+        preparedCategories.push({
+          name: category.name,
+          description: category.description,
+          articles: deduplicatedArticles
+        });
+      }
+    }
+
+    if (!preparedCategories.length) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          headline: 'No RSS articles were available.',
+          markdown: '# No RSS articles were available.\n\nThe configured feeds could not be read or did not return any recent entries.',
+          categories: [],
+          emptyMessage: 'The configured feeds could not be read or did not return any entries.',
+          sourceErrors
+        },
+        errorMessage: sourceErrors[0] || 'News widget could not load any RSS articles.',
+        generatedAt
+      };
+    }
+
+    try {
+      const summary = await this.newsSummarizer.summarize({
+        snapshotDate: formatDateKey(generatedAt),
+        categories: preparedCategories
+      });
+
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'READY',
+        content: {
+          headline: summary.headline,
+          markdown: summary.markdown,
+          categories: summary.categories,
+          emptyMessage: '',
+          sourceErrors
+        },
+        errorMessage: null,
+        generatedAt
+      };
+    } catch (error) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          headline: 'News summarization failed.',
+          markdown: '# News summarization failed.\n\nThe RSS feeds were loaded, but the local LLM could not produce a summary.',
+          categories: [],
+          emptyMessage: 'The local LLM could not summarize the configured feeds.',
+          sourceErrors
+        },
+        errorMessage: error instanceof Error ? error.message : 'News snapshot generation failed.',
+        generatedAt
       };
     }
   }
@@ -461,6 +643,14 @@ function startOfDay(date: Date): Date {
 }
 
 function buildSummary(widgets: DashboardSnapshotWidgetRecord[]): string {
+  const newsWidget = widgets.find(function findNewsWidget(widget) {
+    return widget.widgetType === 'news' && widget.status === 'READY';
+  });
+
+  if (newsWidget && typeof newsWidget.content.headline === 'string' && newsWidget.content.headline.trim()) {
+    return newsWidget.content.headline;
+  }
+
   const weatherWidget = widgets.find(function findWeatherWidget(widget) {
     return widget.widgetType === 'weather' && widget.status === 'READY';
   });
@@ -548,6 +738,22 @@ function getGoogleCalendarRefreshToken(config: Record<string, unknown>): string 
   }
 
   return '';
+}
+
+function classifySnapshotFailureLevel(errorMessage: string | null): 'warn' | 'error' {
+  const normalized = (errorMessage || '').toLowerCase();
+
+  if (
+    normalized.includes('missing') ||
+    normalized.includes('unsupported') ||
+    normalized.includes('required') ||
+    normalized.includes('not found') ||
+    normalized.includes('stale')
+  ) {
+    return 'warn';
+  }
+
+  return 'error';
 }
 
 function isTokenExpired(config: Record<string, unknown>): boolean {
@@ -672,6 +878,28 @@ function addDays(date: Date, days: number): Date {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
+}
+
+function dedupeArticlesByUrl(items: ParsedRssArticle[]): ParsedRssArticle[] {
+  const seen = new Set<string>();
+
+  return items.filter(function filterItem(item) {
+    const key = item.url.trim().toLowerCase();
+
+    if (!key || seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function compareArticlesByDateDesc(left: ParsedRssArticle, right: ParsedRssArticle): number {
+  const leftTimestamp = left.publishedAt ? Date.parse(left.publishedAt) : 0;
+  const rightTimestamp = right.publishedAt ? Date.parse(right.publishedAt) : 0;
+
+  return rightTimestamp - leftTimestamp;
 }
 
 function formatDateKey(date: Date): string {

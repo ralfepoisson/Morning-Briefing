@@ -1,3 +1,5 @@
+import { describeFetchFailure } from '../../shared/fetch-error.js';
+
 export type TodoistTask = {
   id: string;
   content: string;
@@ -26,11 +28,17 @@ export class TodoistTaskClientImpl implements TodoistTaskClient {
         url.searchParams.set('cursor', nextCursor);
       }
 
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${apiKey}`
-        }
-      });
+      let response: Response;
+
+      try {
+        response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${apiKey}`
+          }
+        });
+      } catch (error) {
+        throw new Error(describeFetchFailure('Todoist request', url, error));
+      }
 
       if (!response.ok) {
         throw new Error(`Todoist request failed with status ${response.status}.`);

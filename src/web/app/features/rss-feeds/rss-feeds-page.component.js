@@ -10,9 +10,9 @@
       '      <h1 class="stage-title stage-title--compact">Curate your news sources</h1>' +
       '      <p class="stage-copy stage-copy--compact mb-0">Organize RSS feeds into categories that the News widget will use later for summaries and headlines.</p>' +
       '    </div>' +
-      '    <button type="button" class="btn btn-outline-light connectors-refresh-button" ng-click="$ctrl.resetDefaults()">' +
-      '      <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>' +
-      '      <span>Reset forms</span>' +
+      '    <button type="button" class="btn btn-outline-light connectors-refresh-button" ng-click="$ctrl.loadCategories()" ng-disabled="$ctrl.isLoading">' +
+      '      <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>' +
+      '      <span>Refresh</span>' +
       '    </button>' +
       '  </div>' +
       '  <div class="rss-feeds-layout">' +
@@ -27,13 +27,18 @@
       '        <input id="rssCategoryName" class="form-control" type="text" ng-model="$ctrl.categoryForm.name" placeholder="Technology" required />' +
       '        <label class="form-label mt-3" for="rssCategoryDescription">Description</label>' +
       '        <textarea id="rssCategoryDescription" class="form-control rss-feeds-textarea" ng-model="$ctrl.categoryForm.description" placeholder="What kind of stories belong here?"></textarea>' +
+      '        <p class="connectors-panel-copy" ng-if="$ctrl.isLoading">Loading categories...</p>' +
       '        <p class="connectors-panel-copy connectors-panel-copy--success" ng-if="$ctrl.categorySuccessMessage">{{$ctrl.categorySuccessMessage}}</p>' +
       '        <p class="connectors-panel-copy connectors-panel-copy--error" ng-if="$ctrl.categoryErrorMessage">{{$ctrl.categoryErrorMessage}}</p>' +
       '        <div class="modal-actions modal-actions--page rss-feeds-actions">' +
       '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.startNewCategory()">New category</button>' +
-      '          <button type="submit" class="btn btn-primary" ng-disabled="!$ctrl.categoryForm.name">{{$ctrl.categoryForm.id ? "Save category" : "Add category"}}</button>' +
+      '          <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.isSavingCategory || !$ctrl.categoryForm.name">{{$ctrl.categoryForm.id ? "Save category" : "Add category"}}</button>' +
       '        </div>' +
       '      </form>' +
+      '      <div class="connectors-empty-state" ng-if="!$ctrl.isLoading && !$ctrl.categories.length">' +
+      '        <strong>No categories yet</strong>' +
+      '        <span>Create your first category to start collecting RSS feeds for the News widget.</span>' +
+      '      </div>' +
       '      <div class="rss-feed-category-list">' +
       '        <button type="button" class="connector-list-item rss-feed-category-item" ng-repeat="category in $ctrl.categories track by category.id" ng-class="{\'connector-list-item--active\': $ctrl.isSelectedCategory(category)}" ng-click="$ctrl.selectCategory(category)">' +
       '          <div class="connector-list-item__header">' +
@@ -70,8 +75,8 @@
       '          <p class="connectors-panel-copy connectors-panel-copy--error" ng-if="$ctrl.feedErrorMessage">{{$ctrl.feedErrorMessage}}</p>' +
       '          <div class="modal-actions modal-actions--page rss-feeds-actions">' +
       '            <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.clearFeedForm()">Clear</button>' +
-      '            <button type="submit" class="btn btn-primary" ng-disabled="!$ctrl.feedForm.name || !$ctrl.feedForm.url">Add feed</button>' +
-      '            <button type="button" class="btn btn-outline-danger" ng-click="$ctrl.deleteSelectedCategory()" ng-disabled="!$ctrl.selectedCategory">Delete category</button>' +
+      '            <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.isSavingFeed || !$ctrl.feedForm.name || !$ctrl.feedForm.url">Add feed</button>' +
+      '            <button type="button" class="btn btn-outline-danger" ng-click="$ctrl.deleteSelectedCategory()" ng-disabled="$ctrl.isDeletingCategory || !$ctrl.selectedCategory">Delete category</button>' +
       '          </div>' +
       '        </form>' +
       '        <div class="rss-feed-list" ng-if="$ctrl.selectedCategory.feeds.length">' +
@@ -80,7 +85,7 @@
       '              <strong>{{feed.name}}</strong>' +
       '              <a class="rss-feed-item__url" ng-href="{{feed.url}}" target="_blank" rel="noreferrer">{{feed.url}}</a>' +
       '            </div>' +
-      '            <button type="button" class="btn btn-sm btn-outline-light" ng-click="$ctrl.removeFeed(feed.id)">Remove</button>' +
+      '            <button type="button" class="btn btn-sm btn-outline-light" ng-click="$ctrl.removeFeed(feed.id)" ng-disabled="$ctrl.isSavingFeed">Remove</button>' +
       '          </article>' +
       '        </div>' +
       '        <div class="connectors-empty-state" ng-if="!$ctrl.selectedCategory.feeds.length">' +
@@ -107,9 +112,26 @@
     $ctrl.categorySuccessMessage = '';
     $ctrl.feedErrorMessage = '';
     $ctrl.feedSuccessMessage = '';
+    $ctrl.isLoading = false;
+    $ctrl.isSavingCategory = false;
+    $ctrl.isSavingFeed = false;
+    $ctrl.isDeletingCategory = false;
 
     $ctrl.$onInit = function onInit() {
-      refreshCategories();
+      $ctrl.loadCategories();
+    };
+
+    $ctrl.loadCategories = function loadCategories(selectedCategoryId) {
+      $ctrl.isLoading = true;
+
+      return RssFeedService.listCategories().then(function handleCategories(categories) {
+        $ctrl.categories = categories;
+        syncSelectedCategory(selectedCategoryId);
+      }).catch(function handleError(error) {
+        $ctrl.categoryErrorMessage = getErrorMessage(error, 'RSS feeds are currently unavailable.');
+      }).finally(function clearLoading() {
+        $ctrl.isLoading = false;
+      });
     };
 
     $ctrl.selectCategory = function selectCategory(category) {
@@ -134,42 +156,47 @@
     };
 
     $ctrl.saveCategory = function saveCategory() {
-      try {
-        if ($ctrl.categoryForm.id) {
-          RssFeedService.updateCategory($ctrl.categoryForm.id, $ctrl.categoryForm);
-          $ctrl.categorySuccessMessage = 'Category updated.';
-          clearCategoryError();
-          refreshCategories($ctrl.categoryForm.id);
-        } else {
-          var newCategory = RssFeedService.createCategory($ctrl.categoryForm);
-          $ctrl.categorySuccessMessage = 'Category created.';
-          clearCategoryError();
-          $ctrl.categoryForm = buildEmptyCategoryForm();
-          refreshCategories(newCategory.id);
-          clearFeedMessages();
-          return;
-        }
-      } catch (error) {
-        $ctrl.categoryErrorMessage = error.message || 'Unable to save category.';
-        $ctrl.categorySuccessMessage = '';
-      }
-    };
+      var request;
 
-    $ctrl.addFeed = function addFeed() {
-      if (!$ctrl.selectedCategory) {
+      if (!$ctrl.categoryForm.name) {
         return;
       }
 
-      try {
-        RssFeedService.addFeed($ctrl.selectedCategory.id, $ctrl.feedForm);
+      $ctrl.isSavingCategory = true;
+      clearCategoryMessages();
+
+      request = $ctrl.categoryForm.id
+        ? RssFeedService.updateCategory($ctrl.categoryForm.id, $ctrl.categoryForm)
+        : RssFeedService.createCategory($ctrl.categoryForm);
+
+      request.then(function handleSaved(category) {
+        $ctrl.categorySuccessMessage = $ctrl.categoryForm.id ? 'Category updated.' : 'Category created.';
+        $ctrl.categoryForm = buildEmptyCategoryForm();
+        return $ctrl.loadCategories(category.id);
+      }).catch(function handleError(error) {
+        $ctrl.categoryErrorMessage = getErrorMessage(error, 'Unable to save category.');
+      }).finally(function clearSaving() {
+        $ctrl.isSavingCategory = false;
+      });
+    };
+
+    $ctrl.addFeed = function addFeed() {
+      if (!$ctrl.selectedCategory || !$ctrl.feedForm.name || !$ctrl.feedForm.url) {
+        return;
+      }
+
+      $ctrl.isSavingFeed = true;
+      clearFeedMessages();
+
+      RssFeedService.addFeed($ctrl.selectedCategory.id, $ctrl.feedForm).then(function handleAdded(category) {
         $ctrl.feedForm = buildEmptyFeedForm();
         $ctrl.feedSuccessMessage = 'Feed added.';
-        $ctrl.feedErrorMessage = '';
-        refreshCategories($ctrl.selectedCategory.id);
-      } catch (error) {
-        $ctrl.feedErrorMessage = error.message || 'Unable to add feed.';
-        $ctrl.feedSuccessMessage = '';
-      }
+        return $ctrl.loadCategories(category.id);
+      }).catch(function handleError(error) {
+        $ctrl.feedErrorMessage = getErrorMessage(error, 'Unable to add feed.');
+      }).finally(function clearSaving() {
+        $ctrl.isSavingFeed = false;
+      });
     };
 
     $ctrl.removeFeed = function removeFeed(feedId) {
@@ -177,37 +204,41 @@
         return;
       }
 
-      try {
-        RssFeedService.removeFeed($ctrl.selectedCategory.id, feedId);
+      $ctrl.isSavingFeed = true;
+      clearFeedMessages();
+
+      RssFeedService.removeFeed($ctrl.selectedCategory.id, feedId).then(function handleRemoved(category) {
         $ctrl.feedSuccessMessage = 'Feed removed.';
-        $ctrl.feedErrorMessage = '';
-        refreshCategories($ctrl.selectedCategory.id);
-      } catch (error) {
-        $ctrl.feedErrorMessage = error.message || 'Unable to remove feed.';
-        $ctrl.feedSuccessMessage = '';
-      }
+        return $ctrl.loadCategories(category.id);
+      }).catch(function handleError(error) {
+        $ctrl.feedErrorMessage = getErrorMessage(error, 'Unable to remove feed.');
+      }).finally(function clearSaving() {
+        $ctrl.isSavingFeed = false;
+      });
     };
 
     $ctrl.deleteSelectedCategory = function deleteSelectedCategory() {
+      var currentCategoryId;
+
       if (!$ctrl.selectedCategory) {
         return;
       }
 
-      try {
-        var removedCategoryId = $ctrl.selectedCategory.id;
+      currentCategoryId = $ctrl.selectedCategory.id;
+      $ctrl.isDeletingCategory = true;
+      clearCategoryMessages();
+      clearFeedMessages();
 
-        RssFeedService.deleteCategory(removedCategoryId);
+      RssFeedService.deleteCategory(currentCategoryId).then(function handleDeleted() {
+        $ctrl.categorySuccessMessage = 'Category deleted.';
         $ctrl.categoryForm = buildEmptyCategoryForm();
         $ctrl.feedForm = buildEmptyFeedForm();
-        $ctrl.categorySuccessMessage = 'Category deleted.';
-        $ctrl.categoryErrorMessage = '';
-        $ctrl.feedSuccessMessage = '';
-        $ctrl.feedErrorMessage = '';
-        refreshCategories();
-      } catch (error) {
-        $ctrl.categoryErrorMessage = error.message || 'Unable to delete category.';
-        $ctrl.categorySuccessMessage = '';
-      }
+        return $ctrl.loadCategories();
+      }).catch(function handleError(error) {
+        $ctrl.categoryErrorMessage = getErrorMessage(error, 'Unable to delete category.');
+      }).finally(function clearDeleting() {
+        $ctrl.isDeletingCategory = false;
+      });
     };
 
     $ctrl.clearFeedForm = function clearFeedForm() {
@@ -215,34 +246,18 @@
       clearFeedMessages();
     };
 
-    $ctrl.resetDefaults = function resetDefaults() {
-      $ctrl.categoryForm = $ctrl.selectedCategory
-        ? {
-          id: $ctrl.selectedCategory.id,
-          name: $ctrl.selectedCategory.name,
-          description: $ctrl.selectedCategory.description || ''
-        }
-        : buildEmptyCategoryForm();
-      $ctrl.feedForm = buildEmptyFeedForm();
-      clearCategoryMessages();
-      clearFeedMessages();
-    };
-
-    function refreshCategories(selectedCategoryId) {
-      $ctrl.categories = RssFeedService.listCategories();
-
-      if (!$ctrl.categories.length) {
-        $ctrl.selectedCategory = null;
-        return;
-      }
+    function syncSelectedCategory(selectedCategoryId) {
+      var nextSelectedCategory = null;
 
       if (selectedCategoryId) {
-        $ctrl.selectedCategory = findCategoryById(selectedCategoryId, $ctrl.categories);
+        nextSelectedCategory = findCategoryById(selectedCategoryId, $ctrl.categories);
       }
 
-      if (!$ctrl.selectedCategory) {
-        $ctrl.selectedCategory = $ctrl.categories[0];
+      if (!nextSelectedCategory && $ctrl.selectedCategory) {
+        nextSelectedCategory = findCategoryById($ctrl.selectedCategory.id, $ctrl.categories);
       }
+
+      $ctrl.selectedCategory = nextSelectedCategory || ($ctrl.categories.length ? $ctrl.categories[0] : null);
 
       if ($ctrl.selectedCategory) {
         $ctrl.categoryForm = {
@@ -256,10 +271,6 @@
     function clearCategoryMessages() {
       $ctrl.categoryErrorMessage = '';
       $ctrl.categorySuccessMessage = '';
-    }
-
-    function clearCategoryError() {
-      $ctrl.categoryErrorMessage = '';
     }
 
     function clearFeedMessages() {
@@ -284,8 +295,16 @@
   }
 
   function findCategoryById(categoryId, categories) {
-    return (categories || []).find(function (category) {
+    return (categories || []).find(function findCategory(category) {
       return category.id === categoryId;
     }) || null;
+  }
+
+  function getErrorMessage(error, fallbackMessage) {
+    if (error && error.data && typeof error.data.message === 'string' && error.data.message.trim()) {
+      return error.data.message;
+    }
+
+    return fallbackMessage;
   }
 })();

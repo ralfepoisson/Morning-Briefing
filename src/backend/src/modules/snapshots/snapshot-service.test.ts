@@ -1,4 +1,6 @@
 import type { GoogleCalendarOAuthClient } from '../connections/google-calendar-oauth-client.js';
+import { listApplicationLogs, resetApplicationLogs } from '../admin/application-log-store.js';
+import type { RssFeedRepository } from '../rss-feeds/rss-feed-repository.js';
 import type { GoogleCalendarClient } from './google-calendar-client.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,6 +14,8 @@ import type {
 } from './snapshot-repository.js';
 import type { DashboardSnapshotRecord, WeatherSnapshotData } from './snapshot-types.js';
 import type { WeatherClient } from './open-meteo-weather-client.js';
+import type { NewsSummarizer } from './lm-studio-client.js';
+import type { RssFeedClient } from './rss-feed-client.js';
 import type { TodoistTaskClient } from './todoist-task-client.js';
 import type { GenerateWidgetSnapshotRequested } from './snapshot-job-types.js';
 
@@ -77,7 +81,16 @@ test('SnapshotService generates and persists a weather snapshot for the dashboar
       throw new Error('not used');
     }
   };
-  const service = new SnapshotService(repository, weatherClient, todoistTaskClient, unusedGoogleCalendarClient(), unusedGoogleCalendarOAuthClient());
+  const service = new SnapshotService(
+    repository,
+    unusedRssFeedRepository(),
+    weatherClient,
+    todoistTaskClient,
+    unusedGoogleCalendarClient(),
+    unusedGoogleCalendarOAuthClient(),
+    unusedRssFeedClient(),
+    unusedNewsSummarizer()
+  );
 
   const snapshot = await service.getLatestForDashboard('dash-1', {
     tenantId: 'tenant-1',
@@ -146,7 +159,16 @@ test('SnapshotService returns a failed weather widget snapshot when location con
       throw new Error('not used');
     }
   };
-  const service = new SnapshotService(repository, weatherClient, todoistTaskClient, unusedGoogleCalendarClient(), unusedGoogleCalendarOAuthClient());
+  const service = new SnapshotService(
+    repository,
+    unusedRssFeedRepository(),
+    weatherClient,
+    todoistTaskClient,
+    unusedGoogleCalendarClient(),
+    unusedGoogleCalendarOAuthClient(),
+    unusedRssFeedClient(),
+    unusedNewsSummarizer()
+  );
 
   const snapshot = await service.getLatestForDashboard('dash-1', {
     tenantId: 'tenant-1',
@@ -256,7 +278,16 @@ test('SnapshotService generates a Todoist task snapshot for the dashboard', asyn
       ];
     }
   };
-  const service = new SnapshotService(repository, weatherClient, todoistTaskClient, unusedGoogleCalendarClient(), unusedGoogleCalendarOAuthClient());
+  const service = new SnapshotService(
+    repository,
+    unusedRssFeedRepository(),
+    weatherClient,
+    todoistTaskClient,
+    unusedGoogleCalendarClient(),
+    unusedGoogleCalendarOAuthClient(),
+    unusedRssFeedClient(),
+    unusedNewsSummarizer()
+  );
 
   const snapshot = await service.getLatestForDashboard('dash-1', {
     tenantId: 'tenant-1',
@@ -311,6 +342,128 @@ test('SnapshotService generates a Todoist task snapshot for the dashboard', asyn
     ],
     emptyMessage: ''
   });
+});
+
+test('SnapshotService generates a news snapshot from RSS feeds and the local summarizer', async function () {
+  const repository = new InMemorySnapshotRepository({
+    id: 'dash-1',
+    tenantId: 'tenant-1',
+    ownerUserId: 'user-1',
+    name: 'Morning Focus',
+    description: 'Seed dashboard',
+    widgets: [
+      {
+        id: 'widget-news',
+        tenantId: 'tenant-1',
+        dashboardId: 'dash-1',
+        ownerUserId: 'user-1',
+        type: 'news',
+        title: 'News Briefing',
+        x: 0,
+        y: 0,
+        width: 420,
+        height: 420,
+        minWidth: 360,
+        minHeight: 320,
+        isVisible: true,
+        sortOrder: 1,
+        refreshMode: 'SNAPSHOT',
+        version: 1,
+        config: {},
+        configHash: 'hash-news',
+        data: {},
+        connections: [],
+        createdAt: new Date('2026-03-19T07:00:00.000Z'),
+        updatedAt: new Date('2026-03-19T07:00:00.000Z')
+      }
+    ]
+  });
+  const service = new SnapshotService(
+    repository,
+    {
+      async listCategories() {
+        return [
+          {
+            id: 'category-1',
+            tenantId: 'tenant-1',
+            name: 'Technology',
+            description: 'AI and software',
+            sortOrder: 1,
+            feeds: [
+              {
+                id: 'feed-1',
+                categoryId: 'category-1',
+                name: 'Ars Technica',
+                url: 'https://example.com/rss.xml',
+                createdAt: new Date('2026-03-19T07:00:00.000Z'),
+                updatedAt: new Date('2026-03-19T07:00:00.000Z')
+              }
+            ],
+            createdAt: new Date('2026-03-19T07:00:00.000Z'),
+            updatedAt: new Date('2026-03-19T07:00:00.000Z')
+          }
+        ];
+      }
+    },
+    unusedWeatherClient(),
+    unusedTodoistClient(),
+    unusedGoogleCalendarClient(),
+    unusedGoogleCalendarOAuthClient(),
+    {
+      async fetchFeed(url) {
+        assert.equal(url, 'https://example.com/rss.xml');
+
+        return {
+          sourceName: 'Ars Technica',
+          items: [
+            {
+              title: 'Open source model release',
+              url: 'https://example.com/article-1',
+              summary: 'A notable local-model release shipped today.',
+              publishedAt: '2026-03-20T07:00:00.000Z',
+              sourceName: 'Ars Technica'
+            }
+          ]
+        };
+      }
+    },
+    {
+      async summarize(input) {
+        assert.equal(input.categories.length, 1);
+        assert.equal(input.categories[0].articles.length, 1);
+
+        return {
+          headline: 'Local AI tooling leads the morning briefing.',
+          markdown: '# Local AI tooling leads the morning briefing.',
+          categories: [
+            {
+              name: 'Technology',
+              bullets: [
+                {
+                  headline: 'Open source model release',
+                  summary: 'A notable local-model release shipped today.',
+                  url: 'https://example.com/article-1',
+                  sourceName: 'Ars Technica'
+                }
+              ]
+            }
+          ]
+        };
+      }
+    }
+  );
+
+  const snapshot = await service.getLatestForDashboard('dash-1', {
+    tenantId: 'tenant-1',
+    userId: 'user-1',
+    displayName: 'Ralfe',
+    timezone: 'Europe/Paris'
+  });
+
+  assert.ok(snapshot);
+  assert.equal(snapshot && snapshot.widgets[0].status, 'READY');
+  assert.equal(snapshot && snapshot.widgets[0].content.headline, 'Local AI tooling leads the morning briefing.');
+  assert.equal(snapshot && snapshot.widgets[0].content.categories[0].bullets.length, 1);
 });
 
 test('SnapshotService generates a Google Calendar snapshot for the dashboard', async function () {
@@ -420,7 +573,16 @@ test('SnapshotService generates a Google Calendar snapshot for the dashboard', a
       };
     }
   };
-  const service = new SnapshotService(repository, weatherClient, todoistTaskClient, googleCalendarClient, googleCalendarOAuthClient);
+  const service = new SnapshotService(
+    repository,
+    unusedRssFeedRepository(),
+    weatherClient,
+    todoistTaskClient,
+    googleCalendarClient,
+    googleCalendarOAuthClient,
+    unusedRssFeedClient(),
+    unusedNewsSummarizer()
+  );
 
   const snapshot = await service.getLatestForDashboard('dash-1', {
     tenantId: 'tenant-1',
@@ -458,6 +620,124 @@ test('SnapshotService generates a Google Calendar snapshot for the dashboard', a
   });
 });
 
+test('SnapshotService logs Google Calendar snapshot failures for troubleshooting', async function () {
+  resetApplicationLogs();
+
+  const repository = new InMemorySnapshotRepository({
+    id: 'dash-1',
+    tenantId: 'tenant-1',
+    ownerUserId: 'user-1',
+    name: 'Morning Focus',
+    description: 'Seed dashboard',
+    widgets: [
+      {
+        id: 'widget-3',
+        tenantId: 'tenant-1',
+        dashboardId: 'dash-1',
+        ownerUserId: 'user-1',
+        type: 'calendar',
+        title: 'Today on Calendar',
+        x: 0,
+        y: 0,
+        width: 360,
+        height: 360,
+        minWidth: 360,
+        minHeight: 260,
+        isVisible: true,
+        sortOrder: 3,
+        refreshMode: 'SNAPSHOT',
+        version: 1,
+        config: {
+          connectionId: 'connection-2',
+          connectionName: 'Google Calendar',
+          provider: 'google-calendar'
+        },
+        configHash: 'hash-calendar',
+        data: {},
+        connections: [
+          {
+            id: 'connection-2',
+            usageRole: 'calendar',
+            connector: {
+              id: 'connection-2',
+              type: 'google-calendar',
+              name: 'Google Calendar',
+              status: 'ACTIVE',
+              authType: 'OAUTH',
+              baseUrl: null,
+              config: {
+                refreshToken: 'google-refresh-token',
+                expiresAt: '2026-03-19T07:00:00.000Z',
+                calendarId: 'team@example.com'
+              },
+              lastSyncAt: null,
+              createdAt: new Date('2026-03-19T07:00:00.000Z'),
+              updatedAt: new Date('2026-03-19T07:00:00.000Z')
+            }
+          }
+        ],
+        createdAt: new Date('2026-03-19T07:00:00.000Z'),
+        updatedAt: new Date('2026-03-19T07:00:00.000Z')
+      }
+    ]
+  });
+  const service = new SnapshotService(
+    repository,
+    unusedRssFeedRepository(),
+    unusedWeatherClient(),
+    unusedTodoistClient(),
+    {
+      async listEvents() {
+        throw new Error('Google Calendar request failed with status 403.');
+      }
+    },
+    {
+      async refreshAccessToken() {
+        return {
+          accessToken: 'google-refreshed-token',
+          expiresAt: '2026-03-20T12:00:00.000Z',
+          scope: 'https://www.googleapis.com/auth/calendar.readonly',
+          tokenType: 'Bearer'
+        };
+      }
+    },
+    unusedRssFeedClient(),
+    unusedNewsSummarizer()
+  );
+
+  const snapshot = await service.getLatestForDashboard('dash-1', {
+    tenantId: 'tenant-1',
+    userId: 'user-1',
+    displayName: 'Ralfe',
+    timezone: 'Europe/Paris'
+  });
+  const logs = listApplicationLogs({
+    levels: ['error']
+  });
+
+  assert.ok(snapshot);
+  assert.equal(snapshot && snapshot.generationStatus, 'FAILED');
+  assert.equal(snapshot && snapshot.widgets[0].errorMessage, 'Google Calendar request failed with status 403.');
+  assert.equal(logs.length, 1);
+  assert.equal(logs[0].scope, 'snapshot-service');
+  assert.equal(logs[0].event, 'widget_snapshot_failed');
+  assert.equal(logs[0].message, 'Google Calendar request failed with status 403.');
+  assert.deepEqual(logs[0].context, {
+    widgetId: 'widget-3',
+    widgetType: 'calendar',
+    widgetTitle: 'Today on Calendar',
+    dashboardId: 'dash-1',
+    tenantId: 'tenant-1',
+    provider: 'google-calendar',
+    connectionId: 'connection-2',
+    connectionName: 'Google Calendar',
+    errorMessage: 'Google Calendar request failed with status 403.',
+    source: 'dashboard_refresh'
+  });
+
+  resetApplicationLogs();
+});
+
 test('SnapshotService skips stale widget generation messages', async function () {
   const repository = new InMemorySnapshotRepository({
     id: 'dash-1',
@@ -472,7 +752,16 @@ test('SnapshotService skips stale widget generation messages', async function ()
       })
     ]
   });
-  const service = new SnapshotService(repository, unusedWeatherClient(), unusedTodoistClient(), unusedGoogleCalendarClient(), unusedGoogleCalendarOAuthClient());
+  const service = new SnapshotService(
+    repository,
+    unusedRssFeedRepository(),
+    unusedWeatherClient(),
+    unusedTodoistClient(),
+    unusedGoogleCalendarClient(),
+    unusedGoogleCalendarOAuthClient(),
+    unusedRssFeedClient(),
+    unusedNewsSummarizer()
+  );
 
   const result = await service.generateForWidget({
     schemaVersion: 1,
@@ -584,6 +873,30 @@ function unusedGoogleCalendarClient(): GoogleCalendarClient {
 function unusedGoogleCalendarOAuthClient(): Pick<GoogleCalendarOAuthClient, 'refreshAccessToken'> {
   return {
     async refreshAccessToken() {
+      throw new Error('not used');
+    }
+  };
+}
+
+function unusedRssFeedRepository(): Pick<RssFeedRepository, 'listCategories'> {
+  return {
+    async listCategories() {
+      return [];
+    }
+  };
+}
+
+function unusedRssFeedClient(): Pick<RssFeedClient, 'fetchFeed'> {
+  return {
+    async fetchFeed() {
+      throw new Error('not used');
+    }
+  };
+}
+
+function unusedNewsSummarizer(): Pick<NewsSummarizer, 'summarize'> {
+  return {
+    async summarize() {
       throw new Error('not used');
     }
   };

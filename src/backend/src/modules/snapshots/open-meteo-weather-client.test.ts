@@ -82,3 +82,35 @@ test('OpenMeteoWeatherClient throws when the provider returns an error', async f
     globalThis.fetch = originalFetch;
   }
 });
+
+test('OpenMeteoWeatherClient includes network failure details when fetch throws', async function () {
+  const originalFetch = globalThis.fetch;
+  const client = new OpenMeteoWeatherClient();
+
+  globalThis.fetch = async function mockFetch() {
+    const cause = new Error('connect ECONNREFUSED 127.0.0.1:443');
+    (cause as Error & { code?: string }).code = 'ECONNREFUSED';
+
+    const error = new TypeError('fetch failed') as TypeError & { cause?: unknown };
+    error.cause = cause;
+    throw error;
+  } as typeof fetch;
+
+  try {
+    await assert.rejects(
+      function () {
+        return client.getSnapshot({
+          latitude: 48.85341,
+          longitude: 2.3488,
+          timezone: 'Europe/Paris',
+          locationLabel: 'Paris, FR'
+        });
+      },
+      {
+        message: 'Weather provider request failed before receiving a response from https://api.open-meteo.com: ECONNREFUSED connect ECONNREFUSED 127.0.0.1:443.'
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

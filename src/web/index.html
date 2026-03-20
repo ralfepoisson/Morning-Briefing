@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Morning Briefing</title>
+    <title>Daily Briefing</title>
+    <link rel="icon" type="image/x-icon" href="./favicon.ico?v=2" />
     <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="./node_modules/@fortawesome/fontawesome-free/css/all.min.css" />
     <link rel="stylesheet" href="./assets/styles/main.css" />
@@ -28,11 +29,14 @@
     <script src="./app/core/services/connection.service.js"></script>
     <script src="./app/core/services/log.service.js"></script>
     <script src="./app/core/services/message-broker.service.js"></script>
+    <script src="./app/core/services/admin-widget.service.js"></script>
     <script src="./app/core/services/reference-data.service.js"></script>
     <script src="./app/core/services/rss-feed.service.js"></script>
     <script src="./app/core/services/widget-registry.service.js"></script>
     <script src="./app/widgets/weather/weather-widget.component.js"></script>
     <script src="./app/widgets/weather/weather-widget.definition.js"></script>
+    <script src="./app/widgets/news/news-widget.component.js"></script>
+    <script src="./app/widgets/news/news-widget.definition.js"></script>
     <script src="./app/widgets/calendar/calendar-widget.component.js"></script>
     <script src="./app/widgets/calendar/calendar-widget.definition.js"></script>
     <script src="./app/widgets/tasks/tasks-widget.component.js"></script>
@@ -44,6 +48,7 @@
     <script src="./app/features/dashboard/dashboard-page.component.js"></script>
     <script src="./app/features/admin/logs-page.component.js"></script>
     <script src="./app/features/admin/message-broker-page.component.js"></script>
+    <script src="./app/features/admin/widgets-page.component.js"></script>
     <script src="./app/features/connectors/connectors-page.component.js"></script>
     <script src="./app/features/rss-feeds/rss-feeds-page.component.js"></script>
   </body>

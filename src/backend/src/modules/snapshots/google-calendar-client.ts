@@ -1,3 +1,5 @@
+import { describeFetchFailure } from '../../shared/fetch-error.js';
+
 export type GoogleCalendarEvent = {
   id: string;
   title: string;
@@ -21,11 +23,17 @@ export class GoogleCalendarClientImpl implements GoogleCalendarClient {
     url.searchParams.set('timeMax', range.end.toISOString());
     url.searchParams.set('maxResults', '20');
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
+    let response: Response;
+
+    try {
+      response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      });
+    } catch (error) {
+      throw new Error(describeFetchFailure('Google Calendar request', url, error));
+    }
 
     if (!response.ok) {
       throw new Error(`Google Calendar request failed with status ${response.status}.`);

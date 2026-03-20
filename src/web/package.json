@@ -20,7 +20,8 @@
     "angular": "^1.8.3",
     "angular-route": "^1.8.3",
     "bootstrap": "^5.3.8",
-    "interactjs": "^1.10.27"
+    "interactjs": "^1.10.27",
+    "watch": "^1.0.2"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

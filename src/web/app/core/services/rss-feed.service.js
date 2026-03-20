@@ -3,230 +3,294 @@
 
   angular.module('morningBriefingApp').service('RssFeedService', RssFeedService);
 
-  RssFeedService.$inject = ['LocalStorageService'];
+  RssFeedService.$inject = ['$http', '$q', 'LocalStorageService', 'ApiConfig'];
 
-  function RssFeedService(LocalStorageService) {
+  function RssFeedService($http, $q, LocalStorageService, ApiConfig) {
     var STORAGE_KEY = 'morningBriefing.rssFeeds';
+    var backendAvailable = true;
 
     this.listCategories = function listCategories() {
-      return cloneCategories(loadCategories());
+      return requestBackendCategories().catch(function handleBackendFailure() {
+        backendAvailable = false;
+        return loadLegacyCategories();
+      });
     };
 
     this.createCategory = function createCategory(payload) {
-      var categories = loadCategories();
-      var categoryName = sanitizeText(payload && payload.name);
-
-      if (!categoryName) {
-        throw new Error('Enter a category name.');
+      if (!backendAvailable) {
+        return $q.resolve(createLegacyCategory(payload));
       }
 
-      if (findCategoryByName(categoryName, categories)) {
-        throw new Error('A category with that name already exists.');
-      }
-
-      var category = {
-        id: createId('category'),
-        name: categoryName,
-        description: sanitizeText(payload && payload.description),
-        feeds: []
-      };
-
-      categories.push(category);
-      persistCategories(categories);
-
-      return cloneCategory(category);
+      return $http.post(ApiConfig.baseUrl + '/rss-feeds/categories', {
+        name: payload.name,
+        description: payload.description || ''
+      }).then(function handleResponse(response) {
+        return response.data;
+      }).catch(function handleFailure() {
+        backendAvailable = false;
+        return createLegacyCategory(payload);
+      });
     };
 
     this.updateCategory = function updateCategory(categoryId, payload) {
-      var categories = loadCategories();
-      var category = findCategoryById(categoryId, categories);
-      var categoryName = sanitizeText(payload && payload.name);
-
-      if (!category) {
-        throw new Error('Category not found.');
+      if (!backendAvailable) {
+        return $q.resolve(updateLegacyCategory(categoryId, payload));
       }
 
-      if (!categoryName) {
-        throw new Error('Enter a category name.');
-      }
-
-      if (findCategoryByName(categoryName, categories, categoryId)) {
-        throw new Error('A category with that name already exists.');
-      }
-
-      category.name = categoryName;
-      category.description = sanitizeText(payload && payload.description);
-      persistCategories(categories);
-
-      return cloneCategory(category);
+      return $http.patch(ApiConfig.baseUrl + '/rss-feeds/categories/' + encodeURIComponent(categoryId), {
+        name: payload.name,
+        description: payload.description || ''
+      }).then(function handleResponse(response) {
+        return response.data;
+      }).catch(function handleFailure() {
+        backendAvailable = false;
+        return updateLegacyCategory(categoryId, payload);
+      });
     };
 
     this.deleteCategory = function deleteCategory(categoryId) {
-      var categories = loadCategories();
-      var categoryIndex = categories.findIndex(function (category) {
-        return category.id === categoryId;
-      });
-
-      if (categoryIndex === -1) {
-        throw new Error('Category not found.');
+      if (!backendAvailable) {
+        deleteLegacyCategory(categoryId);
+        return $q.resolve();
       }
 
-      categories.splice(categoryIndex, 1);
-      persistCategories(categories);
-
-      return cloneCategories(categories);
+      return $http.delete(ApiConfig.baseUrl + '/rss-feeds/categories/' + encodeURIComponent(categoryId)).catch(function handleFailure() {
+        backendAvailable = false;
+        deleteLegacyCategory(categoryId);
+      });
     };
 
     this.addFeed = function addFeed(categoryId, payload) {
-      var categories = loadCategories();
-      var category = findCategoryById(categoryId, categories);
-      var feedName = sanitizeText(payload && payload.name);
-      var feedUrl = sanitizeUrl(payload && payload.url);
-
-      if (!category) {
-        throw new Error('Choose a category before adding a feed.');
+      if (!backendAvailable) {
+        return $q.resolve(addLegacyFeed(categoryId, payload));
       }
 
-      if (!feedName) {
-        throw new Error('Enter a feed name.');
-      }
-
-      if (!feedUrl) {
-        throw new Error('Enter a valid RSS feed URL.');
-      }
-
-      if (category.feeds.some(function (feed) {
-        return feed.url.toLowerCase() === feedUrl.toLowerCase();
-      })) {
-        throw new Error('That feed URL is already in this category.');
-      }
-
-      category.feeds.push({
-        id: createId('feed'),
-        name: feedName,
-        url: feedUrl
+      return $http.post(ApiConfig.baseUrl + '/rss-feeds/categories/' + encodeURIComponent(categoryId) + '/feeds', {
+        name: payload.name,
+        url: payload.url
+      }).then(function handleResponse(response) {
+        return response.data;
+      }).catch(function handleFailure() {
+        backendAvailable = false;
+        return addLegacyFeed(categoryId, payload);
       });
-
-      persistCategories(categories);
-
-      return cloneCategory(category);
     };
 
     this.removeFeed = function removeFeed(categoryId, feedId) {
-      var categories = loadCategories();
-      var category = findCategoryById(categoryId, categories);
+      if (!backendAvailable) {
+        return $q.resolve(removeLegacyFeed(categoryId, feedId));
+      }
+
+      return $http.delete(
+        ApiConfig.baseUrl + '/rss-feeds/categories/' + encodeURIComponent(categoryId) + '/feeds/' + encodeURIComponent(feedId)
+      ).then(function handleResponse(response) {
+        return response.data;
+      }).catch(function handleFailure() {
+        backendAvailable = false;
+        return removeLegacyFeed(categoryId, feedId);
+      });
+    };
+
+    function requestBackendCategories() {
+      return $http.get(ApiConfig.baseUrl + '/rss-feeds').then(function handleResponse(response) {
+        var items = response.data.items || [];
+
+        if (items.length) {
+          return items;
+        }
+
+        return importLegacyIntoBackend(items);
+      });
+    }
+
+    function importLegacyIntoBackend(existingItems) {
+      var legacyCategories = loadLegacyCategories();
+
+      if (!legacyCategories.length) {
+        return existingItems;
+      }
+
+      return legacyCategories.reduce(function chainImport(promise, category) {
+        return promise.then(function importCategory() {
+          return $http.post(ApiConfig.baseUrl + '/rss-feeds/categories', {
+            name: category.name,
+            description: category.description || ''
+          }).then(function handleCategoryCreated(response) {
+            return (category.feeds || []).reduce(function chainFeedImport(feedPromise, feed) {
+              return feedPromise.then(function importFeed() {
+                return $http.post(ApiConfig.baseUrl + '/rss-feeds/categories/' + encodeURIComponent(response.data.id) + '/feeds', {
+                  name: feed.name,
+                  url: feed.url
+                });
+              });
+            }, $q.resolve());
+          });
+        });
+      }, $q.resolve()).then(function handleImported() {
+        LocalStorageService.remove(STORAGE_KEY);
+
+        return $http.get(ApiConfig.baseUrl + '/rss-feeds').then(function refresh(response) {
+          return response.data.items || existingItems;
+        });
+      }).catch(function ignoreImportError() {
+        return existingItems.length ? existingItems : legacyCategories;
+      });
+    }
+
+    function loadLegacyCategories() {
+      var rawValue = LocalStorageService.get(STORAGE_KEY);
+      var parsed;
+
+      if (!rawValue) {
+        return [];
+      }
+
+      try {
+        parsed = JSON.parse(rawValue);
+      } catch (error) {
+        return [];
+      }
+
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed.filter(function filterCategory(category) {
+        return category && typeof category.name === 'string' && category.name.trim();
+      }).map(cloneCategory);
+    }
+
+    function saveLegacyCategories(categories) {
+      LocalStorageService.set(STORAGE_KEY, JSON.stringify(categories));
+    }
+
+    function createLegacyCategory(payload) {
+      var categories = loadLegacyCategories();
+      var name = sanitizeText(payload && payload.name);
+      var category;
+
+      if (!name) {
+        throw new Error('Category name is required.');
+      }
+
+      if (findCategoryByName(categories, name)) {
+        throw new Error('A category with that name already exists.');
+      }
+
+      category = {
+        id: createId('category'),
+        name: name,
+        description: sanitizeText(payload && payload.description),
+        feeds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      categories.push(category);
+      saveLegacyCategories(categories);
+
+      return cloneCategory(category);
+    }
+
+    function updateLegacyCategory(categoryId, payload) {
+      var categories = loadLegacyCategories();
+      var category = findCategoryById(categories, categoryId);
+      var name = sanitizeText(payload && payload.name);
 
       if (!category) {
         throw new Error('Category not found.');
       }
 
-      category.feeds = category.feeds.filter(function (feed) {
+      if (!name) {
+        throw new Error('Category name is required.');
+      }
+
+      if (findCategoryByName(categories, name, categoryId)) {
+        throw new Error('A category with that name already exists.');
+      }
+
+      category.name = name;
+      category.description = sanitizeText(payload && payload.description);
+      category.updatedAt = new Date().toISOString();
+      saveLegacyCategories(categories);
+
+      return cloneCategory(category);
+    }
+
+    function deleteLegacyCategory(categoryId) {
+      var categories = loadLegacyCategories();
+      var nextCategories = categories.filter(function filterCategory(category) {
+        return category.id !== categoryId;
+      });
+
+      if (nextCategories.length === categories.length) {
+        throw new Error('Category not found.');
+      }
+
+      saveLegacyCategories(nextCategories);
+    }
+
+    function addLegacyFeed(categoryId, payload) {
+      var categories = loadLegacyCategories();
+      var category = findCategoryById(categories, categoryId);
+      var name = sanitizeText(payload && payload.name);
+      var url = sanitizeUrl(payload && payload.url);
+
+      if (!category) {
+        throw new Error('Category not found.');
+      }
+
+      if (!name) {
+        throw new Error('Feed name is required.');
+      }
+
+      if (!url) {
+        throw new Error('A valid feed URL is required.');
+      }
+
+      if ((category.feeds || []).some(function hasFeed(feed) {
+        return feed.url.toLowerCase() === url.toLowerCase();
+      })) {
+        throw new Error('That feed URL already exists in this category.');
+      }
+
+      category.feeds = category.feeds || [];
+      category.feeds.push({
+        id: createId('feed'),
+        name: name,
+        url: url,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      category.updatedAt = new Date().toISOString();
+      saveLegacyCategories(categories);
+
+      return cloneCategory(category);
+    }
+
+    function removeLegacyFeed(categoryId, feedId) {
+      var categories = loadLegacyCategories();
+      var category = findCategoryById(categories, categoryId);
+      var nextFeeds;
+
+      if (!category) {
+        throw new Error('Category not found.');
+      }
+
+      nextFeeds = (category.feeds || []).filter(function filterFeed(feed) {
         return feed.id !== feedId;
       });
 
-      persistCategories(categories);
+      if (nextFeeds.length === (category.feeds || []).length) {
+        throw new Error('Feed not found.');
+      }
+
+      category.feeds = nextFeeds;
+      category.updatedAt = new Date().toISOString();
+      saveLegacyCategories(categories);
 
       return cloneCategory(category);
-    };
-
-    function loadCategories() {
-      var storedValue = LocalStorageService.get(STORAGE_KEY);
-
-      if (!storedValue) {
-        persistCategories(DEFAULT_CATEGORIES);
-        return cloneCategories(DEFAULT_CATEGORIES);
-      }
-
-      try {
-        return normalizeCategories(JSON.parse(storedValue));
-      } catch (error) {
-        persistCategories(DEFAULT_CATEGORIES);
-        return cloneCategories(DEFAULT_CATEGORIES);
-      }
     }
-
-    function persistCategories(categories) {
-      LocalStorageService.set(STORAGE_KEY, JSON.stringify(normalizeCategories(categories)));
-    }
-  }
-
-  var DEFAULT_CATEGORIES = [
-    {
-      id: 'category-world',
-      name: 'World',
-      description: 'International headlines and major geopolitics.',
-      feeds: []
-    },
-    {
-      id: 'category-business',
-      name: 'Business',
-      description: 'Markets, companies, and the broader economy.',
-      feeds: []
-    },
-    {
-      id: 'category-technology',
-      name: 'Technology',
-      description: 'AI, software, devices, and product launches.',
-      feeds: []
-    }
-  ];
-
-  function normalizeCategories(value) {
-    if (!Array.isArray(value) || !value.length) {
-      return cloneCategories(DEFAULT_CATEGORIES);
-    }
-
-    return value.reduce(function (categories, category, categoryIndex) {
-      var categoryName = sanitizeText(category && category.name);
-
-      if (!categoryName) {
-        return categories;
-      }
-
-      categories.push({
-        id: sanitizeText(category && category.id) || createFallbackId('category', categoryIndex),
-        name: categoryName,
-        description: sanitizeText(category && category.description),
-        feeds: Array.isArray(category && category.feeds)
-          ? category.feeds.reduce(function (feeds, feed, feedIndex) {
-            var feedName = sanitizeText(feed && feed.name);
-            var feedUrl = sanitizeUrl(feed && feed.url);
-
-            if (!feedName || !feedUrl) {
-              return feeds;
-            }
-
-            feeds.push({
-              id: sanitizeText(feed && feed.id) || createFallbackId('feed', categoryIndex + '-' + feedIndex),
-              name: feedName,
-              url: feedUrl
-            });
-
-            return feeds;
-          }, [])
-          : []
-      });
-
-      return categories;
-    }, []);
-  }
-
-  function findCategoryById(categoryId, categories) {
-    return (categories || []).find(function (category) {
-      return category.id === categoryId;
-    }) || null;
-  }
-
-  function findCategoryByName(name, categories, ignoredCategoryId) {
-    var normalizedName = name.toLowerCase();
-
-    return (categories || []).find(function (category) {
-      return category.id !== ignoredCategoryId && category.name.toLowerCase() === normalizedName;
-    }) || null;
-  }
-
-  function cloneCategories(categories) {
-    return (categories || []).map(cloneCategory);
   }
 
   function cloneCategory(category) {
@@ -234,16 +298,32 @@
       id: category.id,
       name: category.name,
       description: category.description || '',
-      feeds: Array.isArray(category.feeds)
-        ? category.feeds.map(function (feed) {
-          return {
-            id: feed.id,
-            name: feed.name,
-            url: feed.url
-          };
-        })
-        : []
+      feeds: Array.isArray(category.feeds) ? category.feeds.map(function mapFeed(feed) {
+        return {
+          id: feed.id,
+          name: feed.name,
+          url: feed.url,
+          createdAt: feed.createdAt,
+          updatedAt: feed.updatedAt
+        };
+      }) : [],
+      createdAt: category.createdAt,
+      updatedAt: category.updatedAt
     };
+  }
+
+  function findCategoryById(categories, categoryId) {
+    return (categories || []).find(function findCategory(category) {
+      return category.id === categoryId;
+    }) || null;
+  }
+
+  function findCategoryByName(categories, name, ignoredCategoryId) {
+    var normalizedName = name.toLowerCase();
+
+    return (categories || []).find(function findCategory(category) {
+      return category.id !== ignoredCategoryId && category.name.toLowerCase() === normalizedName;
+    }) || null;
   }
 
   function sanitizeText(value) {
@@ -251,20 +331,20 @@
   }
 
   function sanitizeUrl(value) {
-    var urlValue = sanitizeText(value);
+    var text = sanitizeText(value);
 
-    if (!urlValue) {
+    if (!text) {
       return '';
     }
 
     try {
-      var parsedUrl = new URL(urlValue);
+      var url = new URL(text);
 
-      if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
         return '';
       }
 
-      return parsedUrl.toString();
+      return url.toString();
     } catch (error) {
       return '';
     }
@@ -272,9 +352,5 @@
 
   function createId(prefix) {
     return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
-  }
-
-  function createFallbackId(prefix, suffix) {
-    return prefix + '-' + suffix;
   }
 })();

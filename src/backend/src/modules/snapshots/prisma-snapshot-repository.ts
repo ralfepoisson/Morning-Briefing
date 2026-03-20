@@ -460,6 +460,20 @@ function buildDashboardSummary(
     contentJson: unknown;
   }>
 ): Record<string, unknown> {
+  const newsSummary = widgetSnapshots.find(function findNews(snapshot) {
+    return snapshot.widgetType === 'news' && snapshot.status === 'READY';
+  });
+
+  if (newsSummary) {
+    const content = asObject(newsSummary.contentJson);
+
+    if (typeof content.headline === 'string' && content.headline.trim()) {
+      return {
+        headline: content.headline
+      };
+    }
+  }
+
   const asReadySummary = widgetSnapshots.find(function findWeather(snapshot) {
     return snapshot.widgetType === 'weather' && snapshot.status === 'READY';
   });

@@ -18,6 +18,26 @@ export type WidgetDefinition = {
 
 const widgetDefinitions: WidgetDefinition[] = [
   {
+    type: 'news',
+    name: 'News',
+    title: 'News Briefing',
+    description: 'Summaries from configured RSS feeds',
+    defaultSize: { width: 420, height: 420 },
+    minSize: { width: 360, height: 320 },
+    refreshMode: 'SNAPSHOT',
+    createDefaultConfig: function createDefaultConfig() {
+      return {};
+    },
+    createMockData: function createMockData() {
+      return {
+        headline: 'Top stories from your RSS feeds.',
+        markdown: '# Top stories from your RSS feeds.\n\n## Getting started\n- Add feeds on the RSS Feeds page to generate a news snapshot.',
+        categories: [],
+        emptyMessage: 'Add RSS feeds on the RSS Feeds page to start generating news summaries.'
+      };
+    }
+  },
+  {
     type: 'weather',
     name: 'Weather',
     title: 'Weather Outlook',

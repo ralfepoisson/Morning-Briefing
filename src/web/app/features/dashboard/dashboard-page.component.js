@@ -147,7 +147,7 @@
       '        <div>' +
       '          <div class="eyebrow">Widget Library</div>' +
       '          <h2 class="modal-title mb-2">Add a widget</h2>' +
-      '          <p class="modal-copy mb-0">Weather, tasks, and calendar are ready to place. More widgets can slot into this same library later.</p>' +
+      '          <p class="modal-copy mb-0">Weather, news, tasks, and calendar are ready to place. More widgets can slot into this same library later.</p>' +
       '        </div>' +
       '        <button type="button" class="btn btn-outline-secondary icon-button" ng-click="$ctrl.closeWidgetPanel()" aria-label="Close widget panel"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>' +
       '      </div>' +
@@ -187,6 +187,7 @@
     $ctrl.$onInit = function onInit() {
       bindUiWatchers();
       DashboardService.load().then(function handleDashboardLoad() {
+        $ctrl.ready = true;
         return syncState();
       }).finally(function markReady() {
         $ctrl.ready = true;
@@ -510,6 +511,8 @@
     };
 
     function syncState() {
+      var activeDashboardId;
+
       $ctrl.dashboards = DashboardService.list();
       $ctrl.activeDashboard = DashboardService.getActive();
 
@@ -519,17 +522,30 @@
         return Promise.resolve([]);
       }
 
-      $ctrl.widgets = WidgetService.listForDashboard($ctrl.activeDashboard.id);
+      activeDashboardId = $ctrl.activeDashboard.id;
+      $ctrl.widgets = WidgetService.listForDashboard(activeDashboardId);
 
-      return WidgetService.loadForDashboard($ctrl.activeDashboard.id).then(function handleWidgetLoad(widgets) {
+      return WidgetService.loadForDashboard(activeDashboardId).then(function handleWidgetLoad(widgets) {
+        if (!$ctrl.activeDashboard || $ctrl.activeDashboard.id !== activeDashboardId) {
+          return widgets;
+        }
+
         $ctrl.widgets = widgets;
-        return DashboardSnapshotService.loadLatestForDashboard($ctrl.activeDashboard.id).then(function handleSnapshot(snapshot) {
-          WidgetService.applySnapshot($ctrl.activeDashboard.id, snapshot);
-          $ctrl.widgets = WidgetService.listForDashboard($ctrl.activeDashboard.id);
+        return DashboardSnapshotService.loadLatestForDashboard(activeDashboardId).then(function handleSnapshot(snapshot) {
+          if (!$ctrl.activeDashboard || $ctrl.activeDashboard.id !== activeDashboardId) {
+            return widgets;
+          }
+
+          WidgetService.applySnapshot(activeDashboardId, snapshot);
+          $ctrl.widgets = WidgetService.listForDashboard(activeDashboardId);
           return $ctrl.widgets;
         }).catch(function ignoreSnapshotFailure() {
-          WidgetService.applySnapshot($ctrl.activeDashboard.id, null);
-          $ctrl.widgets = WidgetService.listForDashboard($ctrl.activeDashboard.id);
+          if (!$ctrl.activeDashboard || $ctrl.activeDashboard.id !== activeDashboardId) {
+            return widgets;
+          }
+
+          WidgetService.applySnapshot(activeDashboardId, null);
+          $ctrl.widgets = WidgetService.listForDashboard(activeDashboardId);
           return $ctrl.widgets;
         });
       });

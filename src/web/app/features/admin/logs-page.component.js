@@ -72,17 +72,27 @@
       '            <th>Scope</th>' +
       '            <th>Event</th>' +
       '            <th>Message</th>' +
-      '            <th>Context</th>' +
+      '            <th class="logs-table__context-column">Context</th>' +
       '          </tr>' +
       '        </thead>' +
       '        <tbody>' +
-      '          <tr ng-repeat="entry in $ctrl.data.entries track by entry.id">' +
+      '          <tr ng-repeat-start="entry in $ctrl.data.entries track by entry.id">' +
       '            <td class="logs-table__time">{{entry.timestamp | date:\'medium\'}}</td>' +
       '            <td><span class="message-broker-status-pill" ng-class="$ctrl.getLogLevelClass(entry.level)">{{entry.level}}</span></td>' +
       '            <td>{{entry.scope}}</td>' +
       '            <td>{{entry.event}}</td>' +
       '            <td class="logs-table__message">{{entry.message}}</td>' +
-      '            <td><pre class="logs-table__context">{{$ctrl.formatContext(entry.context)}}</pre></td>' +
+      '            <td class="logs-table__context-cell">' +
+      '              <button type="button" class="logs-context-toggle" ng-click="$ctrl.toggleExpanded(entry.id)" ng-attr-aria-expanded="{{$ctrl.isExpanded(entry.id)}}">' +
+      '                <i class="fa-solid" ng-class="$ctrl.isExpanded(entry.id) ? \'fa-chevron-up\' : \'fa-chevron-down\'" aria-hidden="true"></i>' +
+      '                <span>{{$ctrl.isExpanded(entry.id) ? "Hide context" : "Show context"}}</span>' +
+      '              </button>' +
+      '            </td>' +
+      '          </tr>' +
+      '          <tr class="logs-table__details-row" ng-repeat-end ng-if="$ctrl.isExpanded(entry.id)">' +
+      '            <td colspan="6">' +
+      '              <pre class="logs-table__context">{{$ctrl.formatContext(entry.context)}}</pre>' +
+      '            </td>' +
       '          </tr>' +
       '        </tbody>' +
       '      </table>' +
@@ -114,6 +124,7 @@
     $ctrl.data = null;
     $ctrl.errorMessage = '';
     $ctrl.isLoading = false;
+    $ctrl.expandedEntries = {};
 
     $ctrl.$onInit = function onInit() {
       loadLogs();
@@ -168,6 +179,14 @@
       }
 
       return 'message-broker-status-pill--completed';
+    };
+
+    $ctrl.isExpanded = function isExpanded(entryId) {
+      return !!$ctrl.expandedEntries[entryId];
+    };
+
+    $ctrl.toggleExpanded = function toggleExpanded(entryId) {
+      $ctrl.expandedEntries[entryId] = !$ctrl.expandedEntries[entryId];
     };
 
     $ctrl.getLevelCount = function getLevelCount(level) {

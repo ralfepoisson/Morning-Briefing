@@ -1,4 +1,5 @@
 import type { WeatherSnapshotData, WeatherSnapshotInput } from './snapshot-types.js';
+import { describeFetchFailure } from '../../shared/fetch-error.js';
 
 const WEATHER_CODE_LABELS: Record<number, string> = {
   0: 'Clear sky',
@@ -45,7 +46,13 @@ export class OpenMeteoWeatherClient implements WeatherClient {
     url.searchParams.set('current', 'temperature_2m,apparent_temperature,weather_code,wind_speed_10m');
     url.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max');
 
-    const response = await fetch(url);
+    let response: Response;
+
+    try {
+      response = await fetch(url);
+    } catch (error) {
+      throw new Error(describeFetchFailure('Weather provider request', url, error));
+    }
 
     if (!response.ok) {
       throw new Error('Weather provider request failed.');

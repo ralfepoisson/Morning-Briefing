@@ -111,6 +111,10 @@
           widget.title = 'Weather Outlook';
         }
 
+        if (widget.type === 'news') {
+          widget.title = 'News Briefing';
+        }
+
         if (widget.type === 'tasks') {
           widget.title = 'Task List';
         }
@@ -147,6 +151,9 @@
         condition: widgetPayload.data && widgetPayload.data.condition,
         highLow: widgetPayload.data && widgetPayload.data.highLow,
         summary: widgetPayload.data && widgetPayload.data.summary,
+        headline: widgetPayload.data && widgetPayload.data.headline,
+        markdown: widgetPayload.data && widgetPayload.data.markdown,
+        categories: widgetPayload.data && widgetPayload.data.categories,
         details: widgetPayload.data && widgetPayload.data.details,
         dateLabel: widgetPayload.data && widgetPayload.data.dateLabel,
         appointments: widgetPayload.data && widgetPayload.data.appointments,

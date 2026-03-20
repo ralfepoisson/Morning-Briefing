@@ -68,10 +68,41 @@ model Tenant {
   dashboards  Dashboard[]
   widgets     DashboardWidget[]
   connectors  Connector[]
+  rssFeedCategories RssFeedCategory[]
   referenceCities ReferenceCity[]
   snapshots   BriefingSnapshot[]
 
   @@map("tenants")
+}
+
+model RssFeedCategory {
+  id             String     @id @default(uuid()) @db.Uuid
+  tenantId       String     @map("tenant_id") @db.Uuid
+  name           String
+  normalizedName String     @map("normalized_name")
+  description    String     @default("")
+  sortOrder      Int        @default(0) @map("sort_order")
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant         Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  feeds          RssFeed[]
+
+  @@unique([tenantId, normalizedName])
+  @@index([tenantId, sortOrder])
+  @@map("rss_feed_categories")
+}
+
+model RssFeed {
+  id          String          @id @default(uuid()) @db.Uuid
+  categoryId  String          @map("category_id") @db.Uuid
+  name        String
+  url         String
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  category    RssFeedCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId])
+  @@map("rss_feeds")
 }
 
 model AppUser {

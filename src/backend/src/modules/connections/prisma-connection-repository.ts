@@ -51,12 +51,19 @@ export class PrismaConnectionRepository implements ConnectionRepository {
   }
 
   async update(input: UpdateConnectionInput): Promise<ConnectionRecord> {
+    const existingConnector = await this.prisma.connector.findUniqueOrThrow({
+      where: {
+        id: input.connectionId
+      }
+    });
+
     const connector = await this.prisma.connector.update({
       where: {
         id: input.connectionId
       },
       data: {
         name: typeof input.name === 'string' ? input.name.trim() : undefined,
+        authType: input.credentials ? getConnectionAuthType(existingConnector.connectorType, input.credentials) : undefined,
         configJson: input.credentials ? normalizeConfig(input.credentials) : undefined,
         status: 'ACTIVE'
       }
