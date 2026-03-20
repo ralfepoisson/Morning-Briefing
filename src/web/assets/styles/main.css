@@ -1201,22 +1201,22 @@ body.theme-light .widget-card {
 
 .widget-resize-handle {
   position: absolute;
-  left: 50%;
+  right: 12px;
   bottom: 8px;
-  width: 56px;
-  height: 10px;
-  transform: translateX(-50%);
-  border-radius: 999px;
+  width: 18px;
+  height: 18px;
+  transform: none;
+  border-radius: 6px;
   background: rgba(121, 224, 192, 0.18);
-  cursor: ns-resize;
+  cursor: nwse-resize;
 }
 
 .widget-resize-handle::before {
   content: "";
   position: absolute;
-  inset: 3px 14px;
-  border-radius: 999px;
-  background: rgba(121, 224, 192, 0.7);
+  inset: 4px;
+  border-right: 2px solid rgba(121, 224, 192, 0.78);
+  border-bottom: 2px solid rgba(121, 224, 192, 0.78);
 }
 
 .widget-card--weather::after {

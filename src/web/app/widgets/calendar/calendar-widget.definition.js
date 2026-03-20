@@ -19,9 +19,8 @@
         height: 360
       },
       resizable: {
-        vertical: true,
-        minHeight: 260,
-        maxHeight: 560
+        minWidth: 140,
+        minHeight: 140
       },
       createMockWidget: function createMockWidget(options) {
         var data = options.data || {};

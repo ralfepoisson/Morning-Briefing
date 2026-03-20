@@ -87,8 +87,8 @@
         return;
       }
 
-      widget.width = Math.round(width);
-      widget.height = Math.max(getMinHeight(widget.type, widget.height), Math.round(height));
+      widget.width = Math.max(getMinWidth(widget.type), Math.round(width));
+      widget.height = Math.max(getMinHeight(widget.type), Math.round(height));
     };
 
     this.applySnapshot = function applySnapshot(dashboardId, snapshot) {
@@ -162,14 +162,24 @@
       });
     }
 
-    function getMinHeight(type, fallbackHeight) {
+    function getMinWidth(type) {
       var definition = WidgetRegistryService.get(type);
 
-      if (definition && definition.resizable && definition.resizable.vertical) {
+      if (definition && definition.resizable && definition.resizable.minWidth) {
+        return definition.resizable.minWidth;
+      }
+
+      return 140;
+    }
+
+    function getMinHeight(type) {
+      var definition = WidgetRegistryService.get(type);
+
+      if (definition && definition.resizable && definition.resizable.minHeight) {
         return definition.resizable.minHeight;
       }
 
-      return fallbackHeight;
+      return 140;
     }
 
     function replaceWidgets(dashboardId, nextWidgets) {

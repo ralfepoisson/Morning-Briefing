@@ -522,7 +522,7 @@
     $ctrl.isWidgetResizable = function isWidgetResizable(widget) {
       var definition = WidgetRegistryService.get(widget.type);
 
-      return !!(definition && definition.resizable && definition.resizable.vertical);
+      return !!(definition && definition.resizable);
     };
 
     function syncState() {

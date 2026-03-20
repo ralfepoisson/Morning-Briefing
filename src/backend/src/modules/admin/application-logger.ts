@@ -3,6 +3,7 @@ import {
   type ApplicationLogEntry,
   type ApplicationLogLevel
 } from './application-log-store.js';
+import { appendApplicationLogToFile } from './application-log-file.js';
 
 export function logApplicationEvent(input: {
   level: ApplicationLogLevel;
@@ -21,6 +22,9 @@ export function logApplicationEvent(input: {
   });
 
   writeToConsole(entry);
+  void appendApplicationLogToFile(entry).catch(function ignoreLogFileWriteError() {
+    return undefined;
+  });
 
   return entry;
 }

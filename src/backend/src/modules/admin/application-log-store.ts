@@ -10,6 +10,13 @@ export type ApplicationLogEntry = {
   context: Record<string, unknown>;
 };
 
+export type ApplicationLogFilters = {
+  search?: string;
+  levels?: ApplicationLogLevel[];
+  limit?: number;
+  since?: string;
+};
+
 const MAX_LOG_ENTRIES = 500;
 const logEntries: ApplicationLogEntry[] = [];
 
@@ -28,18 +35,17 @@ export function appendApplicationLog(entry: Omit<ApplicationLogEntry, 'id'>): Ap
   return storedEntry;
 }
 
-export function listApplicationLogs(filters: {
-  search?: string;
-  levels?: ApplicationLogLevel[];
-  limit?: number;
-  since?: string;
-} = {}): ApplicationLogEntry[] {
+export function listApplicationLogs(filters: ApplicationLogFilters = {}): ApplicationLogEntry[] {
+  return filterApplicationLogs(logEntries, filters);
+}
+
+export function filterApplicationLogs(entries: ApplicationLogEntry[], filters: ApplicationLogFilters = {}): ApplicationLogEntry[] {
   const normalizedSearch = normalizeSearch(filters.search);
   const includedLevels = new Set(filters.levels && filters.levels.length ? filters.levels : ['info', 'warn', 'error']);
   const limit = Math.max(1, Math.min(filters.limit || 200, MAX_LOG_ENTRIES));
   const sinceTimestamp = filters.since ? Date.parse(filters.since) : Number.NaN;
 
-  return logEntries
+  return entries
     .filter(function filterEntry(entry) {
       if (!includedLevels.has(entry.level)) {
         return false;
@@ -61,7 +67,11 @@ export function listApplicationLogs(filters: {
 }
 
 export function summarizeApplicationLogs(): Record<ApplicationLogLevel, number> {
-  return logEntries.reduce<Record<ApplicationLogLevel, number>>(function reduceSummary(summary, entry) {
+  return summarizeEntries(logEntries);
+}
+
+export function summarizeEntries(entries: ApplicationLogEntry[]): Record<ApplicationLogLevel, number> {
+  return entries.reduce<Record<ApplicationLogLevel, number>>(function reduceSummary(summary, entry) {
     summary[entry.level] += 1;
     return summary;
   }, {

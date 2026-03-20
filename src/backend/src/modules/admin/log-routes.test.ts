@@ -7,7 +7,7 @@ test('GET /api/v1/admin/logs returns stored logs with default filters', async fu
   const app = Fastify();
 
   await registerLogRoutes(app, {
-    listLogs: function listLogs() {
+    async listLogs() {
       return [
         {
           id: 'log-2',
@@ -34,7 +34,7 @@ test('GET /api/v1/admin/logs returns stored logs with default filters', async fu
         }
       ];
     },
-    summarizeLogs: function summarizeLogs() {
+    async summarizeLogs() {
       return {
         info: 3,
         warn: 1,
@@ -110,11 +110,11 @@ test('GET /api/v1/admin/logs normalizes filters', async function () {
   };
 
   await registerLogRoutes(app, {
-    listLogs: function listLogs(filters) {
+    async listLogs(filters) {
       receivedFilters = filters;
       return [];
     },
-    summarizeLogs: function summarizeLogs() {
+    async summarizeLogs() {
       return {
         info: 0,
         warn: 0,

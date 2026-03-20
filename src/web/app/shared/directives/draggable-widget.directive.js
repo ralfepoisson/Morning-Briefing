@@ -51,17 +51,14 @@
 
         interactable.resizable({
           edges: {
+            right: '.widget-resize-handle',
             bottom: '.widget-resize-handle'
           },
           modifiers: [
             interact.modifiers.restrictSize({
               min: {
-                width: scope.widget.width,
+                width: getMinWidth(),
                 height: getMinHeight()
-              },
-              max: {
-                width: scope.widget.width,
-                height: getMaxHeight()
               }
             })
           ],
@@ -72,6 +69,7 @@
               }
 
               scope.$applyAsync(function applyResizeMove() {
+                scope.widget.width = Math.round(event.rect.width);
                 scope.widget.height = Math.round(event.rect.height);
               });
             },
@@ -107,23 +105,23 @@
         function isResizable() {
           var definition = WidgetRegistryService.get(scope.widget.type);
 
-          return !!(definition && definition.resizable && definition.resizable.vertical);
+          return !!(definition && definition.resizable);
+        }
+
+        function getMinWidth() {
+          var definition = WidgetRegistryService.get(scope.widget.type);
+
+          return definition && definition.resizable && definition.resizable.minWidth
+            ? definition.resizable.minWidth
+            : 140;
         }
 
         function getMinHeight() {
           var definition = WidgetRegistryService.get(scope.widget.type);
 
-          return definition && definition.resizable && definition.resizable.vertical
+          return definition && definition.resizable && definition.resizable.minHeight
             ? definition.resizable.minHeight
-            : scope.widget.height;
-        }
-
-        function getMaxHeight() {
-          var definition = WidgetRegistryService.get(scope.widget.type);
-
-          return definition && definition.resizable && definition.resizable.vertical
-            ? definition.resizable.maxHeight
-            : scope.widget.height;
+            : 140;
         }
       }
     };

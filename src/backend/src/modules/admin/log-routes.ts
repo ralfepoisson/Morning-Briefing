@@ -1,21 +1,23 @@
 import type { FastifyInstance } from 'fastify';
 import {
-  listApplicationLogs,
-  summarizeApplicationLogs,
   type ApplicationLogEntry,
   type ApplicationLogLevel
 } from './application-log-store.js';
+import {
+  listPersistedApplicationLogs,
+  summarizePersistedApplicationLogs
+} from './application-log-file.js';
 
 type LogRouteDependencies = {
-  listLogs: typeof listApplicationLogs;
-  summarizeLogs: typeof summarizeApplicationLogs;
+  listLogs: typeof listPersistedApplicationLogs;
+  summarizeLogs: typeof summarizePersistedApplicationLogs;
 };
 
 export async function registerLogRoutes(
   app: FastifyInstance,
   dependencies: LogRouteDependencies = {
-    listLogs: listApplicationLogs,
-    summarizeLogs: summarizeApplicationLogs
+    listLogs: listPersistedApplicationLogs,
+    summarizeLogs: summarizePersistedApplicationLogs
   }
 ): Promise<void> {
   app.get('/api/v1/admin/logs', async function handleGetLogs(request) {
@@ -29,7 +31,7 @@ export async function registerLogRoutes(
     const limit = parseLimit(query.limit);
     const range = parseRange(query.range);
     const since = range ? new Date(Date.now() - (range.minutes * 60 * 1000)).toISOString() : undefined;
-    const entries = dependencies.listLogs({
+    const entries = await dependencies.listLogs({
       search: query.q,
       levels,
       limit,
@@ -44,7 +46,7 @@ export async function registerLogRoutes(
         range: range ? range.value : 'all'
       },
       totals: {
-        stored: dependencies.summarizeLogs(),
+        stored: await dependencies.summarizeLogs(),
         filtered: summarizeEntries(entries)
       },
       entries: entries.map(serializeEntry)
