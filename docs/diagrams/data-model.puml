@@ -63,6 +63,7 @@ class DashboardWidget {
   sort_order : int
   version : int
   config_json : json
+  config_hash : varchar
   created_at : timestamp
   updated_at : timestamp
 }
@@ -119,6 +120,28 @@ class WidgetSnapshot {
   error_message : varchar
 }
 
+class SnapshotGenerationJob {
+  +snapshot_generation_job_id : UUID
+  --
+  widget_id : UUID
+  dashboard_id : UUID
+  tenant_id : UUID
+  user_id : UUID
+  snapshot_date : date
+  trigger_source : varchar
+  idempotency_key : varchar
+  requested_config_version : int
+  requested_config_hash : varchar
+  status : varchar
+  attempt_count : int
+  last_message_id : varchar
+  last_error : varchar
+  started_at : timestamp
+  completed_at : timestamp
+  created_at : timestamp
+  updated_at : timestamp
+}
+
 Tenant "1" -- "0..*" AppUser : has >
 Tenant "1" -- "0..*" Dashboard : owns >
 Tenant "1" -- "0..*" Connector : provides >
@@ -136,6 +159,9 @@ Dashboard "1" -- "0..*" BriefingSnapshot : rendered as >
 
 BriefingSnapshot "1" -- "0..*" WidgetSnapshot : includes >
 DashboardWidget "1" -- "0..*" WidgetSnapshot : materialised as >
+DashboardWidget "1" -- "0..*" SnapshotGenerationJob : requested as >
+AppUser "1" -- "0..*" SnapshotGenerationJob : requested for >
+Dashboard "1" -- "0..*" SnapshotGenerationJob : scoped to >
 
 note right of DashboardWidget
 Represents the configured widget instance
@@ -148,6 +174,14 @@ for a widget at a specific point in time.
 Denormalises widget type and title so
 historical snapshots remain readable even
 if widget configuration changes later.
+end note
+
+note right of SnapshotGenerationJob
+Tracks idempotent widget snapshot commands.
+Used to coalesce duplicate SQS deliveries,
+record retries, and mark stale jobs skipped.
+The logical key is widget_id + snapshot_date
++ requested_config_hash.
 end note
 
 note bottom of Connector

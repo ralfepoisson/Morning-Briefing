@@ -26,7 +26,24 @@
       '          </button>' +
       '        </div>' +
       '      </div>' +
-      '      <a class="nav-link" href="" ng-click="$ctrl.prevent($event)">Connectors</a>' +
+      '      <a class="nav-link" ng-class="{active: $ctrl.isActiveRoute(\'/connectors\')}" href="#/connectors">Connectors</a>' +
+      '      <a class="nav-link" ng-class="{active: $ctrl.isActiveRoute(\'/rss-feeds\')}" href="#/rss-feeds">RSS Feeds</a>' +
+      '      <div class="dashboard-menu dashboard-menu--compact" ng-class="{\'dashboard-menu--open\': $ctrl.isAdminMenuOpen}">' +
+      '        <button class="dashboard-menu__trigger dashboard-menu__trigger--compact" type="button" ng-click="$ctrl.toggleAdminMenu()" aria-haspopup="true" aria-expanded="{{$ctrl.isAdminMenuOpen}}">' +
+      '          <span class="dashboard-menu__label">Admin</span>' +
+      '          <i class="fa-solid" ng-class="$ctrl.isAdminMenuOpen ? \'fa-chevron-up\' : \'fa-chevron-down\'" aria-hidden="true"></i>' +
+      '        </button>' +
+      '        <div class="dashboard-menu__panel dashboard-menu__panel--compact" ng-if="$ctrl.isAdminMenuOpen">' +
+      '          <a class="dashboard-menu__item dashboard-menu__item--link" ng-class="{\'dashboard-menu__item--active\': $ctrl.isActiveRoute(\'/admin/logs\')}" href="#/admin/logs" ng-click="$ctrl.closeAdminMenu()">' +
+      '            <span class="dashboard-menu__item-title">Logs</span>' +
+      '            <span class="dashboard-menu__item-copy">Search recent backend events and filter by level</span>' +
+      '          </a>' +
+      '          <a class="dashboard-menu__item dashboard-menu__item--link" ng-class="{\'dashboard-menu__item--active\': $ctrl.isActiveRoute(\'/admin/message-broker\')}" href="#/admin/message-broker" ng-click="$ctrl.closeAdminMenu()">' +
+      '            <span class="dashboard-menu__item-title">Message Broker</span>' +
+      '            <span class="dashboard-menu__item-copy">Queue depth, recent jobs, and throughput</span>' +
+      '          </a>' +
+      '        </div>' +
+      '      </div>' +
       '      <div class="theme-toggle theme-toggle--nav" role="group" aria-label="Theme switcher">' +
       '        <button type="button" class="theme-toggle__button" ng-class="{active: $ctrl.ui.theme === \'light\'}" ng-click="$ctrl.setTheme(\'light\')">Light</button>' +
       '        <button type="button" class="theme-toggle__button" ng-class="{active: $ctrl.ui.theme === \'dark\'}" ng-click="$ctrl.setTheme(\'dark\')">Dark</button>' +
@@ -37,14 +54,15 @@
     controller: TopNavController
   });
 
-  TopNavController.$inject = ['UiShellService', 'DashboardService', '$document', '$scope'];
+  TopNavController.$inject = ['UiShellService', 'DashboardService', '$document', '$scope', '$location'];
 
-  function TopNavController(UiShellService, DashboardService, $document, $scope) {
+  function TopNavController(UiShellService, DashboardService, $document, $scope, $location) {
     var $ctrl = this;
 
     $ctrl.ui = UiShellService.state;
     $ctrl.dashboards = DashboardService.list();
     $ctrl.isDashboardMenuOpen = false;
+    $ctrl.isAdminMenuOpen = false;
 
     $ctrl.$onInit = function onInit() {
       applyTheme($ctrl.ui.theme);
@@ -75,21 +93,35 @@
     };
 
     $ctrl.toggleDashboardMenu = function toggleDashboardMenu() {
+      $ctrl.isAdminMenuOpen = false;
       $ctrl.isDashboardMenuOpen = !$ctrl.isDashboardMenuOpen;
+    };
+
+    $ctrl.toggleAdminMenu = function toggleAdminMenu() {
+      $ctrl.isDashboardMenuOpen = false;
+      $ctrl.isAdminMenuOpen = !$ctrl.isAdminMenuOpen;
+    };
+
+    $ctrl.closeAdminMenu = function closeAdminMenu() {
+      $ctrl.isAdminMenuOpen = false;
     };
 
     $ctrl.selectDashboard = function selectDashboard(dashboardId) {
       DashboardService.setActive(dashboardId);
       $ctrl.isDashboardMenuOpen = false;
+      $ctrl.isAdminMenuOpen = false;
+      $location.path('/');
     };
 
     $ctrl.openCreateDashboard = function openCreateDashboard() {
       $ctrl.isDashboardMenuOpen = false;
+      $ctrl.isAdminMenuOpen = false;
+      $location.path('/');
       UiShellService.openDashboardModal('create');
     };
 
-    $ctrl.prevent = function prevent(event) {
-      event.preventDefault();
+    $ctrl.isActiveRoute = function isActiveRoute(path) {
+      return $location.path() === path;
     };
 
     function applyTheme(theme) {
@@ -111,8 +143,9 @@
     function bindDocumentHandler() {
       function handleDocumentClick(event) {
         if (!event.target.closest('.dashboard-menu')) {
-          $scope.$evalAsync(function closeDashboardMenu() {
+          $scope.$evalAsync(function closeMenus() {
             $ctrl.isDashboardMenuOpen = false;
+            $ctrl.isAdminMenuOpen = false;
           });
         }
       }

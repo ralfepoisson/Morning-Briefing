@@ -19,3 +19,15 @@ test('GET /health returns ok', async function () {
     await app.close();
   }
 });
+
+test('buildApp registers dashboard archive route', async function () {
+  const app = await buildApp();
+
+  try {
+    const routes = app.printRoutes();
+
+    assert.match(routes, /dashboards[\s\S]*:dashboardId \(PATCH, DELETE\)/);
+  } finally {
+    await app.close();
+  }
+});

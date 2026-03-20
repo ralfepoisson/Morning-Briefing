@@ -1,16 +1,22 @@
 import { createHash } from 'node:crypto';
+import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { getWidgetDefinition } from '../widgets/widget-definitions.js';
 import type { DashboardWidgetRecord } from '../widgets/widget-types.js';
+import { hashWidgetConfig } from './snapshot-job-utils.js';
 import type {
   DashboardSnapshotRecord,
   DashboardSnapshotWidgetRecord
 } from './snapshot-types.js';
 import type {
+  ClaimSnapshotJobResult,
   SnapshotDashboardRecord,
   SnapshotRepository,
-  UpsertDashboardSnapshotInput
+  UpsertDashboardSnapshotInput,
+  UpsertWidgetSnapshotInput
 } from './snapshot-repository.js';
+import type { GenerateWidgetSnapshotRequested } from './snapshot-job-types.js';
+import { parseSnapshotDate } from './snapshot-date.js';
 
 export class PrismaSnapshotRepository implements SnapshotRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -19,10 +25,21 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
     const dashboard = await this.prisma.dashboard.findFirst({
       where: {
         id: dashboardId,
-        ownerUserId
+        ownerUserId,
+        archivedAt: null
       },
       include: {
         widgets: {
+          where: {
+            archivedAt: null
+          },
+          include: {
+            connectors: {
+              include: {
+                connector: true
+              }
+            }
+          },
           orderBy: [
             { sortOrder: 'asc' },
             { createdAt: 'asc' }
@@ -72,52 +89,37 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
     const widgetSnapshots: DashboardSnapshotWidgetRecord[] = [];
 
     for (const widget of input.widgets) {
-      const existingWidgetSnapshot = await this.prisma.widgetSnapshot.findFirst({
+      const contentHash = createHash('sha256').update(JSON.stringify(widget.content || {})).digest('hex');
+      const savedWidgetSnapshot = await this.prisma.widgetSnapshot.upsert({
         where: {
+          snapshotId_dashboardWidgetId: {
+            snapshotId: snapshot.id,
+            dashboardWidgetId: widget.widgetId
+          }
+        },
+        update: {
+          widgetType: widget.widgetType,
+          title: widget.title,
+          status: widget.status,
+          contentJson: widget.content,
+          contentHash,
+          errorMessage: widget.errorMessage,
+          generatedAt: widget.generatedAt
+        },
+        create: {
           snapshotId: snapshot.id,
-          dashboardWidgetId: widget.widgetId
+          dashboardWidgetId: widget.widgetId,
+          widgetType: widget.widgetType,
+          title: widget.title,
+          status: widget.status,
+          contentJson: widget.content,
+          contentHash,
+          errorMessage: widget.errorMessage,
+          generatedAt: widget.generatedAt
         }
       });
 
-      const contentHash = createHash('sha256').update(JSON.stringify(widget.content || {})).digest('hex');
-      const savedWidgetSnapshot = existingWidgetSnapshot
-        ? await this.prisma.widgetSnapshot.update({
-            where: {
-              id: existingWidgetSnapshot.id
-            },
-            data: {
-              widgetType: widget.widgetType,
-              title: widget.title,
-              status: widget.status,
-              contentJson: widget.content,
-              contentHash: contentHash,
-              errorMessage: widget.errorMessage,
-              generatedAt: widget.generatedAt
-            }
-          })
-        : await this.prisma.widgetSnapshot.create({
-            data: {
-              snapshotId: snapshot.id,
-              dashboardWidgetId: widget.widgetId,
-              widgetType: widget.widgetType,
-              title: widget.title,
-              status: widget.status,
-              contentJson: widget.content,
-              contentHash: contentHash,
-              errorMessage: widget.errorMessage,
-              generatedAt: widget.generatedAt
-            }
-          });
-
-      widgetSnapshots.push({
-        widgetId: savedWidgetSnapshot.dashboardWidgetId,
-        widgetType: savedWidgetSnapshot.widgetType,
-        title: savedWidgetSnapshot.title,
-        status: savedWidgetSnapshot.status,
-        content: asObject(savedWidgetSnapshot.contentJson),
-        errorMessage: savedWidgetSnapshot.errorMessage,
-        generatedAt: savedWidgetSnapshot.generatedAt
-      });
+      widgetSnapshots.push(mapWidgetSnapshotRecord(savedWidgetSnapshot));
     }
 
     return {
@@ -131,11 +133,381 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
       widgets: widgetSnapshots
     };
   }
+
+  async findWidgetForSnapshotGeneration(widgetId: string): Promise<DashboardWidgetRecord | null> {
+    const widget = await this.prisma.dashboardWidget.findFirst({
+      where: {
+        id: widgetId,
+        archivedAt: null,
+        dashboard: {
+          archivedAt: null
+        }
+      },
+      include: {
+        dashboard: true,
+        connectors: {
+          include: {
+            connector: true
+          }
+        }
+      }
+    });
+
+    return widget ? mapDashboardWidgetRecord(widget) : null;
+  }
+
+  async listWidgetsForScheduledRefresh(): Promise<DashboardWidgetRecord[]> {
+    const widgets = await this.prisma.dashboardWidget.findMany({
+      where: {
+        archivedAt: null,
+        isVisible: true,
+        refreshMode: {
+          in: ['SNAPSHOT', 'HYBRID']
+        },
+        dashboard: {
+          isActive: true,
+          archivedAt: null,
+          owner: {
+            isActive: true
+          }
+        }
+      },
+      include: {
+        dashboard: true,
+        connectors: {
+          include: {
+            connector: true
+          }
+        }
+      },
+      orderBy: [
+        { dashboardId: 'asc' },
+        { sortOrder: 'asc' }
+      ]
+    });
+
+    return widgets.map(mapDashboardWidgetRecord);
+  }
+
+  async claimSnapshotJob(
+    message: GenerateWidgetSnapshotRequested,
+    messageReceiptId: string | null
+  ): Promise<ClaimSnapshotJobResult> {
+    const now = new Date();
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const existing = await this.prisma.snapshotGenerationJob.findUnique({
+        where: {
+          idempotencyKey: message.idempotencyKey
+        }
+      });
+
+      if (existing) {
+        if (existing.status === 'COMPLETED' || existing.status === 'SKIPPED') {
+          return {
+            status: 'already_processed',
+            jobId: existing.id
+          };
+        }
+
+        if (existing.status === 'PROCESSING') {
+          return {
+            status: 'already_processing',
+            jobId: existing.id
+          };
+        }
+
+        const updated = await this.prisma.snapshotGenerationJob.update({
+          where: {
+            id: existing.id
+          },
+          data: {
+            status: 'PROCESSING',
+            attemptCount: {
+              increment: 1
+            },
+            lastMessageId: messageReceiptId,
+            lastError: null,
+            startedAt: now,
+            completedAt: null
+          }
+        });
+
+        return {
+          status: 'claimed',
+          jobId: updated.id,
+          attemptCount: updated.attemptCount
+        };
+      }
+
+      try {
+        const created = await this.prisma.snapshotGenerationJob.create({
+          data: {
+            widgetId: message.widgetId,
+            dashboardId: message.dashboardId,
+            tenantId: message.tenantId,
+            userId: message.userId,
+            snapshotDate: parseSnapshotDate(message.snapshotDate),
+            triggerSource: message.triggerSource,
+            idempotencyKey: message.idempotencyKey,
+            requestedConfigVersion: message.widgetConfigVersion,
+            requestedConfigHash: message.widgetConfigHash,
+            status: 'PROCESSING',
+            attemptCount: 1,
+            lastMessageId: messageReceiptId,
+            startedAt: now
+          }
+        });
+
+        return {
+          status: 'claimed',
+          jobId: created.id,
+          attemptCount: created.attemptCount
+        };
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    const created = await this.prisma.snapshotGenerationJob.findUniqueOrThrow({
+      where: {
+        idempotencyKey: message.idempotencyKey
+      }
+    });
+
+    return {
+      status: created.status === 'PROCESSING' ? 'already_processing' : 'already_processed',
+      jobId: created.id
+    };
+  }
+
+  async completeSnapshotJob(idempotencyKey: string): Promise<void> {
+    await this.prisma.snapshotGenerationJob.update({
+      where: {
+        idempotencyKey
+      },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        lastError: null
+      }
+    });
+  }
+
+  async skipSnapshotJob(idempotencyKey: string, reason: string): Promise<void> {
+    await this.prisma.snapshotGenerationJob.update({
+      where: {
+        idempotencyKey
+      },
+      data: {
+        status: 'SKIPPED',
+        completedAt: new Date(),
+        lastError: reason
+      }
+    });
+  }
+
+  async failSnapshotJob(idempotencyKey: string, reason: string): Promise<void> {
+    await this.prisma.snapshotGenerationJob.update({
+      where: {
+        idempotencyKey
+      },
+      data: {
+        status: 'FAILED',
+        completedAt: new Date(),
+        lastError: reason
+      }
+    });
+  }
+
+  async upsertWidgetSnapshot(input: UpsertWidgetSnapshotInput): Promise<void> {
+    const snapshotDate = parseSnapshotDate(input.snapshotDate);
+
+    await this.prisma.$transaction(async (tx) => {
+      const briefingSnapshot = await tx.briefingSnapshot.upsert({
+        where: {
+          userId_dashboardId_snapshotDate: {
+            userId: input.widget.ownerUserId,
+            dashboardId: input.widget.dashboardId,
+            snapshotDate
+          }
+        },
+        update: {
+          generatedAt: input.widgetSnapshot.generatedAt
+        },
+        create: {
+          tenantId: input.widget.tenantId,
+          userId: input.widget.ownerUserId,
+          dashboardId: input.widget.dashboardId,
+          snapshotDate,
+          generationStatus: 'PENDING',
+          summaryJson: {}
+        }
+      });
+
+      const contentHash = createHash('sha256')
+        .update(JSON.stringify(input.widgetSnapshot.content || {}))
+        .digest('hex');
+
+      await tx.widgetSnapshot.upsert({
+        where: {
+          snapshotId_dashboardWidgetId: {
+            snapshotId: briefingSnapshot.id,
+            dashboardWidgetId: input.widget.id
+          }
+        },
+        update: {
+          widgetType: input.widgetSnapshot.widgetType,
+          title: input.widgetSnapshot.title,
+          status: input.widgetSnapshot.status,
+          contentJson: input.widgetSnapshot.content,
+          contentHash,
+          errorMessage: input.widgetSnapshot.errorMessage,
+          generatedAt: input.widgetSnapshot.generatedAt
+        },
+        create: {
+          snapshotId: briefingSnapshot.id,
+          dashboardWidgetId: input.widget.id,
+          widgetType: input.widgetSnapshot.widgetType,
+          title: input.widgetSnapshot.title,
+          status: input.widgetSnapshot.status,
+          contentJson: input.widgetSnapshot.content,
+          contentHash,
+          errorMessage: input.widgetSnapshot.errorMessage,
+          generatedAt: input.widgetSnapshot.generatedAt
+        }
+      });
+
+      const [eligibleWidgets, widgetSnapshots] = await Promise.all([
+        tx.dashboardWidget.findMany({
+          where: {
+            dashboardId: input.widget.dashboardId,
+            archivedAt: null,
+            isVisible: true,
+            refreshMode: {
+              in: ['SNAPSHOT', 'HYBRID']
+            }
+          },
+          orderBy: [
+            { sortOrder: 'asc' },
+            { createdAt: 'asc' }
+          ]
+        }),
+        tx.widgetSnapshot.findMany({
+          where: {
+            snapshotId: briefingSnapshot.id
+          },
+          orderBy: {
+            generatedAt: 'desc'
+          }
+        })
+      ]);
+
+      const snapshotStatus = computeDashboardSnapshotStatus(eligibleWidgets, widgetSnapshots);
+      const summary = buildDashboardSummary(widgetSnapshots);
+
+      await tx.briefingSnapshot.update({
+        where: {
+          id: briefingSnapshot.id
+        },
+        data: {
+          generationStatus: snapshotStatus,
+          summaryJson: summary,
+          generatedAt: input.widgetSnapshot.generatedAt
+        }
+      });
+    });
+  }
+}
+
+function computeDashboardSnapshotStatus(
+  eligibleWidgets: Array<{ id: string }>,
+  widgetSnapshots: Array<{ dashboardWidgetId: string; status: 'PENDING' | 'READY' | 'FAILED' }>
+): 'PENDING' | 'READY' | 'FAILED' {
+  if (!eligibleWidgets.length) {
+    return 'READY';
+  }
+
+  const widgetSnapshotById = new Map(widgetSnapshots.map(function mapSnapshot(snapshot) {
+    return [snapshot.dashboardWidgetId, snapshot];
+  }));
+
+  const statuses = eligibleWidgets.map(function mapWidget(widget) {
+    return widgetSnapshotById.get(widget.id)?.status || 'PENDING';
+  });
+
+  if (statuses.includes('PENDING')) {
+    return 'PENDING';
+  }
+
+  if (statuses.every(function isReady(status) {
+    return status === 'READY';
+  })) {
+    return 'READY';
+  }
+
+  return 'FAILED';
+}
+
+function buildDashboardSummary(
+  widgetSnapshots: Array<{
+    widgetType: string;
+    status: 'PENDING' | 'READY' | 'FAILED';
+    contentJson: unknown;
+  }>
+): Record<string, unknown> {
+  const asReadySummary = widgetSnapshots.find(function findWeather(snapshot) {
+    return snapshot.widgetType === 'weather' && snapshot.status === 'READY';
+  });
+
+  if (asReadySummary) {
+    const content = asObject(asReadySummary.contentJson);
+
+    if (typeof content.summary === 'string' && content.summary.trim()) {
+      return {
+        headline: content.summary
+      };
+    }
+  }
+
+  const taskSummary = widgetSnapshots.find(function findTasks(snapshot) {
+    return snapshot.widgetType === 'tasks' && snapshot.status === 'READY';
+  });
+
+  if (taskSummary) {
+    return {
+      headline: 'Your latest widget snapshots are ready.'
+    };
+  }
+
+  const calendarSummary = widgetSnapshots.find(function findCalendar(snapshot) {
+    return snapshot.widgetType === 'calendar' && snapshot.status === 'READY';
+  });
+
+  if (calendarSummary) {
+    return {
+      headline: 'Your latest widget snapshots are ready.'
+    };
+  }
+
+  return {
+    headline: widgetSnapshots.some(function hasFailures(snapshot) {
+      return snapshot.status === 'FAILED';
+    })
+      ? 'Some widget snapshots failed to refresh.'
+      : 'Snapshot refresh is in progress.'
+  };
 }
 
 function mapDashboardWidgetRecord(widget: {
   id: string;
+  tenantId: string;
   dashboardId: string;
+  dashboard: { ownerUserId: string } | undefined;
   widgetType: string;
   title: string;
   positionX: number;
@@ -145,17 +517,37 @@ function mapDashboardWidgetRecord(widget: {
   minWidth: number;
   minHeight: number;
   isVisible: boolean;
+  refreshMode: 'SNAPSHOT' | 'LIVE' | 'HYBRID';
   sortOrder: number;
+  version: number;
   configJson: unknown;
+  configHash?: string | null;
+  connectors?: Array<{
+    usageRole: string;
+    connector: {
+      id: string;
+      connectorType: string;
+      name: string;
+      status: 'ACTIVE' | 'DISABLED' | 'ERROR';
+      authType: 'NONE' | 'API_KEY' | 'OAUTH' | 'BASIC';
+      baseUrl: string | null;
+      configJson: unknown;
+      lastSyncAt: Date | null;
+      createdAt: Date;
+      updatedAt: Date;
+    };
+  }>;
   createdAt: Date;
   updatedAt: Date;
 }): DashboardWidgetRecord {
   const definition = getWidgetDefinition(widget.widgetType);
+  const config = withConnectionConfig(asObject(widget.configJson), widget.connectors);
 
   return {
     id: widget.id,
+    tenantId: widget.tenantId,
     dashboardId: widget.dashboardId,
-    ownerUserId: '',
+    ownerUserId: widget.dashboard ? widget.dashboard.ownerUserId : '',
     type: widget.widgetType,
     title: widget.title,
     x: widget.positionX,
@@ -166,11 +558,111 @@ function mapDashboardWidgetRecord(widget: {
     minHeight: widget.minHeight,
     isVisible: widget.isVisible,
     sortOrder: widget.sortOrder,
-    config: asObject(widget.configJson),
-    data: definition ? definition.createMockData(asObject(widget.configJson)) : {},
+    refreshMode: widget.refreshMode,
+    version: widget.version,
+    config,
+    configHash: widget.configHash || hashWidgetConfig(config),
+    data: definition ? definition.createMockData(config) : {},
+    connections: (widget.connectors || []).map(mapWidgetConnection),
     createdAt: widget.createdAt,
     updatedAt: widget.updatedAt
   };
+}
+
+function mapWidgetConnection(connection: {
+  usageRole: string;
+  connector: {
+    id: string;
+    connectorType: string;
+    name: string;
+    status: 'ACTIVE' | 'DISABLED' | 'ERROR';
+    authType: 'NONE' | 'API_KEY' | 'OAUTH' | 'BASIC';
+    baseUrl: string | null;
+    configJson: unknown;
+    lastSyncAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+}) {
+  return {
+    id: connection.connector.id,
+    usageRole: connection.usageRole,
+    connector: {
+      id: connection.connector.id,
+      type: connection.connector.connectorType,
+      name: connection.connector.name,
+      status: connection.connector.status,
+      authType: connection.connector.authType,
+      baseUrl: connection.connector.baseUrl,
+      config: asObject(connection.connector.configJson),
+      lastSyncAt: connection.connector.lastSyncAt,
+      createdAt: connection.connector.createdAt,
+      updatedAt: connection.connector.updatedAt
+    }
+  };
+}
+
+function mapWidgetSnapshotRecord(snapshot: {
+  dashboardWidgetId: string;
+  widgetType: string;
+  title: string;
+  status: 'PENDING' | 'READY' | 'FAILED';
+  contentJson: unknown;
+  errorMessage: string | null;
+  generatedAt: Date;
+}): DashboardSnapshotWidgetRecord {
+  return {
+    widgetId: snapshot.dashboardWidgetId,
+    widgetType: snapshot.widgetType,
+    title: snapshot.title,
+    status: snapshot.status,
+    content: asObject(snapshot.contentJson),
+    errorMessage: snapshot.errorMessage,
+    generatedAt: snapshot.generatedAt
+  };
+}
+
+function withConnectionConfig(
+  config: Record<string, unknown>,
+  connectors: Array<{
+    usageRole: string;
+    connector: {
+      id: string;
+      name: string;
+      connectorType: string;
+    };
+  }> | undefined
+): Record<string, unknown> {
+  const nextConfig = { ...config };
+  applyConnectorConfig(nextConfig, connectors, 'tasks');
+  applyConnectorConfig(nextConfig, connectors, 'calendar');
+
+  return nextConfig;
+}
+
+function applyConnectorConfig(
+  nextConfig: Record<string, unknown>,
+  connectors: Array<{
+    usageRole: string;
+    connector: {
+      id: string;
+      name: string;
+      connectorType: string;
+    };
+  }> | undefined,
+  usageRole: string
+) {
+  const connector = (connectors || []).find(function findConnector(item) {
+    return item.usageRole === usageRole;
+  });
+
+  if (!connector) {
+    return;
+  }
+
+  nextConfig.connectionId = connector.connector.id;
+  nextConfig.connectionName = connector.connector.name;
+  nextConfig.provider = connector.connector.connectorType;
 }
 
 function asObject(value: unknown): Record<string, unknown> {

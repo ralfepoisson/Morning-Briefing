@@ -1,5 +1,6 @@
 import type { DashboardRepository } from './dashboard-repository.js';
 import type {
+  ArchiveDashboardInput,
   CreateDashboardInput,
   DashboardResponse,
   UpdateDashboardInput
@@ -45,6 +46,10 @@ export class DashboardService {
     });
 
     return dashboard ? toResponse(dashboard) : null;
+  }
+
+  async archive(input: ArchiveDashboardInput): Promise<boolean> {
+    return this.repository.archive(input);
   }
 }
 

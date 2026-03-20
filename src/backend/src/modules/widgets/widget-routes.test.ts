@@ -20,7 +20,8 @@ test('GET /api/v1/dashboards/:dashboardId/widgets returns widget instances', asy
         return {
           tenantId: 'tenant-1',
           userId: 'user-1',
-          displayName: 'Ralfe'
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
         };
       }
     },
@@ -63,7 +64,8 @@ test('POST /api/v1/dashboards/:dashboardId/widgets creates a widget', async func
         return {
           tenantId: 'tenant-1',
           userId: 'user-1',
-          displayName: 'Ralfe'
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
         };
       }
     },
@@ -75,6 +77,7 @@ test('POST /api/v1/dashboards/:dashboardId/widgets creates a widget', async func
         assert.equal(input.dashboardId, 'dash-1');
         assert.equal(input.ownerUserId, 'user-1');
         assert.equal(input.type, 'calendar');
+        assert.equal(input.timezone, 'Europe/Paris');
 
         return createWidgetResponse({
           id: 'widget-2',
@@ -114,7 +117,8 @@ test('POST /api/v1/dashboards/:dashboardId/widgets rejects blank widget type', a
         return {
           tenantId: 'tenant-1',
           userId: 'user-1',
-          displayName: 'Ralfe'
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
         };
       }
     },
@@ -158,7 +162,8 @@ test('PATCH /api/v1/dashboards/:dashboardId/widgets/:widgetId updates widget lay
         return {
           tenantId: 'tenant-1',
           userId: 'user-1',
-          displayName: 'Ralfe'
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
         };
       }
     },

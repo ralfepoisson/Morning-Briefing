@@ -25,11 +25,13 @@
       },
       createMockWidget: function createMockWidget(options) {
         var data = options.data || {};
+        var connectionLabel = data.connectionLabel || options.connectionLabel || (options.config && options.config.connectionName) || 'Not connected';
 
         return {
           id: options.id,
           dashboardId: options.dashboardId,
           type: 'calendar',
+          isLoading: !!options.isLoading,
           title: options.title || 'Today on Calendar',
           x: options.x,
           y: options.y,
@@ -37,8 +39,13 @@
           height: options.height || 360,
           config: options.config || {},
           data: {
+            provider: data.provider || 'google-calendar',
+            connectionLabel: connectionLabel,
             dateLabel: data.dateLabel || options.dateLabel || 'Today',
-            appointments: data.appointments || options.appointments || [
+            emptyMessage: data.emptyMessage || (connectionLabel === 'Not connected'
+              ? 'Choose a Google Calendar connection in edit mode to configure this widget.'
+              : 'Live appointments will appear after you save the dashboard.'),
+            appointments: data.appointments || options.appointments || (connectionLabel === 'Not connected' ? [] : [
               {
                 time: '09:00',
                 title: 'Stand-up',
@@ -59,7 +66,7 @@
                 title: 'Dinner reservation',
                 location: 'Le Petit Marchand'
               }
-            ]
+            ])
           }
         };
       }

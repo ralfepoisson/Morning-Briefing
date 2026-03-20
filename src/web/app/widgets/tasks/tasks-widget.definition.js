@@ -25,11 +25,13 @@
       },
       createMockWidget: function createMockWidget(options) {
         var data = options.data || {};
+        var connectionLabel = data.connectionLabel || options.connectionLabel || (options.config && options.config.connectionName) || 'Not connected';
 
         return {
           id: options.id,
           dashboardId: options.dashboardId,
           type: 'tasks',
+          isLoading: !!options.isLoading,
           title: options.title || 'Task List',
           x: options.x,
           y: options.y,
@@ -37,29 +39,34 @@
           height: options.height || 360,
           config: options.config || {},
           data: {
-            groups: data.groups || options.groups || [
+            provider: data.provider || 'todoist',
+            connectionLabel: connectionLabel,
+            emptyMessage: data.emptyMessage || (connectionLabel === 'Not connected'
+              ? 'Choose a connection in edit mode to configure this widget.'
+              : 'Live tasks will appear after you save the dashboard.'),
+            groups: data.groups || options.groups || (connectionLabel === 'Not connected' ? [] : [
               {
                 label: 'Due Today',
                 items: [
-                  { title: 'Reply to insurance email' },
-                  { title: 'Confirm dinner reservation' }
+                  { title: 'Reply to insurance email', meta: 'today' },
+                  { title: 'Confirm dinner reservation', meta: 'today' }
                 ]
               },
               {
                 label: 'Due Tomorrow',
                 items: [
-                  { title: 'Draft project update' },
-                  { title: 'Buy birthday card' }
+                  { title: 'Draft project update', meta: 'tomorrow' },
+                  { title: 'Buy birthday card', meta: 'tomorrow' }
                 ]
               },
               {
                 label: 'No Due Date',
                 items: [
-                  { title: 'Declutter camera roll' },
-                  { title: 'Research standing desk options' }
+                  { title: 'Declutter camera roll', meta: '' },
+                  { title: 'Research standing desk options', meta: '' }
                 ]
               }
-            ]
+            ])
           }
         };
       }

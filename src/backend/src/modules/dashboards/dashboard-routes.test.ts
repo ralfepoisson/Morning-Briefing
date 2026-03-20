@@ -13,7 +13,8 @@ test('GET /api/v1/me returns the default user profile', async function () {
         return {
           tenantId: 'tenant-1',
           userId: 'user-1',
-          displayName: 'Ralfe'
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
         };
       }
     },
@@ -25,6 +26,9 @@ test('GET /api/v1/me returns the default user profile', async function () {
         throw new Error('not used');
       },
       async update() {
+        throw new Error('not used');
+      },
+      async archive() {
         throw new Error('not used');
       }
     }
@@ -61,7 +65,8 @@ test('GET /api/v1/dashboards returns dashboards for the default user', async fun
         return {
           tenantId: 'tenant-1',
           userId: 'user-1',
-          displayName: 'Ralfe'
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
         };
       }
     },
@@ -74,6 +79,9 @@ test('GET /api/v1/dashboards returns dashboards for the default user', async fun
         throw new Error('not used');
       },
       async update() {
+        throw new Error('not used');
+      },
+      async archive() {
         throw new Error('not used');
       }
     }
@@ -103,7 +111,8 @@ test('PATCH /api/v1/dashboards/:dashboardId updates a dashboard', async function
         return {
           tenantId: 'tenant-1',
           userId: 'user-1',
-          displayName: 'Ralfe'
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
         };
       }
     },
@@ -125,6 +134,9 @@ test('PATCH /api/v1/dashboards/:dashboardId updates a dashboard', async function
           name: 'Travel Briefing',
           description: 'Flights and weather'
         });
+      },
+      async archive() {
+        throw new Error('not used');
       }
     }
   });
@@ -159,7 +171,8 @@ test('POST /api/v1/dashboards creates a dashboard', async function () {
         return {
           tenantId: 'tenant-1',
           userId: 'user-1',
-          displayName: 'Ralfe'
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
         };
       }
     },
@@ -180,6 +193,9 @@ test('POST /api/v1/dashboards creates a dashboard', async function () {
         });
       },
       async update() {
+        throw new Error('not used');
+      },
+      async archive() {
         throw new Error('not used');
       }
     }
@@ -212,7 +228,8 @@ test('POST /api/v1/dashboards rejects blank names', async function () {
         return {
           tenantId: 'tenant-1',
           userId: 'user-1',
-          displayName: 'Ralfe'
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
         };
       }
     },
@@ -224,6 +241,9 @@ test('POST /api/v1/dashboards rejects blank names', async function () {
         throw new Error('not used');
       },
       async update() {
+        throw new Error('not used');
+      },
+      async archive() {
         throw new Error('not used');
       }
     }
@@ -241,6 +261,95 @@ test('POST /api/v1/dashboards rejects blank names', async function () {
     assert.equal(response.statusCode, 400);
     assert.deepEqual(response.json(), {
       message: 'Dashboard name is required.'
+    });
+  } finally {
+    await app.close();
+  }
+});
+
+test('DELETE /api/v1/dashboards/:dashboardId archives a dashboard', async function () {
+  const app = Fastify();
+
+  await registerDashboardRoutes(app, {
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
+        };
+      }
+    },
+    dashboardService: {
+      async listForOwner() {
+        throw new Error('not used');
+      },
+      async create() {
+        throw new Error('not used');
+      },
+      async update() {
+        throw new Error('not used');
+      },
+      async archive(input) {
+        assert.equal(input.dashboardId, 'dash-1');
+        assert.equal(input.ownerUserId, 'user-1');
+        return true;
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'DELETE',
+      url: '/api/v1/dashboards/dash-1'
+    });
+
+    assert.equal(response.statusCode, 204);
+  } finally {
+    await app.close();
+  }
+});
+
+test('DELETE /api/v1/dashboards/:dashboardId returns 404 when dashboard is missing', async function () {
+  const app = Fastify();
+
+  await registerDashboardRoutes(app, {
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
+        };
+      }
+    },
+    dashboardService: {
+      async listForOwner() {
+        throw new Error('not used');
+      },
+      async create() {
+        throw new Error('not used');
+      },
+      async update() {
+        throw new Error('not used');
+      },
+      async archive() {
+        return false;
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'DELETE',
+      url: '/api/v1/dashboards/dash-missing'
+    });
+
+    assert.equal(response.statusCode, 404);
+    assert.deepEqual(response.json(), {
+      message: 'Dashboard not found.'
     });
   } finally {
     await app.close();

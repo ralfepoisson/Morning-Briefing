@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { DashboardService } from './dashboard-service.js';
 import type { DashboardRepository } from './dashboard-repository.js';
 import type {
+  ArchiveDashboardInput,
   CreateDashboardInput,
   DashboardRecord,
   UpdateDashboardInput
@@ -64,7 +65,29 @@ test('DashboardService rejects blank dashboard names', async function () {
   );
 });
 
+test('DashboardService archives a dashboard through the repository', async function () {
+  const repository = new InMemoryDashboardRepository([
+    createDashboardRecord({
+      id: 'dash-1'
+    })
+  ]);
+  const service = new DashboardService(repository);
+
+  const archived = await service.archive({
+    dashboardId: 'dash-1',
+    ownerUserId: 'user-1'
+  });
+
+  assert.equal(archived, true);
+  assert.deepEqual(repository.archivedInputs[0], {
+    dashboardId: 'dash-1',
+    ownerUserId: 'user-1'
+  });
+});
+
 class InMemoryDashboardRepository implements DashboardRepository {
+  public archivedInputs: ArchiveDashboardInput[] = [];
+
   constructor(public readonly items: DashboardRecord[]) {}
 
   async listForOwner(ownerUserId: string): Promise<DashboardRecord[]> {
@@ -99,6 +122,15 @@ class InMemoryDashboardRepository implements DashboardRepository {
     dashboard.description = input.description || '';
     dashboard.updatedAt = new Date();
     return dashboard;
+  }
+
+  async archive(input: ArchiveDashboardInput): Promise<boolean> {
+    const dashboard = this.items.find(function (item) {
+      return item.id === input.dashboardId && item.ownerUserId === input.ownerUserId;
+    });
+
+    this.archivedInputs.push(input);
+    return !!dashboard;
   }
 }
 

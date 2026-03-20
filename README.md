@@ -102,6 +102,7 @@ Deliver a working web-based dashboard with a small number of widgets, beginning 
 - Dashboard persistence
 - Multiple dashboards per user
 - Manual dashboard switching
+- Tenant-level connector management with edit support
 - Additional widgets such as calendar or RSS
 
 ### Suggested third milestone
@@ -122,6 +123,7 @@ Deliver a working web-based dashboard with a small number of widgets, beginning 
 - Widgets can be positioned and resized
 - Widget configuration is persisted
 - Tenant-level connectors can be configured
+- Existing connectors can be reviewed and edited after creation
 - A scheduler can prepare daily briefing content
 - The UI can display either live data or generated snapshots
 

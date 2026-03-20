@@ -1,6 +1,10 @@
+import type { GoogleCalendarOAuthClient } from '../connections/google-calendar-oauth-client.js';
 import type { DefaultUserContext } from '../default-user/default-user-service.js';
 import type { DashboardWidgetRecord } from '../widgets/widget-types.js';
+import type { GoogleCalendarClient, GoogleCalendarEvent } from './google-calendar-client.js';
 import type { WeatherClient } from './open-meteo-weather-client.js';
+import type { GenerateWidgetSnapshotRequested } from './snapshot-job-types.js';
+import type { TodoistTask, TodoistTaskClient } from './todoist-task-client.js';
 import type { SnapshotRepository } from './snapshot-repository.js';
 import type {
   DashboardSnapshotRecord,
@@ -11,8 +15,59 @@ import type {
 export class SnapshotService {
   constructor(
     private readonly repository: SnapshotRepository,
-    private readonly weatherClient: WeatherClient
+    private readonly weatherClient: WeatherClient,
+    private readonly todoistTaskClient: TodoistTaskClient,
+    private readonly googleCalendarClient: GoogleCalendarClient,
+    private readonly googleCalendarOAuthClient: Pick<GoogleCalendarOAuthClient, 'refreshAccessToken'>
   ) {}
+
+  async generateForWidget(message: GenerateWidgetSnapshotRequested): Promise<{
+    status: 'generated' | 'skipped';
+    reason?: 'widget_not_found' | 'widget_not_visible' | 'widget_not_snapshot_based' | 'stale_message';
+  }> {
+    const widget = await this.repository.findWidgetForSnapshotGeneration(message.widgetId);
+
+    if (!widget) {
+      return {
+        status: 'skipped',
+        reason: 'widget_not_found'
+      };
+    }
+
+    if (!widget.isVisible) {
+      return {
+        status: 'skipped',
+        reason: 'widget_not_visible'
+      };
+    }
+
+    if (widget.refreshMode === 'LIVE') {
+      return {
+        status: 'skipped',
+        reason: 'widget_not_snapshot_based'
+      };
+    }
+
+    if (widget.version !== message.widgetConfigVersion || widget.configHash !== message.widgetConfigHash) {
+      return {
+        status: 'skipped',
+        reason: 'stale_message'
+      };
+    }
+
+    const generatedAt = new Date();
+    const widgetSnapshot = await this.buildWidgetSnapshot(widget, generatedAt);
+
+    await this.repository.upsertWidgetSnapshot({
+      widget,
+      snapshotDate: message.snapshotDate,
+      widgetSnapshot
+    });
+
+    return {
+      status: 'generated'
+    };
+  }
 
   async getLatestForDashboard(dashboardId: string, user: DefaultUserContext): Promise<DashboardSnapshotResponse | null> {
     const dashboard = await this.repository.findDashboardWithWidgets(dashboardId, user.userId);
@@ -48,6 +103,14 @@ export class SnapshotService {
   }
 
   private async buildWidgetSnapshot(widget: DashboardWidgetRecord, generatedAt: Date): Promise<DashboardSnapshotWidgetRecord> {
+    if (widget.type === 'calendar') {
+      return this.buildCalendarWidgetSnapshot(widget, generatedAt);
+    }
+
+    if (widget.type === 'tasks') {
+      return this.buildTaskWidgetSnapshot(widget, generatedAt);
+    }
+
     if (widget.type !== 'weather') {
       return {
         widgetId: widget.id,
@@ -113,6 +176,229 @@ export class SnapshotService {
           details: []
         },
         errorMessage: error instanceof Error ? error.message : 'Weather snapshot generation failed.',
+        generatedAt: generatedAt
+      };
+    }
+  }
+
+  private async buildTaskWidgetSnapshot(widget: DashboardWidgetRecord, generatedAt: Date): Promise<DashboardSnapshotWidgetRecord> {
+    const connector = widget.connections.find(function findConnector(item) {
+      return item.usageRole === 'tasks';
+    });
+
+    if (!connector) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          provider: 'todoist',
+          connectionLabel: 'Not connected',
+          groups: [],
+          emptyMessage: 'Choose a Todoist connection in edit mode to configure this widget.'
+        },
+        errorMessage: 'Task list widget is missing a configured connection.',
+        generatedAt: generatedAt
+      };
+    }
+
+    if (connector.connector.type !== 'todoist') {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          provider: connector.connector.type,
+          connectionLabel: connector.connector.name,
+          groups: [],
+          emptyMessage: 'The selected task provider is not supported yet.'
+        },
+        errorMessage: 'Task list widget is configured with an unsupported provider.',
+        generatedAt: generatedAt
+      };
+    }
+
+    const apiKey = getConnectorApiKey(connector.connector.config);
+
+    if (!apiKey) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          provider: 'todoist',
+          connectionLabel: connector.connector.name,
+          groups: [],
+          emptyMessage: 'The selected Todoist connection is missing its API key.'
+        },
+        errorMessage: 'Todoist connection is missing an API key.',
+        generatedAt: generatedAt
+      };
+    }
+
+    try {
+      const tasks = await this.todoistTaskClient.listTasks(apiKey);
+
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'READY',
+        content: buildTaskSnapshotContent(tasks, generatedAt, connector.connector.name),
+        errorMessage: null,
+        generatedAt: generatedAt
+      };
+    } catch (error) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          provider: 'todoist',
+          connectionLabel: connector.connector.name,
+          groups: [],
+          emptyMessage: 'Todoist could not be reached. Please check the API key and try again.'
+        },
+        errorMessage: error instanceof Error ? error.message : 'Todoist snapshot generation failed.',
+        generatedAt: generatedAt
+      };
+    }
+  }
+
+  private async buildCalendarWidgetSnapshot(widget: DashboardWidgetRecord, generatedAt: Date): Promise<DashboardSnapshotWidgetRecord> {
+    const connector = widget.connections.find(function findConnector(item) {
+      return item.usageRole === 'calendar';
+    });
+
+    if (!connector) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          provider: 'google-calendar',
+          connectionLabel: 'Not connected',
+          dateLabel: 'Today',
+          appointments: [],
+          emptyMessage: 'Choose a Google Calendar connection in edit mode to configure this widget.'
+        },
+        errorMessage: 'Calendar widget is missing a configured connection.',
+        generatedAt: generatedAt
+      };
+    }
+
+    if (connector.connector.type !== 'google-calendar') {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          provider: connector.connector.type,
+          connectionLabel: connector.connector.name,
+          dateLabel: 'Today',
+          appointments: [],
+          emptyMessage: 'The selected calendar provider is not supported yet.'
+        },
+        errorMessage: 'Calendar widget is configured with an unsupported provider.',
+        generatedAt: generatedAt
+      };
+    }
+
+    const accessToken = getGoogleCalendarAccessToken(connector.connector.config);
+    const refreshToken = getGoogleCalendarRefreshToken(connector.connector.config);
+    const calendarId = getGoogleCalendarId(connector.connector.config);
+
+    if (connector.connector.authType !== 'OAUTH') {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          provider: 'google-calendar',
+          connectionLabel: connector.connector.name,
+          dateLabel: 'Today',
+          appointments: [],
+          emptyMessage: 'This Google Calendar connection needs OAuth access before it can load private events.'
+        },
+        errorMessage: 'Google Calendar connection is using an unsupported authentication mode.',
+        generatedAt: generatedAt
+      };
+    }
+
+    if (!refreshToken) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          provider: 'google-calendar',
+          connectionLabel: connector.connector.name,
+          dateLabel: 'Today',
+          appointments: [],
+          emptyMessage: 'The selected Google Calendar connection is missing its refresh token.'
+        },
+        errorMessage: 'Google Calendar connection is missing a refresh token.',
+        generatedAt: generatedAt
+      };
+    }
+
+    if (!calendarId) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          provider: 'google-calendar',
+          connectionLabel: connector.connector.name,
+          dateLabel: 'Today',
+          appointments: [],
+          emptyMessage: 'The selected Google Calendar connection is missing its calendar id.'
+        },
+        errorMessage: 'Google Calendar connection is missing a calendar id.',
+        generatedAt: generatedAt
+      };
+    }
+
+    try {
+      const token = accessToken && !isTokenExpired(connector.connector.config)
+        ? {
+            accessToken
+          }
+        : await this.googleCalendarOAuthClient.refreshAccessToken(refreshToken);
+      const events = await this.googleCalendarClient.listEvents(token.accessToken, calendarId, generatedAt);
+
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'READY',
+        content: buildCalendarSnapshotContent(events, connector.connector.name),
+        errorMessage: null,
+        generatedAt: generatedAt
+      };
+    } catch (error) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          provider: 'google-calendar',
+          connectionLabel: connector.connector.name,
+          dateLabel: 'Today',
+          appointments: [],
+          emptyMessage: 'Google Calendar could not be reached. Please check the connection and try again.'
+        },
+        errorMessage: error instanceof Error ? error.message : 'Google Calendar snapshot generation failed.',
         generatedAt: generatedAt
       };
     }
@@ -183,6 +469,30 @@ function buildSummary(widgets: DashboardSnapshotWidgetRecord[]): string {
     return weatherWidget.content.summary;
   }
 
+  const taskWidget = widgets.find(function findTaskWidget(widget) {
+    return widget.widgetType === 'tasks' && widget.status === 'READY';
+  });
+
+  if (taskWidget) {
+    const taskCount = countTaskItems(taskWidget.content.groups);
+
+    return taskCount
+      ? `${taskCount} tasks loaded from Todoist.`
+      : 'No Todoist tasks are due today, tomorrow, or without a due date.';
+  }
+
+  const calendarWidget = widgets.find(function findCalendarWidget(widget) {
+    return widget.widgetType === 'calendar' && widget.status === 'READY';
+  });
+
+  if (calendarWidget) {
+    const appointmentCount = countCalendarAppointments(calendarWidget.content.appointments);
+
+    return appointmentCount
+      ? `${appointmentCount} appointments loaded from Google Calendar.`
+      : 'No Google Calendar appointments are scheduled for today.';
+  }
+
   return 'Latest dashboard snapshot generated.';
 }
 
@@ -206,4 +516,168 @@ function toResponse(snapshot: DashboardSnapshotRecord): DashboardSnapshotRespons
       };
     })
   };
+}
+
+function getConnectorApiKey(config: Record<string, unknown>): string {
+  if (typeof config.apiKey === 'string' && config.apiKey.trim()) {
+    return config.apiKey.trim();
+  }
+
+  return '';
+}
+
+function getGoogleCalendarId(config: Record<string, unknown>): string {
+  if (typeof config.calendarId === 'string' && config.calendarId.trim()) {
+    return config.calendarId.trim();
+  }
+
+  return '';
+}
+
+function getGoogleCalendarAccessToken(config: Record<string, unknown>): string {
+  if (typeof config.accessToken === 'string' && config.accessToken.trim()) {
+    return config.accessToken.trim();
+  }
+
+  return '';
+}
+
+function getGoogleCalendarRefreshToken(config: Record<string, unknown>): string {
+  if (typeof config.refreshToken === 'string' && config.refreshToken.trim()) {
+    return config.refreshToken.trim();
+  }
+
+  return '';
+}
+
+function isTokenExpired(config: Record<string, unknown>): boolean {
+  if (typeof config.expiresAt !== 'string' || !config.expiresAt.trim()) {
+    return true;
+  }
+
+  return Date.parse(config.expiresAt) <= Date.now() + 60_000;
+}
+
+function buildTaskSnapshotContent(tasks: TodoistTask[], generatedAt: Date, connectionName: string): Record<string, unknown> {
+  const today = formatDateKey(generatedAt);
+  const tomorrow = formatDateKey(addDays(generatedAt, 1));
+  const todayItems: Array<Record<string, unknown>> = [];
+  const tomorrowItems: Array<Record<string, unknown>> = [];
+  const undatedItems: Array<Record<string, unknown>> = [];
+
+  tasks.forEach(function groupTask(task) {
+    const item = toTaskSnapshotItem(task);
+
+    if (!task.due || !task.due.date) {
+      undatedItems.push(item);
+      return;
+    }
+
+    if (task.due.date <= today) {
+      todayItems.push(item);
+      return;
+    }
+
+    if (task.due.date === tomorrow) {
+      tomorrowItems.push(item);
+    }
+  });
+
+  return {
+    provider: 'todoist',
+    connectionLabel: connectionName,
+    groups: [
+      { label: 'Due Today', items: todayItems },
+      { label: 'Due Tomorrow', items: tomorrowItems },
+      { label: 'No Due Date', items: undatedItems }
+    ],
+    emptyMessage: countTaskItems([
+      { items: todayItems },
+      { items: tomorrowItems },
+      { items: undatedItems }
+    ])
+      ? ''
+      : 'No incomplete tasks are due today, tomorrow, or without a due date.'
+  };
+}
+
+function toTaskSnapshotItem(task: TodoistTask): Record<string, unknown> {
+  return {
+    id: task.id,
+    title: task.content,
+    meta: buildTaskMeta(task),
+    isRecurring: !!(task.due && task.due.isRecurring),
+    url: task.url || ''
+  };
+}
+
+function buildCalendarSnapshotContent(events: GoogleCalendarEvent[], connectionName: string): Record<string, unknown> {
+  return {
+    provider: 'google-calendar',
+    connectionLabel: connectionName,
+    dateLabel: 'Today',
+    appointments: events.map(function mapEvent(event) {
+      return {
+        id: event.id,
+        time: event.timeLabel,
+        title: event.title,
+        location: event.location,
+        isAllDay: event.isAllDay,
+        url: event.url
+      };
+    }),
+    emptyMessage: events.length
+      ? ''
+      : 'No appointments are scheduled for today.'
+  };
+}
+
+function buildTaskMeta(task: TodoistTask): string {
+  const parts: string[] = [];
+
+  if (task.due && typeof task.due.string === 'string' && task.due.string.trim()) {
+    parts.push(task.due.string.trim());
+  }
+
+  if (task.due && task.due.isRecurring) {
+    parts.push('Recurring');
+  }
+
+  return parts.join(' • ');
+}
+
+function countTaskItems(groups: unknown): number {
+  if (!Array.isArray(groups)) {
+    return 0;
+  }
+
+  return groups.reduce(function count(total, group) {
+    if (!group || typeof group !== 'object' || !Array.isArray((group as { items?: unknown[] }).items)) {
+      return total;
+    }
+
+    return total + (group as { items: unknown[] }).items.length;
+  }, 0);
+}
+
+function countCalendarAppointments(appointments: unknown): number {
+  if (!Array.isArray(appointments)) {
+    return 0;
+  }
+
+  return appointments.length;
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function formatDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
 }

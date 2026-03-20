@@ -31,12 +31,16 @@ package "Backend API\nNode.js + Fastify" as Api {
     [Postgres Repositories]
     [Connector Clients]
     [Secret Store]
-    [Job Runner]
+    [Snapshot Queue Publisher]
+    [Snapshot Job Processor]
     [Observability]
   }
 }
 
 database "PostgreSQL\n(Local + AWS RDS)" as Postgres
+queue "Amazon SQS\nSnapshot Jobs + DLQ" as Sqs
+cloud "AWS Lambda\nSnapshot Worker" as Lambda
+cloud "EventBridge Scheduler\nNightly Refresh" as Scheduler
 cloud "Secret Backend\n(Local env / AWS Secrets Manager)" as Secrets
 cloud "External Providers\nWeather / Calendar / Tasks / News" as Providers
 
@@ -45,10 +49,16 @@ ApiLayer --> AppLayer
 AppLayer --> DomainLayer
 AppLayer --> InfraLayer
 InfraLayer --> Postgres
+InfraLayer --> Sqs
 InfraLayer --> Secrets
 InfraLayer --> Providers
+Scheduler --> AppLayer : invokes nightly enqueue
+Sqs --> Lambda : event source mapping
+Lambda --> [Snapshot Job Processor]
+[Snapshot Queue Publisher] ..> Sqs : enqueue commands
+[Snapshot Job Processor] ..> [Briefing Use Cases] : generate widget snapshots
+[Snapshot Job Processor] ..> Postgres : job state + snapshots
 
-[Job Runner] ..> [Briefing Use Cases] : executes
 [Connector Clients] ..> [Connector Domain]
 [Postgres Repositories] ..> [Dashboard Domain]
 [Postgres Repositories] ..> [Widget Domain]
@@ -60,8 +70,9 @@ No direct database or provider access.
 end note
 
 note bottom of InfraLayer
-Background jobs remain inside the modular monolith
-initially, with clean seams for later extraction.
+The worker logic stays inside the modular monolith,
+but SQS and Lambda provide the first production queue
+runtime with a clean path to ECS/Fargate later.
 end note
 
 @enduml

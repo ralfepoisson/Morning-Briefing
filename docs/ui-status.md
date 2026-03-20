@@ -60,18 +60,25 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 - Each appointment shows time, title, and location
 - Calendar tile supports vertical resizing in edit mode
 
+### Connectors management
+
+- Top navigation now routes to a dedicated Connectors page
+- The Connectors page lists existing tenant connections with provider, auth type, status, and last update time
+- Todoist connections can be renamed and have their API key replaced from the Connectors page
+- Task-widget connection creation remains available from widget edit mode
+
 ## Current limitations
 
 - Widget content is mocked and does not yet come from briefing snapshots or live connectors
 - Dashboard metadata updates are only partially wired and broader dashboard management is still minimal
 - Layout editing is custom and lightweight rather than using a dedicated dashboard grid library
 - Widget resizing is currently implemented only for calendar widgets
-- Only weather widgets currently expose configurable settings
+- Only weather and task widgets currently expose meaningful configuration flows
 
 ## Next likely UI steps
 
 - Add more widget types to the widget library
-- Add configuration UIs for calendar and task widgets
+- Add configuration UIs for calendar widgets and deeper task connector settings
 - Improve dashboard switching and multi-dashboard management
 - Connect widgets to snapshot-backed or live data
 - Refine spacing, responsive behaviour, and visual polish across themes

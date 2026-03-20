@@ -22,6 +22,11 @@ export type UpdateDashboardInput = {
   description?: string;
 };
 
+export type ArchiveDashboardInput = {
+  dashboardId: string;
+  ownerUserId: string;
+};
+
 export type DashboardResponse = {
   id: string;
   name: string;

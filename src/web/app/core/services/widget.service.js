@@ -92,14 +92,14 @@
     };
 
     this.applySnapshot = function applySnapshot(dashboardId, snapshot) {
-      if (!snapshot || !snapshot.widgets || !snapshot.widgets.length) {
-        return this.listForDashboard(dashboardId);
-      }
-
       this.listForDashboard(dashboardId).forEach(function applyWidgetSnapshot(widget) {
-        var snapshotWidget = snapshot.widgets.find(function findSnapshotWidget(item) {
+        var snapshotWidget = snapshot && snapshot.widgets
+          ? snapshot.widgets.find(function findSnapshotWidget(item) {
           return item.widgetId === widget.id;
-        });
+          })
+          : null;
+
+        widget.isLoading = false;
 
         if (!snapshotWidget || !snapshotWidget.content) {
           return;
@@ -109,6 +109,14 @@
 
         if (widget.type === 'weather') {
           widget.title = 'Weather Outlook';
+        }
+
+        if (widget.type === 'tasks') {
+          widget.title = 'Task List';
+        }
+
+        if (widget.type === 'calendar') {
+          widget.title = 'Today on Calendar';
         }
       });
 
@@ -142,7 +150,8 @@
         details: widgetPayload.data && widgetPayload.data.details,
         dateLabel: widgetPayload.data && widgetPayload.data.dateLabel,
         appointments: widgetPayload.data && widgetPayload.data.appointments,
-        groups: widgetPayload.data && widgetPayload.data.groups
+        groups: widgetPayload.data && widgetPayload.data.groups,
+        isLoading: widgetPayload.isLoading !== undefined ? widgetPayload.isLoading : true
       });
     }
 
@@ -160,6 +169,7 @@
       var currentWidgets = widgetsByDashboard[dashboardId] = [];
 
       nextWidgets.forEach(function (widgetPayload) {
+        widgetPayload.isLoading = true;
         currentWidgets.push(hydrateWidget(widgetPayload));
       });
     }

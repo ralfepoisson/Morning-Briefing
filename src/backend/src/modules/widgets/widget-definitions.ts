@@ -58,19 +58,26 @@ const widgetDefinitions: WidgetDefinition[] = [
     minSize: { width: 360, height: 260 },
     refreshMode: 'SNAPSHOT',
     createDefaultConfig: function createDefaultConfig() {
-      return {
-        source: 'default-calendar'
-      };
+      return {};
     },
-    createMockData: function createMockData() {
+    createMockData: function createMockData(config) {
+      const connectionLabel = getCalendarConnectionLabel(config);
+
       return {
+        provider: 'google-calendar',
+        connectionLabel: connectionLabel || 'Not connected',
         dateLabel: 'Today',
-        appointments: [
-          { time: '09:00', title: 'Stand-up', location: 'Teams' },
-          { time: '10:30', title: 'Deep work block', location: 'Home office' },
-          { time: '13:00', title: 'Client review', location: 'WeWork Meeting Room' },
-          { time: '19:00', title: 'Dinner reservation', location: 'Le Petit Marchand' }
-        ]
+        emptyMessage: connectionLabel
+          ? 'Live appointments will appear after you save the dashboard.'
+          : 'Choose a Google Calendar connection in edit mode to configure this widget.',
+        appointments: connectionLabel
+          ? [
+              { time: '09:00', title: 'Stand-up', location: 'Teams' },
+              { time: '10:30', title: 'Deep work block', location: 'Home office' },
+              { time: '13:00', title: 'Client review', location: 'WeWork Meeting Room' },
+              { time: '19:00', title: 'Dinner reservation', location: 'Le Petit Marchand' }
+            ]
+          : []
       };
     }
   },
@@ -83,35 +90,42 @@ const widgetDefinitions: WidgetDefinition[] = [
     minSize: { width: 360, height: 260 },
     refreshMode: 'SNAPSHOT',
     createDefaultConfig: function createDefaultConfig() {
-      return {
-        source: 'default-task-list'
-      };
+      return {};
     },
-    createMockData: function createMockData() {
+    createMockData: function createMockData(config) {
+      const connectionLabel = getTaskConnectionLabel(config);
+
       return {
-        groups: [
-          {
-            label: 'Due Today',
-            items: [
-              { title: 'Reply to insurance email' },
-              { title: 'Confirm dinner reservation' }
+        provider: 'todoist',
+        connectionLabel: connectionLabel || 'Not connected',
+        emptyMessage: connectionLabel
+          ? 'Live tasks will appear after you save the dashboard.'
+          : 'Choose a Todoist connection in edit mode to configure this widget.',
+        groups: connectionLabel
+          ? [
+              {
+                label: 'Due Today',
+                items: [
+                  { title: 'Reply to insurance email' },
+                  { title: 'Confirm dinner reservation' }
+                ]
+              },
+              {
+                label: 'Due Tomorrow',
+                items: [
+                  { title: 'Draft project update' },
+                  { title: 'Buy birthday card' }
+                ]
+              },
+              {
+                label: 'No Due Date',
+                items: [
+                  { title: 'Declutter camera roll' },
+                  { title: 'Research standing desk options' }
+                ]
+              }
             ]
-          },
-          {
-            label: 'Due Tomorrow',
-            items: [
-              { title: 'Draft project update' },
-              { title: 'Buy birthday card' }
-            ]
-          },
-          {
-            label: 'No Due Date',
-            items: [
-              { title: 'Declutter camera roll' },
-              { title: 'Research standing desk options' }
-            ]
-          }
-        ]
+          : []
       };
     }
   }
@@ -155,4 +169,20 @@ function getWeatherLocationLabel(config: Record<string, unknown>): string {
   }
 
   return location.name;
+}
+
+function getTaskConnectionLabel(config: Record<string, unknown>): string {
+  if (typeof config.connectionName === 'string' && config.connectionName.trim()) {
+    return config.connectionName;
+  }
+
+  return '';
+}
+
+function getCalendarConnectionLabel(config: Record<string, unknown>): string {
+  if (typeof config.connectionName === 'string' && config.connectionName.trim()) {
+    return config.connectionName;
+  }
+
+  return '';
 }

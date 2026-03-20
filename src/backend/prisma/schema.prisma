@@ -49,6 +49,14 @@ enum WidgetSnapshotStatus {
   FAILED
 }
 
+enum SnapshotJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
 model Tenant {
   id          String             @id @default(uuid()) @db.Uuid
   name        String             @map("tenant_name")
@@ -94,6 +102,7 @@ model Dashboard {
   dashboardType      DashboardType   @default(PERSONAL) @map("dashboard_type")
   isDefault          Boolean         @default(false) @map("is_default")
   isActive           Boolean         @default(true) @map("is_active")
+  archivedAt         DateTime?       @map("archived_at") @db.Timestamptz(6)
   version            Int             @default(1)
   activationRuleJson Json?           @map("activation_rule_json")
   themeJson          Json?           @map("theme_json")
@@ -122,16 +131,19 @@ model DashboardWidget {
   minWidth      Int               @default(1) @map("min_width")
   minHeight     Int               @default(1) @map("min_height")
   isVisible     Boolean           @default(true) @map("is_visible")
+  archivedAt    DateTime?         @map("archived_at") @db.Timestamptz(6)
   refreshMode   WidgetRefreshMode @default(SNAPSHOT) @map("refresh_mode")
   sortOrder     Int               @default(0) @map("sort_order")
   version       Int               @default(1)
   configJson    Json?             @map("config_json")
+  configHash    String?           @map("config_hash")
   createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
   tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   dashboard     Dashboard         @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
   connectors    WidgetConnector[]
   snapshots     WidgetSnapshot[]
+  snapshotJobs  SnapshotGenerationJob[]
 
   @@index([tenantId])
   @@index([dashboardId])
@@ -230,7 +242,35 @@ model WidgetSnapshot {
   snapshot          BriefingSnapshot     @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
   dashboardWidget   DashboardWidget      @relation(fields: [dashboardWidgetId], references: [id], onDelete: Restrict)
 
+  @@unique([snapshotId, dashboardWidgetId])
   @@index([snapshotId])
   @@index([dashboardWidgetId])
   @@map("widget_snapshots")
+}
+
+model SnapshotGenerationJob {
+  id                    String            @id @default(uuid()) @db.Uuid
+  widgetId              String            @map("widget_id") @db.Uuid
+  dashboardId           String            @map("dashboard_id") @db.Uuid
+  tenantId              String            @map("tenant_id") @db.Uuid
+  userId                String            @map("user_id") @db.Uuid
+  snapshotDate          DateTime          @map("snapshot_date") @db.Date
+  triggerSource         String            @map("trigger_source")
+  idempotencyKey        String            @unique @map("idempotency_key")
+  requestedConfigVersion Int             @map("requested_config_version")
+  requestedConfigHash   String            @map("requested_config_hash")
+  status                SnapshotJobStatus @default(PENDING)
+  attemptCount          Int               @default(0) @map("attempt_count")
+  lastMessageId         String?           @map("last_message_id")
+  lastError             String?           @map("last_error")
+  startedAt             DateTime?         @map("started_at") @db.Timestamptz(6)
+  completedAt           DateTime?         @map("completed_at") @db.Timestamptz(6)
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  widget                DashboardWidget   @relation(fields: [widgetId], references: [id], onDelete: Cascade)
+
+  @@index([widgetId, snapshotDate])
+  @@index([dashboardId, snapshotDate])
+  @@index([userId, snapshotDate])
+  @@map("snapshot_generation_jobs")
 }

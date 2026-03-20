@@ -75,6 +75,20 @@
       });
     };
 
+    this.archive = function archive(dashboardId) {
+      return $http.delete(ApiConfig.baseUrl + '/dashboards/' + dashboardId).then(function handleResponse() {
+        var archivedIndex = dashboards.findIndex(function (item) {
+          return item.id === dashboardId;
+        });
+
+        if (archivedIndex !== -1) {
+          dashboards.splice(archivedIndex, 1);
+        }
+
+        ensureActiveDashboard();
+      });
+    };
+
     function replaceDashboards(nextDashboards) {
       dashboards.length = 0;
       Array.prototype.push.apply(dashboards, nextDashboards);

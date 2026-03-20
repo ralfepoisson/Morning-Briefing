@@ -14,7 +14,8 @@ test('GET /api/v1/dashboards/:dashboardId/snapshots/latest returns the latest sn
         return {
           tenantId: 'tenant-1',
           userId: 'user-1',
-          displayName: 'Ralfe'
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
         };
       }
     },
@@ -49,7 +50,8 @@ test('GET /api/v1/dashboards/:dashboardId/snapshots/latest returns 404 when dash
         return {
           tenantId: 'tenant-1',
           userId: 'user-1',
-          displayName: 'Ralfe'
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
         };
       }
     },

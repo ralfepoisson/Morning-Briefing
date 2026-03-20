@@ -74,8 +74,9 @@ The UI should communicate with the backend only through REST over HTTP/JSON. No 
 - `DELETE /api/v1/dashboards/:dashboardId/widgets/:widgetId`
 - `GET /api/v1/dashboards/:dashboardId/snapshots/latest`
 - `GET /api/v1/snapshots/:snapshotId`
-- `POST /api/v1/connectors`
-- `PATCH /api/v1/connectors/:connectorId`
+- `GET /api/v1/connections`
+- `POST /api/v1/connections`
+- `PATCH /api/v1/connections/:connectionId`
 - `POST /api/v1/connectors/:connectorId/sync`
 
 ## How The Current UI Maps To The Backend
@@ -87,6 +88,7 @@ The existing AngularJS UI already implies a few important backend requirements:
 - Widget layout is freeform, so absolute `x`, `y`, `width`, and `height` must be persisted.
 - Widget type definitions remain code-owned in the application layer, while widget instance configuration belongs in the database.
 - Widget display content should come from snapshot data or connector-backed reads, not be mixed into widget configuration rows.
+- Connector management needs both creation from task-widget flows and a dedicated page for later credential edits.
 
 That last point is the main reason to keep both `dashboard_widget.config_json` and `widget_snapshot.content_json`. One stores configuration; the other stores rendered content for a specific briefing run.
 
@@ -193,6 +195,23 @@ A typical generation path is:
 7. Let the UI fetch the latest completed snapshot through REST.
 
 This model keeps the dashboard editor fast and independent from the timing of data collection.
+
+### Current queue-based implementation
+
+The codebase now uses an AWS-managed, serverless-first snapshot pipeline:
+
+- widget configuration changes enqueue `GenerateWidgetSnapshotRequested` messages to SQS Standard
+- EventBridge Scheduler is intended to trigger a nightly enqueue function that lists eligible widgets and enqueues one message per widget
+- Lambda is the initial worker runtime, but the consumer logic is written as a transport-agnostic processor so it can move to ECS/Fargate later
+- `snapshot_generation_jobs` persists idempotency, attempt counts, and skip/failure state
+- workers detect stale jobs by comparing the queued widget config version/hash with the current widget row before generating anything
+- a DLQ receives messages that exhaust SQS retries
+
+The logical idempotency key is:
+
+- `widgetId:snapshotDate:widgetConfigHash`
+
+That key intentionally coalesces overlapping scheduled and ad hoc refresh requests for the same widget/day/config state while still allowing a new config change to produce a fresh job.
 
 ## Connectors And Secrets
 

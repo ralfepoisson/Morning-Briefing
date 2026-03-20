@@ -1,9 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
 import { DefaultUserService } from '../default-user/default-user-service.js';
-import { OpenMeteoWeatherClient } from './open-meteo-weather-client.js';
-import { PrismaSnapshotRepository } from './prisma-snapshot-repository.js';
-import { SnapshotService } from './snapshot-service.js';
+import { createSnapshotService } from './snapshot-runtime.js';
+import type { SnapshotService } from './snapshot-service.js';
 
 export type SnapshotRouteDependencies = {
   snapshotService: Pick<SnapshotService, 'getLatestForDashboard'>;
@@ -45,10 +44,7 @@ function createSnapshotRouteDependencies(): SnapshotRouteDependencies {
   const prisma = getPrismaClient();
 
   return {
-    snapshotService: new SnapshotService(
-      new PrismaSnapshotRepository(prisma),
-      new OpenMeteoWeatherClient()
-    ),
+    snapshotService: createSnapshotService(),
     defaultUserService: new DefaultUserService(prisma)
   };
 }

@@ -26,6 +26,16 @@
 
           definition = WidgetRegistryService.get(widget.type);
 
+          if (widget.isLoading) {
+            element.append($compile(
+              '<div class="widget-loading-state">' +
+              '  <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>' +
+              '  <span>Loading snapshot...</span>' +
+              '</div>'
+            )(scope.$new()));
+            return;
+          }
+
           if (!definition || !definition.elementName) {
             return;
           }

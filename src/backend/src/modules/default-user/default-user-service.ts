@@ -7,6 +7,7 @@ export type DefaultUserContext = {
   tenantId: string;
   userId: string;
   displayName: string;
+  timezone: string;
 };
 
 export class DefaultUserService {
@@ -52,7 +53,8 @@ export class DefaultUserService {
     return {
       tenantId: tenant.id,
       userId: user.id,
-      displayName: user.displayName
+      displayName: user.displayName,
+      timezone: user.timezone
     };
   }
 }

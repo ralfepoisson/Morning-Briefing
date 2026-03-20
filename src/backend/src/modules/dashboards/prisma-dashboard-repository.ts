@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import type { DashboardRepository } from './dashboard-repository.js';
 import type {
+  ArchiveDashboardInput,
   CreateDashboardInput,
   DashboardRecord,
   UpdateDashboardInput
@@ -12,7 +13,8 @@ export class PrismaDashboardRepository implements DashboardRepository {
   async listForOwner(ownerUserId: string): Promise<DashboardRecord[]> {
     const dashboards = await this.prisma.dashboard.findMany({
       where: {
-        ownerUserId
+        ownerUserId,
+        archivedAt: null
       },
       orderBy: [
         { isDefault: 'desc' },
@@ -49,7 +51,8 @@ export class PrismaDashboardRepository implements DashboardRepository {
     const dashboard = await this.prisma.dashboard.findFirst({
       where: {
         id: input.dashboardId,
-        ownerUserId: input.ownerUserId
+        ownerUserId: input.ownerUserId,
+        archivedAt: null
       }
     });
 
@@ -71,6 +74,52 @@ export class PrismaDashboardRepository implements DashboardRepository {
     });
 
     return mapDashboardRecord(updatedDashboard);
+  }
+
+  async archive(input: ArchiveDashboardInput): Promise<boolean> {
+    const dashboard = await this.prisma.dashboard.findFirst({
+      where: {
+        id: input.dashboardId,
+        ownerUserId: input.ownerUserId,
+        archivedAt: null
+      }
+    });
+
+    if (!dashboard) {
+      return false;
+    }
+
+    const archivedAt = new Date();
+
+    await this.prisma.$transaction([
+      this.prisma.dashboard.update({
+        where: {
+          id: dashboard.id
+        },
+        data: {
+          archivedAt,
+          isActive: false,
+          version: {
+            increment: 1
+          }
+        }
+      }),
+      this.prisma.dashboardWidget.updateMany({
+        where: {
+          dashboardId: dashboard.id,
+          archivedAt: null
+        },
+        data: {
+          archivedAt,
+          isVisible: false,
+          version: {
+            increment: 1
+          }
+        }
+      })
+    ]);
+
+    return true;
   }
 }
 

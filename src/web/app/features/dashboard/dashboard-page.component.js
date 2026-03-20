@@ -4,7 +4,7 @@
   angular.module('morningBriefingApp').component('dashboardPage', {
     template:
       '<section class="dashboard-workspace" ng-if="$ctrl.ready">' +
-      '  <section class="dashboard-stage">' +
+      '  <section class="dashboard-stage" ng-if="$ctrl.activeDashboard">' +
       '    <div class="stage-toolbar d-flex flex-column gap-2">' +
       '      <div class="d-flex flex-column flex-xl-row align-items-xl-center justify-content-between gap-2">' +
       '        <div class="stage-heading">' +
@@ -22,6 +22,9 @@
       '    </div>' +
       '    <div class="dashboard-canvas" ng-class="{\'dashboard-canvas--editing\': $ctrl.isEditing}">' +
       '      <article class="widget-card" ng-class="$ctrl.getWidgetCardClass(widget)" ng-repeat="widget in $ctrl.widgets track by widget.id" draggable-widget widget="widget" enabled="$ctrl.isEditing" on-move="$ctrl.persistWidgetPosition(widget)" on-resize="$ctrl.persistWidgetSize(widget)" ng-style="{ width: widget.width + \'px\', height: widget.height + \'px\' }">' +
+      '        <button type="button" class="btn btn-outline-light icon-button widget-refresh-button" ng-class="{\'widget-refresh-button--visible\': $ctrl.isRefreshingWidget(widget)}" ng-click="$ctrl.refreshWidget(widget, $event)" ng-disabled="$ctrl.isRefreshingWidget(widget)" aria-label="Refresh widget snapshot">' +
+      '          <i class="fa-solid" ng-class="$ctrl.isRefreshingWidget(widget) ? \'fa-spinner fa-spin\' : \'fa-rotate-right\'" aria-hidden="true"></i>' +
+      '        </button>' +
       '        <div class="widget-handle">' +
       '          <div>' +
       '            <div class="widget-label">{{$ctrl.getWidgetLabel(widget)}}</div>' +
@@ -40,6 +43,15 @@
       '      </div>' +
       '    </div>' +
       '  </section>' +
+      '  <section class="dashboard-stage" ng-if="!$ctrl.activeDashboard">' +
+      '    <div class="canvas-empty-state canvas-empty-state--standalone">' +
+      '      <div>' +
+      '        <h3>No dashboards yet</h3>' +
+      '        <p>Create a dashboard to start building your morning briefing.</p>' +
+      '        <button type="button" class="btn btn-primary" ng-click="$ctrl.openCreateDashboardModal()">Create dashboard</button>' +
+      '      </div>' +
+      '    </div>' +
+      '  </section>' +
       '  <div class="modal-shell" ng-if="$ctrl.ui.dashboardModalMode" ng-click="$ctrl.closeModal()">' +
       '    <div class="modal-card" role="dialog" aria-modal="true" ng-click="$event.stopPropagation()">' +
       '      <div class="eyebrow">{{ $ctrl.ui.dashboardModalMode === "create" ? "Create Dashboard" : "Configure Dashboard" }}</div>' +
@@ -50,7 +62,9 @@
       '        <input id="modalDashboardName" class="form-control form-control-lg" type="text" ng-model="$ctrl.modalForm.name" placeholder="Weekend Reset" required />' +
       '        <label class="form-label mt-3" for="modalDashboardDescription">Description</label>' +
       '        <textarea id="modalDashboardDescription" class="form-control" rows="4" ng-model="$ctrl.modalForm.description" placeholder="A slower view with weather, errands, and family plans."></textarea>' +
+      '        <p class="modal-copy text-danger mt-3 mb-0" ng-if="$ctrl.modalForm.errorMessage">{{$ctrl.modalForm.errorMessage}}</p>' +
       '        <div class="modal-actions">' +
+      '          <button type="button" class="btn btn-outline-danger me-auto" ng-if="$ctrl.ui.dashboardModalMode === \'edit\'" ng-click="$ctrl.archiveDashboard()">Delete dashboard</button>' +
       '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeModal()">Cancel</button>' +
       '          <button type="submit" class="btn btn-primary">{{ $ctrl.ui.dashboardModalMode === "create" ? "Create" : "Save" }}</button>' +
       '        </div>' +
@@ -62,7 +76,9 @@
       '      <div class="eyebrow">Widget Settings</div>' +
       '      <h2 class="modal-title">{{ $ctrl.getWidgetConfigTitle() }}</h2>' +
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'weather\'">Pick the city this weather widget should use. Search results come from our reference city catalog.</p>' +
-      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type !== \'weather\'">This widget type does not have configurable settings yet.</p>' +
+      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'tasks\'">Choose which connection should power this task list. The selection is staged here and persisted when you click Save Dashboard.</p>' +
+      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'calendar\'">Choose which connection should power this calendar. The selection is staged here and persisted when you click Save Dashboard.</p>' +
+      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type !== \'weather\' && $ctrl.widgetConfig.widget.type !== \'tasks\' && $ctrl.widgetConfig.widget.type !== \'calendar\'">This widget type does not have configurable settings yet.</p>' +
       '      <form ng-if="$ctrl.widgetConfig.widget.type === \'weather\'" ng-submit="$ctrl.searchCities()">' +
       '        <label class="form-label" for="weatherLocationSearch">Location</label>' +
       '        <div class="d-flex gap-2">' +
@@ -70,7 +86,19 @@
       '          <button type="submit" class="btn btn-primary">Search</button>' +
       '        </div>' +
       '      </form>' +
+      '      <div ng-if="$ctrl.widgetSupportsConnections()">' +
+      '        <label class="form-label" for="widgetConnectionSelect">Connection</label>' +
+      '        <div class="widget-config-inline">' +
+      '          <select id="widgetConnectionSelect" class="form-select form-select-lg" ng-model="$ctrl.widgetConfig.selectedConnectionId" ng-options="connection.id as connection.name for connection in $ctrl.widgetConfig.availableConnections">' +
+      '            <option value="">Select a connection</option>' +
+      '          </select>' +
+      '          <button type="button" class="btn btn-outline-light" ng-click="$ctrl.openCreateConnectionModal()">Create new connection</button>' +
+      '        </div>' +
+      '        <p class="widget-config-helper" ng-if="$ctrl.widgetConfig.isLoadingConnections">Loading connections...</p>' +
+      '        <p class="widget-config-helper" ng-if="$ctrl.widgetConfig.connectionErrorMessage">{{$ctrl.widgetConfig.connectionErrorMessage}}</p>' +
+      '      </div>' +
       '      <p class="widget-config-selected" ng-if="$ctrl.widgetConfig.selectedCity">Selected city: <strong>{{ $ctrl.getSelectedCityDisplayName($ctrl.widgetConfig.selectedCity) }}</strong></p>' +
+      '      <p class="widget-config-selected" ng-if="$ctrl.widgetSupportsConnections() && $ctrl.getSelectedConnection()">Selected connection: <strong>{{ $ctrl.getSelectedConnection().name }}</strong></p>' +
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.isSearching">Searching cities...</p>' +
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.errorMessage">{{ $ctrl.widgetConfig.errorMessage }}</p>' +
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.hasSearched && !$ctrl.widgetConfig.isSearching && !$ctrl.widgetConfig.searchResults.length && !$ctrl.widgetConfig.errorMessage">No matching cities were found.</p>' +
@@ -83,7 +111,33 @@
       '      <div class="modal-actions">' +
       '        <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeWidgetConfigModal()">Cancel</button>' +
       '        <button type="button" class="btn btn-primary" ng-if="$ctrl.widgetConfig.widget.type === \'weather\'" ng-disabled="!$ctrl.widgetConfig.selectedCity" ng-click="$ctrl.saveWidgetConfig()">Save</button>' +
-      '        <button type="button" class="btn btn-primary" ng-if="$ctrl.widgetConfig.widget.type !== \'weather\'" ng-click="$ctrl.closeWidgetConfigModal()">Close</button>' +
+      '        <button type="button" class="btn btn-primary" ng-if="$ctrl.widgetSupportsConnections()" ng-disabled="!$ctrl.widgetConfig.selectedConnectionId" ng-click="$ctrl.saveWidgetConfig()">Save</button>' +
+      '        <button type="button" class="btn btn-primary" ng-if="$ctrl.widgetConfig.widget.type !== \'weather\' && !$ctrl.widgetSupportsConnections()" ng-click="$ctrl.closeWidgetConfigModal()">Close</button>' +
+      '      </div>' +
+      '    </div>' +
+      '  </div>' +
+      '  <div class="modal-shell" ng-if="$ctrl.connectionModal.isOpen" ng-click="$ctrl.closeCreateConnectionModal()">' +
+      '    <div class="modal-card connection-modal" role="dialog" aria-modal="true" ng-click="$event.stopPropagation()">' +
+      '      <div class="eyebrow">Create Connection</div>' +
+      '      <h2 class="modal-title">New connection</h2>' +
+      '      <p class="modal-copy" ng-if="$ctrl.connectionModal.provider === \'todoist\'">Create a Todoist connection by entering its API key.</p>' +
+      '      <p class="modal-copy" ng-if="$ctrl.connectionModal.provider === \'google-calendar\'">Connect Google Calendar with OAuth so private calendars can be read securely.</p>' +
+      '      <form ng-submit="$ctrl.saveNewConnection()" ng-if="$ctrl.connectionModal.provider === \'todoist\'">' +
+      '        <label class="form-label" for="connectionApiKey">Todoist API Key</label>' +
+      '        <input id="connectionApiKey" class="form-control form-control-lg" type="password" ng-model="$ctrl.connectionModal.apiKey" placeholder="Enter your Todoist API Key" required />' +
+      '        <p class="widget-config-helper" ng-if="$ctrl.connectionModal.errorMessage">{{$ctrl.connectionModal.errorMessage}}</p>' +
+      '        <div class="modal-actions">' +
+      '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeCreateConnectionModal()">Cancel</button>' +
+      '          <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.connectionModal.isSaving || !$ctrl.canSaveConnection()">Save</button>' +
+      '        </div>' +
+      '      </form>' +
+      '      <div ng-if="$ctrl.connectionModal.provider === \'google-calendar\'">' +
+      '        <p class="widget-config-helper">You will be redirected to Google, then returned here after access is granted.</p>' +
+      '        <p class="widget-config-helper" ng-if="$ctrl.connectionModal.errorMessage">{{$ctrl.connectionModal.errorMessage}}</p>' +
+      '        <div class="modal-actions">' +
+      '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeCreateConnectionModal()">Cancel</button>' +
+      '          <button type="button" class="btn btn-primary" ng-click="$ctrl.startGoogleCalendarOAuth()">Continue with Google</button>' +
+      '        </div>' +
       '      </div>' +
       '    </div>' +
       '  </div>' +
@@ -93,7 +147,7 @@
       '        <div>' +
       '          <div class="eyebrow">Widget Library</div>' +
       '          <h2 class="modal-title mb-2">Add a widget</h2>' +
-      '          <p class="modal-copy mb-0">We are planning for a broader catalog. For now, weather is the first live option.</p>' +
+      '          <p class="modal-copy mb-0">Weather, tasks, and calendar are ready to place. More widgets can slot into this same library later.</p>' +
       '        </div>' +
       '        <button type="button" class="btn btn-outline-secondary icon-button" ng-click="$ctrl.closeWidgetPanel()" aria-label="Close widget panel"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>' +
       '      </div>' +
@@ -115,9 +169,9 @@
     controller: DashboardPageController
   });
 
-  DashboardPageController.$inject = ['DashboardService', 'DashboardSnapshotService', 'WidgetService', 'WidgetRegistryService', 'ReferenceDataService', 'UiShellService', '$scope'];
+  DashboardPageController.$inject = ['DashboardService', 'DashboardSnapshotService', 'ConnectionService', 'WidgetService', 'WidgetRegistryService', 'ReferenceDataService', 'UiShellService', '$scope', '$window'];
 
-  function DashboardPageController(DashboardService, DashboardSnapshotService, WidgetService, WidgetRegistryService, ReferenceDataService, UiShellService, $scope) {
+  function DashboardPageController(DashboardService, DashboardSnapshotService, ConnectionService, WidgetService, WidgetRegistryService, ReferenceDataService, UiShellService, $scope, $window) {
     var $ctrl = this;
 
     $ctrl.ready = false;
@@ -127,6 +181,8 @@
     $ctrl.widgetDefinitions = WidgetRegistryService.list();
     $ctrl.widgetCatalog = buildWidgetCatalog();
     $ctrl.widgetConfig = buildEmptyWidgetConfigState();
+    $ctrl.connectionModal = buildEmptyConnectionModalState();
+    $ctrl.refreshingWidgetId = '';
 
     $ctrl.$onInit = function onInit() {
       bindUiWatchers();
@@ -145,7 +201,12 @@
       UiShellService.openDashboardModal('edit');
     };
 
+    $ctrl.openCreateDashboardModal = function openCreateDashboardModal() {
+      UiShellService.openDashboardModal('create');
+    };
+
     $ctrl.closeModal = function closeModal() {
+      $ctrl.modalForm.errorMessage = '';
       UiShellService.closeDashboardModal();
     };
 
@@ -156,6 +217,8 @@
       if (!$ctrl.modalForm.name) {
         return;
       }
+
+      $ctrl.modalForm.errorMessage = '';
 
       if (isCreateMode) {
         request = DashboardService.create({
@@ -180,6 +243,30 @@
             $ctrl.isEditing = isCreateMode;
           });
         });
+      }).catch(function handleDashboardSaveError(error) {
+        $ctrl.modalForm.errorMessage = getErrorMessage(error, 'Unable to save the dashboard right now.');
+      });
+    };
+
+    $ctrl.archiveDashboard = function archiveDashboard() {
+      if (!$ctrl.activeDashboard || $ctrl.ui.dashboardModalMode !== 'edit') {
+        return;
+      }
+
+      $ctrl.modalForm.errorMessage = '';
+
+      if (!window.confirm('Archive this dashboard? Its widgets will be archived too, but existing data will be kept.')) {
+        return;
+      }
+
+      DashboardService.archive($ctrl.activeDashboard.id).then(function handleArchivedDashboard() {
+        $ctrl.isEditing = false;
+        $ctrl.closeWidgetConfigModal();
+        UiShellService.closeWidgetPanel();
+        $ctrl.closeModal();
+        return syncState();
+      }).catch(function handleArchiveDashboardError(error) {
+        $ctrl.modalForm.errorMessage = getErrorMessage(error, 'Unable to archive the dashboard right now.');
       });
     };
 
@@ -197,6 +284,7 @@
           $ctrl.isEditing = false;
           $ctrl.closeWidgetConfigModal();
           UiShellService.closeWidgetPanel();
+          syncState();
         });
         return;
       }
@@ -232,14 +320,23 @@
         cityQuery: getSelectedCityDisplayName(widget.config && widget.config.location),
         searchResults: [],
         selectedCity: widget.config && widget.config.location ? angular.copy(widget.config.location) : null,
+        availableConnections: [],
+        selectedConnectionId: widget.config && widget.config.connectionId ? widget.config.connectionId : '',
+        isLoadingConnections: false,
+        connectionErrorMessage: '',
         isSearching: false,
         hasSearched: false,
         errorMessage: ''
       };
+
+      if (widgetSupportsConnections(widget.type)) {
+        loadConnectionsForWidget(widget.type);
+      }
     };
 
     $ctrl.closeWidgetConfigModal = function closeWidgetConfigModal() {
       $ctrl.widgetConfig = buildEmptyWidgetConfigState();
+      $ctrl.connectionModal = buildEmptyConnectionModalState();
     };
 
     $ctrl.searchCities = function searchCities() {
@@ -270,20 +367,81 @@
     $ctrl.isSelectedCity = function isSelectedCity(city) {
       return !!($ctrl.widgetConfig.selectedCity && city && $ctrl.widgetConfig.selectedCity.id === city.id);
     };
+
     $ctrl.getSelectedCityDisplayName = getSelectedCityDisplayName;
     $ctrl.getWidgetConfigTitle = getWidgetConfigTitle;
+    $ctrl.getSelectedConnection = getSelectedConnection;
+    $ctrl.widgetSupportsConnections = widgetSupportsConnections;
+    $ctrl.canSaveConnection = canSaveConnection;
 
     $ctrl.saveWidgetConfig = function saveWidgetConfig() {
       var widget = $ctrl.widgetConfig.widget;
 
-      if (!widget || widget.type !== 'weather' || !$ctrl.widgetConfig.selectedCity) {
+      if (!widget) {
         return;
       }
 
       widget.config = widget.config || {};
-      widget.config.location = angular.copy($ctrl.widgetConfig.selectedCity);
-      applyWeatherWidgetPreview(widget);
-      $ctrl.closeWidgetConfigModal();
+
+      if (widget.type === 'weather') {
+        if (!$ctrl.widgetConfig.selectedCity) {
+          return;
+        }
+
+        widget.config.location = angular.copy($ctrl.widgetConfig.selectedCity);
+        applyWeatherWidgetPreview(widget);
+        $ctrl.closeWidgetConfigModal();
+        return;
+      }
+
+      if (widgetSupportsConnections(widget.type)) {
+        if (!$ctrl.widgetConfig.selectedConnectionId) {
+          return;
+        }
+
+        applyConnectionWidgetPreview(widget, getSelectedConnection());
+        $ctrl.closeWidgetConfigModal();
+      }
+    };
+
+    $ctrl.openCreateConnectionModal = function openCreateConnectionModal() {
+      if (!$ctrl.widgetConfig.widget || !widgetSupportsConnections($ctrl.widgetConfig.widget.type)) {
+        return;
+      }
+
+      $ctrl.connectionModal = buildEmptyConnectionModalState(getConnectionProviderForWidgetType($ctrl.widgetConfig.widget.type));
+      $ctrl.connectionModal.isOpen = true;
+    };
+
+    $ctrl.closeCreateConnectionModal = function closeCreateConnectionModal() {
+      $ctrl.connectionModal = buildEmptyConnectionModalState();
+    };
+
+    $ctrl.saveNewConnection = function saveNewConnection() {
+      if ($ctrl.connectionModal.provider === 'google-calendar') {
+        $ctrl.startGoogleCalendarOAuth();
+        return;
+      }
+
+      $ctrl.connectionModal.isSaving = true;
+      $ctrl.connectionModal.errorMessage = '';
+
+      ConnectionService.create({
+        type: $ctrl.connectionModal.provider,
+        credentials: buildConnectionCredentials($ctrl.connectionModal)
+      }).then(function handleConnectionCreated(connection) {
+        $ctrl.widgetConfig.availableConnections = [connection].concat($ctrl.widgetConfig.availableConnections);
+        $ctrl.widgetConfig.selectedConnectionId = connection.id;
+        $ctrl.closeCreateConnectionModal();
+      }).catch(function handleCreateConnectionError(error) {
+        $ctrl.connectionModal.errorMessage = getErrorMessage(error, 'Unable to create the connection right now.');
+      }).finally(function clearCreateConnectionLoading() {
+        $ctrl.connectionModal.isSaving = false;
+      });
+    };
+
+    $ctrl.startGoogleCalendarOAuth = function startGoogleCalendarOAuth() {
+      ConnectionService.startGoogleCalendarOAuth($window.location.href);
     };
 
     $ctrl.addWidget = function addWidget(type) {
@@ -303,6 +461,34 @@
 
     $ctrl.persistWidgetSize = function persistWidgetSize(widget) {
       WidgetService.updateSize($ctrl.activeDashboard.id, widget.id, widget.width, widget.height);
+    };
+
+    $ctrl.refreshWidget = function refreshWidget(widget, $event) {
+      if ($event) {
+        $event.preventDefault();
+        $event.stopPropagation();
+      }
+
+      if (!$ctrl.activeDashboard || !widget || $ctrl.refreshingWidgetId) {
+        return;
+      }
+
+      $ctrl.refreshingWidgetId = widget.id;
+      widget.isLoading = true;
+
+      DashboardSnapshotService.loadLatestForDashboard($ctrl.activeDashboard.id).then(function handleSnapshot(snapshot) {
+        WidgetService.applySnapshot($ctrl.activeDashboard.id, snapshot);
+        $ctrl.widgets = WidgetService.listForDashboard($ctrl.activeDashboard.id);
+      }).catch(function handleSnapshotRefreshError() {
+        WidgetService.applySnapshot($ctrl.activeDashboard.id, null);
+        $ctrl.widgets = WidgetService.listForDashboard($ctrl.activeDashboard.id);
+      }).finally(function clearRefreshingWidget() {
+        $ctrl.refreshingWidgetId = '';
+      });
+    };
+
+    $ctrl.isRefreshingWidget = function isRefreshingWidget(widget) {
+      return !!(widget && $ctrl.refreshingWidgetId === widget.id);
     };
 
     $ctrl.getWidgetCardClass = function getWidgetCardClass(widget) {
@@ -342,7 +528,9 @@
           $ctrl.widgets = WidgetService.listForDashboard($ctrl.activeDashboard.id);
           return $ctrl.widgets;
         }).catch(function ignoreSnapshotFailure() {
-          return widgets;
+          WidgetService.applySnapshot($ctrl.activeDashboard.id, null);
+          $ctrl.widgets = WidgetService.listForDashboard($ctrl.activeDashboard.id);
+          return $ctrl.widgets;
         });
       });
     }
@@ -373,14 +561,16 @@
           if (mode === 'create') {
             $ctrl.modalForm = {
               name: '',
-              description: ''
+              description: '',
+              errorMessage: ''
             };
           }
 
           if (mode === 'edit' && $ctrl.activeDashboard) {
             $ctrl.modalForm = {
               name: $ctrl.activeDashboard.name,
-              description: $ctrl.activeDashboard.description
+              description: $ctrl.activeDashboard.description,
+              errorMessage: ''
             };
           }
         }
@@ -410,8 +600,24 @@
         cityQuery: '',
         searchResults: [],
         selectedCity: null,
+        availableConnections: [],
+        selectedConnectionId: '',
+        isLoadingConnections: false,
+        connectionErrorMessage: '',
         isSearching: false,
         hasSearched: false,
+        errorMessage: ''
+      };
+    }
+
+    function buildEmptyConnectionModalState(provider) {
+      var nextProvider = provider || 'todoist';
+
+      return {
+        isOpen: false,
+        provider: nextProvider,
+        apiKey: '',
+        isSaving: false,
         errorMessage: ''
       };
     }
@@ -435,6 +641,108 @@
             { label: 'UV', value: 'Moderate' }
           ]
         : [];
+    }
+
+    function applyTasksWidgetPreview(widget, connection) {
+      if (!connection) {
+        return;
+      }
+
+      widget.config.connectionId = connection.id;
+      widget.config.connectionName = connection.name;
+      widget.config.provider = connection.type;
+      widget.data = {
+        provider: connection.type,
+        connectionLabel: connection.name,
+        emptyMessage: 'Live tasks will appear after you save the dashboard.',
+        groups: [
+          {
+            label: 'Due Today',
+            items: [
+              { title: 'Reply to insurance email', meta: 'today' },
+              { title: 'Confirm dinner reservation', meta: 'today' }
+            ]
+          },
+          {
+            label: 'Due Tomorrow',
+            items: [
+              { title: 'Draft project update', meta: 'tomorrow' },
+              { title: 'Buy birthday card', meta: 'tomorrow' }
+            ]
+          },
+          {
+            label: 'No Due Date',
+            items: [
+              { title: 'Declutter camera roll', meta: '' },
+              { title: 'Research standing desk options', meta: '' }
+            ]
+          }
+        ]
+      };
+    }
+
+    function applyCalendarWidgetPreview(widget, connection) {
+      if (!connection) {
+        return;
+      }
+
+      widget.config.connectionId = connection.id;
+      widget.config.connectionName = connection.name;
+      widget.config.provider = connection.type;
+      widget.data = {
+        provider: connection.type,
+        connectionLabel: connection.name,
+        dateLabel: 'Today',
+        emptyMessage: 'Live appointments will appear after you save the dashboard.',
+        appointments: [
+          {
+            time: '09:00',
+            title: 'Stand-up',
+            location: 'Teams'
+          },
+          {
+            time: '11:30',
+            title: 'Planning session',
+            location: 'Studio'
+          },
+          {
+            time: '16:00',
+            title: 'Doctor appointment',
+            location: 'Rue des Fleurs'
+          }
+        ]
+      };
+    }
+
+    function applyConnectionWidgetPreview(widget, connection) {
+      if (widget.type === 'tasks') {
+        applyTasksWidgetPreview(widget, connection);
+        return;
+      }
+
+      if (widget.type === 'calendar') {
+        applyCalendarWidgetPreview(widget, connection);
+      }
+    }
+
+    function loadConnectionsForWidget(widgetType) {
+      $ctrl.widgetConfig.isLoadingConnections = true;
+      $ctrl.widgetConfig.connectionErrorMessage = '';
+
+      ConnectionService.list(getConnectionProviderForWidgetType(widgetType)).then(function handleConnections(connections) {
+        $ctrl.widgetConfig.availableConnections = connections;
+      }).catch(function handleConnectionLoadError(error) {
+        $ctrl.widgetConfig.availableConnections = [];
+        $ctrl.widgetConfig.connectionErrorMessage = getErrorMessage(error, 'Connections are currently unavailable.');
+      }).finally(function clearConnectionLoading() {
+        $ctrl.widgetConfig.isLoadingConnections = false;
+      });
+    }
+
+    function getSelectedConnection() {
+      return ($ctrl.widgetConfig.availableConnections || []).find(function findConnection(connection) {
+        return connection.id === $ctrl.widgetConfig.selectedConnectionId;
+      }) || null;
     }
 
     function getSelectedCityDisplayName(location) {
@@ -470,7 +778,57 @@
         return 'Configure Weather Widget';
       }
 
+      if ($ctrl.widgetConfig.widget.type === 'tasks') {
+        return 'Configure Task List';
+      }
+
+      if ($ctrl.widgetConfig.widget.type === 'calendar') {
+        return 'Configure Calendar';
+      }
+
       return 'Configure ' + $ctrl.widgetConfig.widget.title;
+    }
+
+    function widgetSupportsConnections(widgetType) {
+      var type = widgetType || ($ctrl.widgetConfig.widget && $ctrl.widgetConfig.widget.type);
+
+      return type === 'tasks' || type === 'calendar';
+    }
+
+    function getConnectionProviderForWidgetType(widgetType) {
+      if (widgetType === 'tasks') {
+        return 'todoist';
+      }
+
+      if (widgetType === 'calendar') {
+        return 'google-calendar';
+      }
+
+      return '';
+    }
+
+    function canSaveConnection() {
+      if ($ctrl.connectionModal.provider === 'google-calendar') {
+        return true;
+      }
+
+      return !!$ctrl.connectionModal.apiKey;
+    }
+
+    function buildConnectionCredentials(connectionModal) {
+      var credentials = {
+        apiKey: connectionModal.apiKey
+      };
+
+      return credentials;
+    }
+
+    function getErrorMessage(error, fallbackMessage) {
+      if (error && error.data && typeof error.data.message === 'string' && error.data.message) {
+        return error.data.message;
+      }
+
+      return fallbackMessage;
     }
   }
 })();

@@ -7,6 +7,7 @@ import type {
   DashboardWidgetRecord,
   UpdateDashboardWidgetInput
 } from './widget-types.js';
+import type { SnapshotJobPublisher, PublishWidgetSnapshotJobInput } from '../snapshots/snapshot-job-publisher.js';
 
 test('WidgetService lists widgets for a dashboard', async function () {
   const repository = new InMemoryWidgetRepository([
@@ -28,17 +29,22 @@ test('WidgetService lists widgets for a dashboard', async function () {
 
 test('WidgetService creates a widget', async function () {
   const repository = new InMemoryWidgetRepository([]);
-  const service = new WidgetService(repository);
+  const publisher = new InMemorySnapshotJobPublisher();
+  const service = new WidgetService(repository, publisher);
 
   const widget = await service.create({
     dashboardId: 'dash-1',
     ownerUserId: 'user-1',
-    type: 'calendar'
+    type: 'calendar',
+    timezone: 'Europe/Paris'
   });
 
   assert.equal(widget.type, 'calendar');
   assert.equal(widget.dashboardId, 'dash-1');
   assert.equal(widget.x, 36);
+  assert.equal(publisher.items.length, 1);
+  assert.equal(publisher.items[0].widgetId, 'widget-1');
+  assert.equal(publisher.items[0].triggerSource, 'config_updated');
 });
 
 test('WidgetService updates widget layout', async function () {
@@ -54,12 +60,14 @@ test('WidgetService updates widget layout', async function () {
       }
     })
   ]);
-  const service = new WidgetService(repository);
+  const publisher = new InMemorySnapshotJobPublisher();
+  const service = new WidgetService(repository, publisher);
 
   const widget = await service.update({
     dashboardId: 'dash-1',
     widgetId: 'widget-1',
     ownerUserId: 'user-1',
+    timezone: 'Europe/Paris',
     x: 120,
     y: 160,
     width: 360,
@@ -79,6 +87,35 @@ test('WidgetService updates widget layout', async function () {
       displayName: 'London, England, GB'
     }
   });
+  assert.equal(publisher.items.length, 1);
+  assert.equal(publisher.items[0].triggerSource, 'config_updated');
+  assert.equal(publisher.items[0].widgetId, 'widget-1');
+});
+
+test('WidgetService does not enqueue a snapshot job when config is unchanged', async function () {
+  const repository = new InMemoryWidgetRepository([
+    createWidgetRecord({
+      id: 'widget-1',
+      dashboardId: 'dash-1',
+      ownerUserId: 'user-1'
+    })
+  ]);
+  const publisher = new InMemorySnapshotJobPublisher();
+  const service = new WidgetService(repository, publisher);
+
+  await service.update({
+    dashboardId: 'dash-1',
+    widgetId: 'widget-1',
+    ownerUserId: 'user-1',
+    timezone: 'Europe/Paris',
+    x: 120,
+    y: 160,
+    width: 360,
+    height: 420,
+    config: {}
+  });
+
+  assert.equal(publisher.items.length, 0);
 });
 
 class InMemoryWidgetRepository implements WidgetRepository {
@@ -115,15 +152,46 @@ class InMemoryWidgetRepository implements WidgetRepository {
     widget.y = input.y;
     widget.width = input.width;
     widget.height = input.height;
-    widget.config = input.config || widget.config;
+    const nextConfig = input.config || widget.config;
+    widget.shouldRefreshSnapshot = JSON.stringify(widget.config) !== JSON.stringify(nextConfig);
+    widget.config = nextConfig;
+    widget.configHash = JSON.stringify(nextConfig);
+    widget.version += 1;
     widget.updatedAt = new Date();
     return widget;
+  }
+}
+
+class InMemorySnapshotJobPublisher implements SnapshotJobPublisher {
+  public items: PublishWidgetSnapshotJobInput[] = [];
+
+  async publishGenerateWidgetSnapshot(input: PublishWidgetSnapshotJobInput) {
+    this.items.push(input);
+
+    return {
+      schemaVersion: 1 as const,
+      jobId: 'job-1',
+      idempotencyKey: 'key-1',
+      widgetId: input.widgetId,
+      dashboardId: input.dashboardId,
+      tenantId: input.tenantId,
+      userId: input.userId,
+      widgetConfigVersion: input.widgetConfigVersion,
+      widgetConfigHash: input.widgetConfigHash,
+      snapshotDate: input.snapshotDate,
+      snapshotPeriod: 'day' as const,
+      triggerSource: input.triggerSource,
+      correlationId: input.correlationId || null,
+      causationId: input.causationId || null,
+      requestedAt: new Date().toISOString()
+    };
   }
 }
 
 function createWidgetRecord(overrides: Partial<DashboardWidgetRecord>): DashboardWidgetRecord {
   return {
     id: overrides.id || 'widget-1',
+    tenantId: overrides.tenantId || 'tenant-1',
     dashboardId: overrides.dashboardId || 'dash-1',
     ownerUserId: overrides.ownerUserId || 'user-1',
     type: overrides.type || 'weather',
@@ -136,8 +204,12 @@ function createWidgetRecord(overrides: Partial<DashboardWidgetRecord>): Dashboar
     minHeight: overrides.minHeight || 260,
     isVisible: overrides.isVisible !== false,
     sortOrder: overrides.sortOrder || 1,
+    refreshMode: overrides.refreshMode || 'SNAPSHOT',
+    version: overrides.version || 1,
     config: overrides.config || {},
+    configHash: overrides.configHash || JSON.stringify(overrides.config || {}),
     data: overrides.data || {},
+    connections: overrides.connections || [],
     createdAt: overrides.createdAt || new Date('2026-03-19T07:00:00.000Z'),
     updatedAt: overrides.updatedAt || new Date('2026-03-19T07:00:00.000Z')
   };

@@ -5,7 +5,7 @@ import { DefaultUserService } from '../default-user/default-user-service.js';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
 
 export type DashboardRouteDependencies = {
-  dashboardService: Pick<DashboardService, 'listForOwner' | 'create' | 'update'>;
+  dashboardService: Pick<DashboardService, 'listForOwner' | 'create' | 'update' | 'archive'>;
   defaultUserService: Pick<DefaultUserService, 'getDefaultUser'>;
 };
 
@@ -97,6 +97,33 @@ export async function registerDashboardRoutes(
     }
 
     return dashboard;
+  });
+
+  app.delete('/api/v1/dashboards/:dashboardId', async function handleArchiveDashboard(request, reply) {
+    const params = request.params as { dashboardId?: string };
+
+    if (!params.dashboardId) {
+      reply.code(400);
+      return {
+        message: 'Dashboard id is required.'
+      };
+    }
+
+    const user = await defaultUserService.getDefaultUser();
+    const archived = await service.archive({
+      dashboardId: params.dashboardId,
+      ownerUserId: user.userId
+    });
+
+    if (!archived) {
+      reply.code(404);
+      return {
+        message: 'Dashboard not found.'
+      };
+    }
+
+    reply.code(204);
+    return null;
   });
 }
 

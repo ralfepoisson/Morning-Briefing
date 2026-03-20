@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
 import { DefaultUserService } from '../default-user/default-user-service.js';
+import { createSnapshotJobPublisherFromEnvironment } from '../snapshots/snapshot-runtime.js';
 import { PrismaWidgetRepository } from './prisma-widget-repository.js';
 import { WidgetService } from './widget-service.js';
 
@@ -57,7 +58,10 @@ export async function registerWidgetRoutes(
       const widget = await widgetService.create({
         dashboardId: params.dashboardId,
         ownerUserId: user.userId,
-        type: body.type.trim()
+        type: body.type.trim(),
+        timezone: user.timezone,
+        correlationId: request.id,
+        causationId: request.id
       });
 
       reply.code(201);
@@ -115,26 +119,40 @@ export async function registerWidgetRoutes(
       };
     }
 
-    const user = await defaultUserService.getDefaultUser();
-    const widget = await widgetService.update({
-      dashboardId: params.dashboardId,
-      widgetId: params.widgetId,
-      ownerUserId: user.userId,
-      x: body.x,
-      y: body.y,
-      width: body.width,
-      height: body.height,
-      config: body.config
-    });
+    try {
+      const user = await defaultUserService.getDefaultUser();
+      const widget = await widgetService.update({
+        dashboardId: params.dashboardId,
+        widgetId: params.widgetId,
+        ownerUserId: user.userId,
+        timezone: user.timezone,
+        correlationId: request.id,
+        causationId: request.id,
+        x: body.x,
+        y: body.y,
+        width: body.width,
+        height: body.height,
+        config: body.config
+      });
 
-    if (!widget) {
-      reply.code(404);
-      return {
-        message: 'Widget not found.'
-      };
+      if (!widget) {
+        reply.code(404);
+        return {
+          message: 'Widget not found.'
+        };
+      }
+
+      return widget;
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Selected connection was not found.') {
+        reply.code(400);
+        return {
+          message: error.message
+        };
+      }
+
+      throw error;
     }
-
-    return widget;
   });
 }
 
@@ -142,7 +160,10 @@ function createWidgetRouteDependencies(): WidgetRouteDependencies {
   const prisma = getPrismaClient();
 
   return {
-    widgetService: new WidgetService(new PrismaWidgetRepository(prisma)),
+    widgetService: new WidgetService(
+      new PrismaWidgetRepository(prisma),
+      createSnapshotJobPublisherFromEnvironment()
+    ),
     defaultUserService: new DefaultUserService(prisma)
   };
 }

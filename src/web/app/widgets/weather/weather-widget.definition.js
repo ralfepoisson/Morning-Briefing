@@ -30,6 +30,7 @@
           id: options.id,
           dashboardId: options.dashboardId,
           type: 'weather',
+          isLoading: !!options.isLoading,
           title: options.title || 'Weather Outlook',
           x: options.x,
           y: options.y,
