@@ -9,6 +9,7 @@ export type PublishWidgetSnapshotJobInput = {
   widgetConfigHash: string;
   snapshotDate: string;
   triggerSource: SnapshotTriggerSource;
+  bypassDuplicateCheck?: boolean;
   correlationId?: string | null;
   causationId?: string | null;
   requestedAt?: Date;

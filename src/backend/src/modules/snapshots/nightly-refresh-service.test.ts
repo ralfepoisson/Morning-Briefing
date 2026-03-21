@@ -66,6 +66,7 @@ class InMemoryPublisher implements SnapshotJobPublisher {
       snapshotDate: input.snapshotDate,
       snapshotPeriod: 'day' as const,
       triggerSource: input.triggerSource,
+      bypassDuplicateCheck: input.bypassDuplicateCheck === true,
       correlationId: null,
       causationId: null,
       requestedAt: new Date().toISOString()

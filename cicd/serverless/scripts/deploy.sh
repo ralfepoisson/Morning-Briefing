@@ -8,6 +8,8 @@ REGION="${AWS_REGION:-eu-west-3}"
 DB_NAME="${DB_NAME:-morning_briefing}"
 DB_USER="${DB_USER:-morning_briefing}"
 DB_PASSWORD="${DB_PASSWORD:-change-me-now}"
+HOSTED_ZONE_NAME="${HOSTED_ZONE_NAME:-ralfepoisson.com}"
+FRONTEND_DOMAIN_NAME="${FRONTEND_DOMAIN_NAME:-briefing.ralfepoisson.com}"
 GOOGLE_OAUTH_CLIENT_ID="${GOOGLE_OAUTH_CLIENT_ID:-}"
 GOOGLE_OAUTH_CLIENT_SECRET="${GOOGLE_OAUTH_CLIENT_SECRET:-}"
 GOOGLE_OAUTH_REDIRECT_URI="${GOOGLE_OAUTH_REDIRECT_URI:-}"
@@ -49,6 +51,13 @@ EOF
   fi
 }
 
+lookup_hosted_zone_id() {
+  aws route53 list-hosted-zones-by-name \
+    --dns-name "${HOSTED_ZONE_NAME}" \
+    --query "HostedZones[?Name=='${HOSTED_ZONE_NAME}.'] | [0].Id" \
+    --output text | sed 's|/hostedzone/||'
+}
+
 deploy_stack() {
   local backend_image="$1"
   local frontend_image="$2"
@@ -63,6 +72,9 @@ deploy_stack() {
     --region "${REGION}"
     --param="frontendImage=${frontend_image}"
     --param="backendImage=${backend_image}"
+    --param="hostedZoneName=${HOSTED_ZONE_NAME}"
+    --param="hostedZoneId=${HOSTED_ZONE_ID}"
+    --param="frontendDomainName=${FRONTEND_DOMAIN_NAME}"
     --param="frontendDesiredCount=${frontend_count}"
     --param="backendDesiredCount=${backend_count}"
     --param="workerDesiredCount=${worker_count}"
@@ -108,6 +120,12 @@ require_command aws
 require_command docker
 require_command npm
 verify_aws_credentials
+HOSTED_ZONE_ID="$(lookup_hosted_zone_id)"
+
+if [[ -z "${HOSTED_ZONE_ID}" || "${HOSTED_ZONE_ID}" == "None" ]]; then
+  echo "Unable to find a Route53 hosted zone for ${HOSTED_ZONE_NAME}" >&2
+  exit 1
+fi
 
 deploy_stack "${PLACEHOLDER_BACKEND_IMAGE}" "${PLACEHOLDER_FRONTEND_IMAGE}" 0 0 0
 

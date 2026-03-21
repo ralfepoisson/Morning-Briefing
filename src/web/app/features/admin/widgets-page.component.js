@@ -45,6 +45,7 @@
       '            <th>Dashboard</th>' +
       '            <th>Latest snapshot</th>' +
       '            <th>Status</th>' +
+      '            <th>Duplicates</th>' +
       '            <th>Actions</th>' +
       '          </tr>' +
       '        </thead>' +
@@ -63,6 +64,11 @@
       '            <td>' +
       '              <span class="message-broker-status-pill" ng-class="$ctrl.getStatusClass(widget)">{{$ctrl.getStatusLabel(widget)}}</span>' +
       '              <div class="message-broker-table__secondary widgets-admin-table__error" ng-if="widget.latestErrorMessage">{{widget.latestErrorMessage}}</div>' +
+      '            </td>' +
+      '            <td>' +
+      '              <div class="message-broker-table__primary">{{widget.duplicateSkipCount || 0}}</div>' +
+      '              <div class="message-broker-table__secondary" ng-if="widget.latestDuplicateAt">Last skipped {{widget.latestDuplicateAt | date:\'medium\'}}</div>' +
+      '              <div class="message-broker-table__secondary" ng-if="!widget.latestDuplicateAt">No duplicate skips recorded</div>' +
       '            </td>' +
       '            <td>' +
       '              <div class="widgets-admin-table__actions">' +

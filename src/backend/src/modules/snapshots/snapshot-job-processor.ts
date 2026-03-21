@@ -130,6 +130,7 @@ export function parseGenerateWidgetSnapshotMessage(body: string): GenerateWidget
     typeof payload.snapshotDate !== 'string' ||
     payload.snapshotPeriod !== 'day' ||
     typeof payload.triggerSource !== 'string' ||
+    typeof payload.bypassDuplicateCheck !== 'boolean' ||
     typeof payload.requestedAt !== 'string'
   ) {
     throw new Error('Snapshot queue message payload is invalid.');

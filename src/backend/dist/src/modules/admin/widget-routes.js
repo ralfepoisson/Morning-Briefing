@@ -1,6 +1,7 @@
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
 import { DefaultUserService } from '../default-user/default-user-service.js';
 import { formatSnapshotDateForTimezone } from '../snapshots/snapshot-date.js';
+import { buildSnapshotJobIdempotencyKey } from '../snapshots/snapshot-job-utils.js';
 import { createSnapshotJobPublisherFromEnvironment, createSnapshotService } from '../snapshots/snapshot-runtime.js';
 export async function registerAdminWidgetRoutes(app, dependencies = createAdminWidgetRouteDependencies()) {
     app.get('/api/v1/admin/widgets', async function handleListWidgets() {
@@ -105,6 +106,7 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
             };
         }
         const snapshotDate = formatSnapshotDateForTimezone(new Date(), user.timezone || 'UTC');
+        const requestedAt = new Date();
         const jobInput = {
             widgetId: widget.id,
             dashboardId: widget.dashboardId,
@@ -115,7 +117,8 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
             snapshotDate,
             triggerSource: 'manual_refresh',
             correlationId: request.id,
-            causationId: request.id
+            causationId: request.id,
+            requestedAt
         };
         try {
             const published = await dependencies.snapshotJobPublisher.publishGenerateWidgetSnapshot(jobInput);
@@ -134,7 +137,13 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
             await dependencies.snapshotService.generateForWidget({
                 schemaVersion: 1,
                 jobId: 'manual-refresh-' + widget.id + '-' + snapshotDate,
-                idempotencyKey: widget.id + ':' + snapshotDate + ':' + widget.configHash,
+                idempotencyKey: buildSnapshotJobIdempotencyKey({
+                    widgetId: widget.id,
+                    snapshotDate,
+                    widgetConfigHash: widget.configHash,
+                    triggerSource: 'manual_refresh',
+                    requestedAt
+                }),
                 widgetId: widget.id,
                 dashboardId: widget.dashboardId,
                 tenantId: widget.tenantId,
@@ -146,7 +155,7 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
                 triggerSource: 'manual_refresh',
                 correlationId: request.id,
                 causationId: request.id,
-                requestedAt: new Date().toISOString()
+                requestedAt: requestedAt.toISOString()
             });
             reply.code(200);
             return {

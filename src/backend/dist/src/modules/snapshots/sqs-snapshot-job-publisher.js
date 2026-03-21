@@ -16,7 +16,10 @@ export class SqsSnapshotJobPublisher {
             idempotencyKey: buildSnapshotJobIdempotencyKey({
                 widgetId: input.widgetId,
                 snapshotDate: input.snapshotDate,
-                widgetConfigHash: input.widgetConfigHash
+                widgetConfigHash: input.widgetConfigHash,
+                triggerSource: input.triggerSource,
+                requestedAt,
+                bypassDuplicateCheck: input.bypassDuplicateCheck
             }),
             widgetId: input.widgetId,
             dashboardId: input.dashboardId,
@@ -27,6 +30,7 @@ export class SqsSnapshotJobPublisher {
             snapshotDate: input.snapshotDate,
             snapshotPeriod: 'day',
             triggerSource: input.triggerSource,
+            bypassDuplicateCheck: input.bypassDuplicateCheck === true,
             correlationId: input.correlationId || null,
             causationId: input.causationId || null,
             requestedAt: requestedAt.toISOString()
@@ -52,13 +56,17 @@ export class SqsSnapshotJobPublisher {
 }
 export class NoopSnapshotJobPublisher {
     async publishGenerateWidgetSnapshot(input) {
+        const requestedAt = input.requestedAt || new Date();
         const payload = {
             schemaVersion: 1,
             jobId: createSnapshotJobId(),
             idempotencyKey: buildSnapshotJobIdempotencyKey({
                 widgetId: input.widgetId,
                 snapshotDate: input.snapshotDate,
-                widgetConfigHash: input.widgetConfigHash
+                widgetConfigHash: input.widgetConfigHash,
+                triggerSource: input.triggerSource,
+                requestedAt,
+                bypassDuplicateCheck: input.bypassDuplicateCheck
             }),
             widgetId: input.widgetId,
             dashboardId: input.dashboardId,
@@ -69,9 +77,10 @@ export class NoopSnapshotJobPublisher {
             snapshotDate: input.snapshotDate,
             snapshotPeriod: 'day',
             triggerSource: input.triggerSource,
+            bypassDuplicateCheck: input.bypassDuplicateCheck === true,
             correlationId: input.correlationId || null,
             causationId: input.causationId || null,
-            requestedAt: (input.requestedAt || new Date()).toISOString()
+            requestedAt: requestedAt.toISOString()
         };
         logSnapshotJob('info', 'snapshot_job_enqueue_skipped', {
             reason: 'queue_disabled',

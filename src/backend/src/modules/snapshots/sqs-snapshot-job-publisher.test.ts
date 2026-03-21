@@ -35,5 +35,33 @@ test('SqsSnapshotJobPublisher sends the expected widget snapshot command', async
   assert.equal(body.payload.widgetId, 'widget-1');
   assert.equal(body.payload.widgetConfigHash, 'abc123');
   assert.equal(body.payload.snapshotDate, '2026-03-19');
+  assert.equal(body.payload.bypassDuplicateCheck, false);
   assert.equal(body.payload.idempotencyKey, payload.idempotencyKey);
+});
+
+test('SqsSnapshotJobPublisher marks forced admin refreshes to bypass duplicate checks', async function () {
+  const commands: SendMessageCommand[] = [];
+  const publisher = new SqsSnapshotJobPublisher({
+    async send(command) {
+      commands.push(command as SendMessageCommand);
+      return {};
+    }
+  }, 'https://example.com/queue');
+
+  const payload = await publisher.publishGenerateWidgetSnapshot({
+    widgetId: 'widget-1',
+    dashboardId: 'dash-1',
+    tenantId: 'tenant-1',
+    userId: 'user-1',
+    widgetConfigVersion: 4,
+    widgetConfigHash: 'abc123',
+    snapshotDate: '2026-03-21',
+    triggerSource: 'manual_refresh',
+    bypassDuplicateCheck: true,
+    requestedAt: new Date('2026-03-21T08:30:20.658Z')
+  });
+
+  const body = JSON.parse(String(commands[0].input.MessageBody));
+  assert.equal(body.payload.bypassDuplicateCheck, true);
+  assert.equal(payload.idempotencyKey, 'widget-1:2026-03-21:abc123:manual-bypass:2026-03-21T08:30:20.658Z');
 });

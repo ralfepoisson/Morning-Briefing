@@ -8,6 +8,9 @@ custom:
   namePrefix: morning-briefing-${self:custom.stage}
   frontendImage: ${param:frontendImage, 'public.ecr.aws/nginx/nginx:stable-alpine'}
   backendImage: ${param:backendImage, 'public.ecr.aws/docker/library/node:20-bookworm-slim'}
+  hostedZoneName: ${param:hostedZoneName, 'ralfepoisson.com'}
+  hostedZoneId: ${param:hostedZoneId, ''}
+  frontendDomainName: ${param:frontendDomainName, 'briefing.ralfepoisson.com'}
   snapshotQueueName: ${self:custom.namePrefix}-snapshot-jobs
   snapshotDlqName: ${self:custom.namePrefix}-snapshot-jobs-dlq
   dbName: ${param:dbName, 'morning_briefing'}
@@ -141,6 +144,10 @@ resources:
           - IpProtocol: tcp
             FromPort: 80
             ToPort: 80
+            CidrIp: 0.0.0.0/0
+          - IpProtocol: tcp
+            FromPort: 443
+            ToPort: 443
             CidrIp: 0.0.0.0/0
         SecurityGroupEgress:
           - IpProtocol: -1
@@ -342,6 +349,18 @@ resources:
           - !Ref PublicSubnetA
           - !Ref PublicSubnetB
 
+    FrontendCertificate:
+      Type: AWS::CertificateManager::Certificate
+      Properties:
+        DomainName: ${self:custom.frontendDomainName}
+        ValidationMethod: DNS
+        DomainValidationOptions:
+          - DomainName: ${self:custom.frontendDomainName}
+            HostedZoneId: ${self:custom.hostedZoneId}
+        Tags:
+          - Key: Name
+            Value: ${self:custom.namePrefix}-frontend-certificate
+
     FrontendTargetGroup:
       Type: AWS::ElasticLoadBalancingV2::TargetGroup
       Properties:
@@ -375,13 +394,28 @@ resources:
         Port: 80
         Protocol: HTTP
         DefaultActions:
+          - Type: redirect
+            RedirectConfig:
+              Port: '443'
+              Protocol: HTTPS
+              StatusCode: HTTP_301
+
+    HttpsListener:
+      Type: AWS::ElasticLoadBalancingV2::Listener
+      Properties:
+        LoadBalancerArn: !Ref LoadBalancer
+        Port: 443
+        Protocol: HTTPS
+        Certificates:
+          - CertificateArn: !Ref FrontendCertificate
+        DefaultActions:
           - Type: forward
             TargetGroupArn: !Ref FrontendTargetGroup
 
-    ApiListenerRule:
+    ApiHttpsListenerRule:
       Type: AWS::ElasticLoadBalancingV2::ListenerRule
       Properties:
-        ListenerArn: !Ref HttpListener
+        ListenerArn: !Ref HttpsListener
         Priority: 10
         Conditions:
           - Field: path-pattern
@@ -390,6 +424,16 @@ resources:
         Actions:
           - Type: forward
             TargetGroupArn: !Ref BackendTargetGroup
+
+    FrontendDnsRecord:
+      Type: AWS::Route53::RecordSet
+      Properties:
+        HostedZoneName: ${self:custom.hostedZoneName}.
+        Name: ${self:custom.frontendDomainName}.
+        Type: A
+        AliasTarget:
+          DNSName: !GetAtt LoadBalancer.DNSName
+          HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
 
     BackendTaskDefinition:
       Type: AWS::ECS::TaskDefinition
@@ -451,7 +495,7 @@ resources:
               - Name: SNAPSHOT_WORKER_POLL_INTERVAL_MS
                 Value: '1000'
               - Name: FRONTEND_BASE_URL
-                Value: !Sub 'http://${LoadBalancer.DNSName}/'
+                Value: !Sub 'https://${self:custom.frontendDomainName}/'
               - Name: GOOGLE_OAUTH_CLIENT_ID
                 Value: ${self:custom.googleOauthClientId}
               - Name: GOOGLE_OAUTH_REDIRECT_URI
@@ -552,7 +596,7 @@ resources:
     BackendService:
       Type: AWS::ECS::Service
       DependsOn:
-        - HttpListener
+        - HttpsListener
       Properties:
         ServiceName: ${self:custom.namePrefix}-backend
         Cluster: !Ref AppCluster
@@ -598,7 +642,7 @@ resources:
     FrontendService:
       Type: AWS::ECS::Service
       DependsOn:
-        - HttpListener
+        - HttpsListener
       Properties:
         ServiceName: ${self:custom.namePrefix}-frontend
         Cluster: !Ref AppCluster
@@ -686,7 +730,11 @@ resources:
     LoadBalancerDnsName:
       Value: !GetAtt LoadBalancer.DNSName
     ApplicationUrl:
-      Value: !Sub 'http://${LoadBalancer.DNSName}'
+      Value: !Sub 'https://${self:custom.frontendDomainName}'
+    FrontendDomainName:
+      Value: ${self:custom.frontendDomainName}
+    FrontendCertificateArn:
+      Value: !Ref FrontendCertificate
     BackendEcrRepositoryUri:
       Value: !GetAtt BackendEcrRepository.RepositoryUri
     FrontendEcrRepositoryUri:

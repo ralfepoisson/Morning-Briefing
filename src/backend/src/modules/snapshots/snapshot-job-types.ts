@@ -13,6 +13,7 @@ export type GenerateWidgetSnapshotRequested = {
   snapshotDate: string;
   snapshotPeriod: 'day';
   triggerSource: SnapshotTriggerSource;
+  bypassDuplicateCheck: boolean;
   correlationId: string | null;
   causationId: string | null;
   requestedAt: string;

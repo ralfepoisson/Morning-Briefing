@@ -4,6 +4,7 @@ import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
 import { DefaultUserService } from '../default-user/default-user-service.js';
 import { formatSnapshotDateForTimezone } from '../snapshots/snapshot-date.js';
 import type { SnapshotJobPublisher } from '../snapshots/snapshot-job-publisher.js';
+import { buildSnapshotJobIdempotencyKey } from '../snapshots/snapshot-job-utils.js';
 import { createSnapshotJobPublisherFromEnvironment, createSnapshotService } from '../snapshots/snapshot-runtime.js';
 import type { SnapshotService } from '../snapshots/snapshot-service.js';
 
@@ -38,6 +39,13 @@ type WidgetListRecord = {
     snapshot: {
       snapshotDate: Date;
     };
+  }>;
+  snapshotJobs?: Array<{
+    status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'SKIPPED';
+    triggerSource: string;
+    duplicateSkipCount: number;
+    lastDuplicateAt: Date | null;
+    createdAt: Date;
   }>;
 };
 
@@ -90,6 +98,12 @@ export async function registerAdminWidgetRoutes(
             generatedAt: 'desc'
           },
           take: 1
+        },
+        snapshotJobs: {
+          orderBy: {
+            createdAt: 'desc'
+          },
+          take: 20
         }
       },
       orderBy: [
@@ -114,6 +128,7 @@ export async function registerAdminWidgetRoutes(
 
   app.post('/api/v1/admin/widgets/:widgetId/regenerate-snapshot', async function handleRegenerateWidgetSnapshot(request, reply) {
     const params = request.params as { widgetId?: string };
+    const body = request.body as { bypassDuplicateCheck?: boolean } | undefined;
 
     if (!params.widgetId) {
       reply.code(400);
@@ -171,6 +186,8 @@ export async function registerAdminWidgetRoutes(
     }
 
     const snapshotDate = formatSnapshotDateForTimezone(new Date(), user.timezone || 'UTC');
+    const requestedAt = new Date();
+    const bypassDuplicateCheck = body?.bypassDuplicateCheck === true;
     const jobInput = {
       widgetId: widget.id,
       dashboardId: widget.dashboardId,
@@ -180,8 +197,10 @@ export async function registerAdminWidgetRoutes(
       widgetConfigHash: widget.configHash,
       snapshotDate,
       triggerSource: 'manual_refresh' as const,
+      bypassDuplicateCheck,
       correlationId: request.id,
-      causationId: request.id
+      causationId: request.id,
+      requestedAt
     };
 
     try {
@@ -194,6 +213,7 @@ export async function registerAdminWidgetRoutes(
           widgetId: widget.id,
           snapshotDate: published.snapshotDate,
           triggerSource: published.triggerSource,
+          bypassDuplicateCheck: published.bypassDuplicateCheck,
           requestedAt: published.requestedAt
         }
       };
@@ -201,7 +221,14 @@ export async function registerAdminWidgetRoutes(
       await dependencies.snapshotService.generateForWidget({
         schemaVersion: 1,
         jobId: 'manual-refresh-' + widget.id + '-' + snapshotDate,
-        idempotencyKey: widget.id + ':' + snapshotDate + ':' + widget.configHash,
+        idempotencyKey: buildSnapshotJobIdempotencyKey({
+          widgetId: widget.id,
+          snapshotDate,
+          widgetConfigHash: widget.configHash,
+          triggerSource: 'manual_refresh',
+          requestedAt,
+          bypassDuplicateCheck
+        }),
         widgetId: widget.id,
         dashboardId: widget.dashboardId,
         tenantId: widget.tenantId,
@@ -211,9 +238,10 @@ export async function registerAdminWidgetRoutes(
         snapshotDate,
         snapshotPeriod: 'day',
         triggerSource: 'manual_refresh',
+        bypassDuplicateCheck,
         correlationId: request.id,
         causationId: request.id,
-        requestedAt: new Date().toISOString()
+        requestedAt: requestedAt.toISOString()
       });
 
       reply.code(200);
@@ -224,7 +252,8 @@ export async function registerAdminWidgetRoutes(
         job: {
           widgetId: widget.id,
           snapshotDate,
-          triggerSource: 'manual_refresh'
+          triggerSource: 'manual_refresh',
+          bypassDuplicateCheck
         }
       };
     }
@@ -244,6 +273,20 @@ function createAdminWidgetRouteDependencies(): AdminWidgetRouteDependencies {
 
 function mapAdminWidgetRecord(widget: WidgetListRecord) {
   const latestSnapshot = widget.snapshots && widget.snapshots.length ? widget.snapshots[0] : null;
+  const duplicateSkipCount = (widget.snapshotJobs || []).reduce(function countDuplicates(total, job) {
+    return total + (job.duplicateSkipCount || 0);
+  }, 0);
+  const latestDuplicateAt = (widget.snapshotJobs || []).reduce<Date | null>(function findLatest(current, job) {
+    if (!job.lastDuplicateAt) {
+      return current;
+    }
+
+    if (!current || job.lastDuplicateAt.getTime() > current.getTime()) {
+      return job.lastDuplicateAt;
+    }
+
+    return current;
+  }, null);
 
   return {
     id: widget.id,
@@ -258,6 +301,8 @@ function mapAdminWidgetRecord(widget: WidgetListRecord) {
     latestSnapshotStatus: latestSnapshot ? latestSnapshot.status : null,
     latestErrorMessage: latestSnapshot ? latestSnapshot.errorMessage : null,
     latestSnapshotContent: latestSnapshot ? latestSnapshot.contentJson ?? null : null,
+    duplicateSkipCount,
+    latestDuplicateAt: latestDuplicateAt ? latestDuplicateAt.toISOString() : null,
     isFailing: !!(latestSnapshot && latestSnapshot.status === 'FAILED'),
     createdAt: widget.createdAt.toISOString(),
     updatedAt: widget.updatedAt.toISOString()

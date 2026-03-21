@@ -962,6 +962,7 @@ test('SnapshotService skips stale widget generation messages', async function ()
     snapshotDate: '2026-03-19',
     snapshotPeriod: 'day',
     triggerSource: 'config_updated',
+    bypassDuplicateCheck: false,
     correlationId: null,
     causationId: null,
     requestedAt: '2026-03-19T08:00:00.000Z'

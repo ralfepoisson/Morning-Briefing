@@ -19,6 +19,7 @@
         var stepSize = 1;
         var stepIntervalMs = 36;
         var pauseUntil = 0;
+        var isHovered = false;
 
         function maxScrollTop() {
           return Math.max(0, host.scrollHeight - host.clientHeight);
@@ -45,6 +46,10 @@
           if (limit <= threshold) {
             resetPosition();
             stopTicker();
+            return;
+          }
+
+          if (isHovered) {
             return;
           }
 
@@ -111,6 +116,14 @@
           });
         }
 
+        element.on('mouseenter', function handleMouseEnter() {
+          isHovered = true;
+        });
+
+        element.on('mouseleave', function handleMouseLeave() {
+          isHovered = false;
+        });
+
         scheduleRefresh();
         $timeout(refresh, 300, false);
         $timeout(refresh, 1200, false);
@@ -129,6 +142,9 @@
           if (mutationObserver) {
             mutationObserver.disconnect();
           }
+
+          element.off('mouseenter');
+          element.off('mouseleave');
         });
       }
     };

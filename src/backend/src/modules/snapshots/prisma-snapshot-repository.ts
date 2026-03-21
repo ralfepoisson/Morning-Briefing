@@ -240,6 +240,19 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
 
       if (existing) {
         if (existing.status === 'COMPLETED' || existing.status === 'SKIPPED') {
+          await this.prisma.snapshotGenerationJob.update({
+            where: {
+              id: existing.id
+            },
+            data: {
+              duplicateSkipCount: {
+                increment: 1
+              },
+              lastDuplicateAt: now,
+              lastMessageId: messageReceiptId
+            }
+          });
+
           return {
             status: 'already_processed',
             jobId: existing.id
@@ -247,6 +260,19 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
         }
 
         if (existing.status === 'PROCESSING') {
+          await this.prisma.snapshotGenerationJob.update({
+            where: {
+              id: existing.id
+            },
+            data: {
+              duplicateSkipCount: {
+                increment: 1
+              },
+              lastDuplicateAt: now,
+              lastMessageId: messageReceiptId
+            }
+          });
+
           return {
             status: 'already_processing',
             jobId: existing.id

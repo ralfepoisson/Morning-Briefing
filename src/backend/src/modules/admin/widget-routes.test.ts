@@ -40,6 +40,15 @@ test('GET /api/v1/admin/widgets returns widgets with latest snapshot state', asy
                     snapshotDate: new Date('2026-03-20T00:00:00.000Z')
                   }
                 }
+              ],
+              snapshotJobs: [
+                {
+                  status: 'COMPLETED',
+                  triggerSource: 'manual_refresh',
+                  duplicateSkipCount: 2,
+                  lastDuplicateAt: new Date('2026-03-20T06:20:00.000Z'),
+                  createdAt: new Date('2026-03-20T06:15:00.000Z')
+                }
               ]
             },
             {
@@ -58,7 +67,8 @@ test('GET /api/v1/admin/widgets returns widgets with latest snapshot state', asy
                 name: 'Personal',
                 ownerUserId: 'user-1'
               },
-              snapshots: []
+              snapshots: [],
+              snapshotJobs: []
             }
           ];
         },
@@ -114,6 +124,8 @@ test('GET /api/v1/admin/widgets returns widgets with latest snapshot state', asy
             summary: 'Weather provider timeout',
             details: []
           },
+          duplicateSkipCount: 2,
+          latestDuplicateAt: '2026-03-20T06:20:00.000Z',
           isFailing: true,
           createdAt: '2026-03-18T08:00:00.000Z',
           updatedAt: '2026-03-19T08:00:00.000Z'
@@ -131,6 +143,8 @@ test('GET /api/v1/admin/widgets returns widgets with latest snapshot state', asy
           latestSnapshotStatus: null,
           latestErrorMessage: null,
           latestSnapshotContent: null,
+          duplicateSkipCount: 0,
+          latestDuplicateAt: null,
           isFailing: false,
           createdAt: '2026-03-17T08:00:00.000Z',
           updatedAt: '2026-03-19T09:00:00.000Z'
@@ -187,7 +201,7 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual
         return {
           schemaVersion: 1,
           jobId: 'job-1',
-          idempotencyKey: 'widget-1:2026-03-20:hash-1',
+          idempotencyKey: 'widget-1:2026-03-21:hash-1:manual-bypass:2026-03-20T07:30:00.000Z',
           widgetId: input.widgetId,
           dashboardId: input.dashboardId,
           tenantId: input.tenantId,
@@ -197,6 +211,7 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual
           snapshotDate: input.snapshotDate,
           snapshotPeriod: 'day',
           triggerSource: input.triggerSource,
+          bypassDuplicateCheck: input.bypassDuplicateCheck === true,
           correlationId: input.correlationId || null,
           causationId: input.causationId || null,
           requestedAt: '2026-03-20T07:30:00.000Z'
@@ -213,18 +228,23 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual
   try {
     const response = await app.inject({
       method: 'POST',
-      url: '/api/v1/admin/widgets/widget-1/regenerate-snapshot'
+      url: '/api/v1/admin/widgets/widget-1/regenerate-snapshot',
+      payload: {
+        bypassDuplicateCheck: true
+      }
     });
 
     assert.equal(response.statusCode, 202);
     assert.equal((publishedInput as { triggerSource: string }).triggerSource, 'manual_refresh');
-    assert.equal((publishedInput as { snapshotDate: string }).snapshotDate, '2026-03-20');
+    assert.equal((publishedInput as { bypassDuplicateCheck: boolean }).bypassDuplicateCheck, true);
+    assert.equal((publishedInput as { snapshotDate: string }).snapshotDate, '2026-03-21');
     assert.deepEqual(response.json(), {
       status: 'queued',
       job: {
         widgetId: 'widget-1',
-        snapshotDate: '2026-03-20',
+        snapshotDate: '2026-03-21',
         triggerSource: 'manual_refresh',
+        bypassDuplicateCheck: true,
         requestedAt: '2026-03-20T07:30:00.000Z'
       }
     });
@@ -290,20 +310,24 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot falls back to dir
   try {
     const response = await app.inject({
       method: 'POST',
-      url: '/api/v1/admin/widgets/widget-1/regenerate-snapshot'
+      url: '/api/v1/admin/widgets/widget-1/regenerate-snapshot',
+      payload: {
+        bypassDuplicateCheck: true
+      }
     });
 
     assert.equal(response.statusCode, 200);
     assert.equal((generatedInput as { triggerSource: string }).triggerSource, 'manual_refresh');
-    assert.equal((generatedInput as { snapshotDate: string }).snapshotDate, '2026-03-20');
+    assert.equal((generatedInput as { snapshotDate: string }).snapshotDate, '2026-03-21');
     assert.deepEqual(response.json(), {
       status: 'generated',
       mode: 'direct',
       message: 'connect ECONNREFUSED 127.0.0.1:4566',
       job: {
         widgetId: 'widget-1',
-        snapshotDate: '2026-03-20',
-        triggerSource: 'manual_refresh'
+        snapshotDate: '2026-03-21',
+        triggerSource: 'manual_refresh',
+        bypassDuplicateCheck: true
       }
     });
   } finally {
