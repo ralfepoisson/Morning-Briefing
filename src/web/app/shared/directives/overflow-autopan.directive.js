@@ -10,94 +10,92 @@
       restrict: 'A',
       link: function link(scope, element) {
         var host = element[0];
-        var animationFrameId = null;
-        var refreshIntervalId = null;
+        var tickPromise = null;
+        var refreshPromise = null;
         var resizeObserver = null;
         var mutationObserver = null;
-        var pausedUntil = 0;
         var direction = 1;
-        var lastTimestamp = 0;
-        var speed = 0.03;
         var threshold = 50;
+        var stepSize = 1;
+        var stepIntervalMs = 36;
+        var pauseUntil = 0;
 
-        function getMaxScrollTop() {
+        function maxScrollTop() {
           return Math.max(0, host.scrollHeight - host.clientHeight);
         }
 
-        function stop() {
-          if (animationFrameId) {
-            $window.cancelAnimationFrame(animationFrameId);
-            animationFrameId = null;
+        function stopTicker() {
+          if (tickPromise) {
+            $interval.cancel(tickPromise);
+            tickPromise = null;
           }
         }
 
-        function step(timestamp) {
-          var delta;
-          var maxScrollTop;
-          var nextScrollTop;
+        function resetPosition() {
+          direction = 1;
+          pauseUntil = 0;
+          host.scrollTop = 0;
+        }
 
-          animationFrameId = $window.requestAnimationFrame(step);
+        function tick() {
+          var limit = maxScrollTop();
+          var now = Date.now();
+          var nextValue;
 
-          if (!lastTimestamp) {
-            lastTimestamp = timestamp;
-          }
-
-          maxScrollTop = getMaxScrollTop();
-
-          if (maxScrollTop <= threshold) {
-            host.scrollTop = 0;
-            direction = 1;
-            pausedUntil = 0;
-            lastTimestamp = timestamp;
+          if (limit <= threshold) {
+            resetPosition();
+            stopTicker();
             return;
           }
 
-          if (pausedUntil && timestamp < pausedUntil) {
-            lastTimestamp = timestamp;
+          if (pauseUntil && now < pauseUntil) {
             return;
           }
 
-          delta = (timestamp - lastTimestamp) * speed * direction;
-          lastTimestamp = timestamp;
-          nextScrollTop = host.scrollTop + delta;
+          nextValue = host.scrollTop + (stepSize * direction);
 
-          if (direction > 0 && nextScrollTop >= maxScrollTop) {
-            host.scrollTop = maxScrollTop;
+          if (direction > 0 && nextValue >= limit) {
+            host.scrollTop = limit;
             direction = -1;
-            pausedUntil = timestamp + 900;
+            pauseUntil = now + 1200;
             return;
           }
 
-          if (direction < 0 && nextScrollTop <= 0) {
+          if (direction < 0 && nextValue <= 0) {
             host.scrollTop = 0;
             direction = 1;
-            pausedUntil = timestamp + 900;
+            pauseUntil = now + 1200;
             return;
           }
 
-          host.scrollTop = nextScrollTop;
+          host.scrollTop = nextValue;
         }
 
         function refresh() {
-          lastTimestamp = 0;
-
-          if (getMaxScrollTop() <= threshold) {
-            host.scrollTop = 0;
-            direction = 1;
-            pausedUntil = 0;
-            stop();
+          if (maxScrollTop() <= threshold) {
+            resetPosition();
+            stopTicker();
             return;
           }
 
-          if (!animationFrameId) {
-            animationFrameId = $window.requestAnimationFrame(step);
+          if (!tickPromise) {
+            tickPromise = $interval(tick, stepIntervalMs, 0, false);
           }
         }
 
-        if ($window.ResizeObserver) {
-          resizeObserver = new $window.ResizeObserver(function handleResize() {
+        function scheduleRefresh() {
+          if (refreshPromise) {
+            $timeout.cancel(refreshPromise);
+          }
+
+          refreshPromise = $timeout(function runRefresh() {
+            refreshPromise = null;
             refresh();
-          });
+          }, 80, false);
+        }
+
+        if ($window.ResizeObserver) {
+          resizeObserver = new $window.ResizeObserver(scheduleRefresh);
           resizeObserver.observe(host);
           if (host.parentElement) {
             resizeObserver.observe(host.parentElement);
@@ -105,9 +103,7 @@
         }
 
         if ($window.MutationObserver) {
-          mutationObserver = new $window.MutationObserver(function handleMutations() {
-            refresh();
-          });
+          mutationObserver = new $window.MutationObserver(scheduleRefresh);
           mutationObserver.observe(host, {
             childList: true,
             subtree: true,
@@ -115,17 +111,15 @@
           });
         }
 
-        refreshIntervalId = $interval(refresh, 1500, 0, false);
-
-        $timeout(refresh, 0, false);
-        $timeout(refresh, 250, false);
-        $timeout(refresh, 1000, false);
+        scheduleRefresh();
+        $timeout(refresh, 300, false);
+        $timeout(refresh, 1200, false);
 
         scope.$on('$destroy', function destroy() {
-          stop();
+          stopTicker();
 
-          if (refreshIntervalId) {
-            $interval.cancel(refreshIntervalId);
+          if (refreshPromise) {
+            $timeout.cancel(refreshPromise);
           }
 
           if (resizeObserver) {
