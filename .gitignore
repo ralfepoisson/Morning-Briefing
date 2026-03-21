@@ -7,3 +7,5 @@ src/web/node_modules/
 .env
 .env.*
 !.env.example
+
+cicd/export_credentials.sh

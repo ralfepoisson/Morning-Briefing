@@ -1,0 +1,17 @@
+FROM node:20-bookworm-slim AS build
+
+WORKDIR /app
+
+COPY src/web/package*.json ./src/web/
+COPY cicd/ci/build-frontend.sh ./cicd/ci/build-frontend.sh
+RUN chmod +x ./cicd/ci/build-frontend.sh
+
+COPY src/web ./src/web
+RUN ./cicd/ci/build-frontend.sh
+
+FROM nginx:1.27-alpine AS runtime
+
+COPY cicd/ci/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/src/web/dist /usr/share/nginx/html
+
+EXPOSE 8080

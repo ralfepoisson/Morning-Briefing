@@ -5,8 +5,10 @@
   "description": "Backend and database tooling for Morning Briefing",
   "type": "module",
   "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.build.json --noCheck",
     "dev": "tsx watch src/app/server.ts",
     "start": "tsx src/app/server.ts",
+    "start:prod": "node dist/src/app/server.js",
     "db:create": "tsx scripts/create-database.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -17,7 +19,9 @@
     "reference:import:cities": "tsx scripts/import-reference-cities.ts",
     "snapshot:queues:setup": "tsx scripts/setup-snapshot-queues.ts",
     "snapshot:worker": "tsx scripts/run-snapshot-worker.ts",
+    "snapshot:worker:prod": "node dist/scripts/run-snapshot-worker.js",
     "snapshot:refresh:nightly": "tsx scripts/run-nightly-refresh.ts",
+    "snapshot:refresh:nightly:prod": "node dist/scripts/run-nightly-refresh.js",
     "prisma:studio": "prisma studio",
     "test": "node --test --import tsx",
     "watch": "watch 'npm run build' ./"

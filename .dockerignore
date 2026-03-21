@@ -1,0 +1,11 @@
+.git
+.gitignore
+node_modules
+**/node_modules
+dist
+**/dist
+.DS_Store
+coverage
+tmp
+*.log
+src/backend/data

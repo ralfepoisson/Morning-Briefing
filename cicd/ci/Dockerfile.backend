@@ -1,0 +1,34 @@
+FROM node:20-bookworm-slim AS build
+
+WORKDIR /app/src/backend
+
+COPY src/backend/package*.json ./
+RUN npm ci
+
+COPY src/backend/ ./
+RUN npm run build
+
+FROM node:20-bookworm-slim AS runtime
+
+WORKDIR /app/src/backend
+
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=3000
+ENV DB_PORT=5432
+ENV DB_ADMIN_NAME=postgres
+ENV DB_SCHEMA=public
+
+COPY src/backend/package*.json ./
+RUN npm ci
+
+COPY src/backend/ ./
+COPY --from=build /app/src/backend/dist ./dist
+COPY cicd/ci/backend-entrypoint.sh /usr/local/bin/backend-entrypoint.sh
+
+RUN chmod +x /usr/local/bin/backend-entrypoint.sh
+
+EXPOSE 3000
+
+ENTRYPOINT ["/usr/local/bin/backend-entrypoint.sh"]
+CMD ["npm", "run", "start:prod"]

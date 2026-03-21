@@ -1,0 +1,13 @@
+{
+  "name": "morning-briefing-serverless",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "deploy": "serverless deploy",
+    "print": "serverless print",
+    "remove": "serverless remove"
+  },
+  "devDependencies": {
+    "serverless": "^3.39.0"
+  }
+}

@@ -1,0 +1,709 @@
+service: morning-briefing-platform
+frameworkVersion: '3'
+configValidationMode: error
+
+custom:
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'eu-west-3'}
+  namePrefix: morning-briefing-${self:custom.stage}
+  frontendImage: ${param:frontendImage, 'public.ecr.aws/nginx/nginx:stable-alpine'}
+  backendImage: ${param:backendImage, 'public.ecr.aws/docker/library/node:20-bookworm-slim'}
+  snapshotQueueName: ${self:custom.namePrefix}-snapshot-jobs
+  snapshotDlqName: ${self:custom.namePrefix}-snapshot-jobs-dlq
+  dbName: ${param:dbName, 'morning_briefing'}
+  dbUser: ${param:dbUser, 'morning_briefing'}
+  dbPassword: ${param:dbPassword, 'change-me-now'}
+  googleOauthClientId: ${param:googleOauthClientId, ''}
+  googleOauthClientSecret: ${param:googleOauthClientSecret, ''}
+  googleOauthRedirectUri: ${param:googleOauthRedirectUri, ''}
+  googleOauthStateSecret: ${param:googleOauthStateSecret, ''}
+  frontendDesiredCount: ${param:frontendDesiredCount, 1}
+  backendDesiredCount: ${param:backendDesiredCount, 1}
+  workerDesiredCount: ${param:workerDesiredCount, 1}
+  nightlyRefreshSchedule: ${param:nightlyRefreshSchedule, 'cron(0 4 * * ? *)'}
+
+provider:
+  name: aws
+  stage: ${self:custom.stage}
+  region: ${self:custom.region}
+  stackName: ${self:service}-${sls:stage}
+  deploymentMethod: direct
+  tags:
+    Project: MorningBriefing
+    Stage: ${sls:stage}
+  stackTags:
+    Project: MorningBriefing
+    Stage: ${sls:stage}
+
+resources:
+  Resources:
+    AppVpc:
+      Type: AWS::EC2::VPC
+      Properties:
+        CidrBlock: 10.42.0.0/16
+        EnableDnsHostnames: true
+        EnableDnsSupport: true
+        Tags:
+          - Key: Name
+            Value: ${self:custom.namePrefix}-vpc
+
+    InternetGateway:
+      Type: AWS::EC2::InternetGateway
+      Properties:
+        Tags:
+          - Key: Name
+            Value: ${self:custom.namePrefix}-igw
+
+    VpcGatewayAttachment:
+      Type: AWS::EC2::VPCGatewayAttachment
+      Properties:
+        VpcId: !Ref AppVpc
+        InternetGatewayId: !Ref InternetGateway
+
+    PublicSubnetA:
+      Type: AWS::EC2::Subnet
+      Properties:
+        VpcId: !Ref AppVpc
+        AvailabilityZone: !Select [0, !GetAZs '']
+        CidrBlock: 10.42.0.0/24
+        MapPublicIpOnLaunch: true
+        Tags:
+          - Key: Name
+            Value: ${self:custom.namePrefix}-public-a
+
+    PublicSubnetB:
+      Type: AWS::EC2::Subnet
+      Properties:
+        VpcId: !Ref AppVpc
+        AvailabilityZone: !Select [1, !GetAZs '']
+        CidrBlock: 10.42.1.0/24
+        MapPublicIpOnLaunch: true
+        Tags:
+          - Key: Name
+            Value: ${self:custom.namePrefix}-public-b
+
+    DatabaseSubnetA:
+      Type: AWS::EC2::Subnet
+      Properties:
+        VpcId: !Ref AppVpc
+        AvailabilityZone: !Select [0, !GetAZs '']
+        CidrBlock: 10.42.10.0/24
+        MapPublicIpOnLaunch: false
+        Tags:
+          - Key: Name
+            Value: ${self:custom.namePrefix}-db-a
+
+    DatabaseSubnetB:
+      Type: AWS::EC2::Subnet
+      Properties:
+        VpcId: !Ref AppVpc
+        AvailabilityZone: !Select [1, !GetAZs '']
+        CidrBlock: 10.42.11.0/24
+        MapPublicIpOnLaunch: false
+        Tags:
+          - Key: Name
+            Value: ${self:custom.namePrefix}-db-b
+
+    PublicRouteTable:
+      Type: AWS::EC2::RouteTable
+      Properties:
+        VpcId: !Ref AppVpc
+        Tags:
+          - Key: Name
+            Value: ${self:custom.namePrefix}-public-rt
+
+    PublicRoute:
+      Type: AWS::EC2::Route
+      DependsOn: VpcGatewayAttachment
+      Properties:
+        RouteTableId: !Ref PublicRouteTable
+        DestinationCidrBlock: 0.0.0.0/0
+        GatewayId: !Ref InternetGateway
+
+    PublicSubnetARouteTableAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref PublicRouteTable
+        SubnetId: !Ref PublicSubnetA
+
+    PublicSubnetBRouteTableAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref PublicRouteTable
+        SubnetId: !Ref PublicSubnetB
+
+    AlbSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: ALB ingress
+        VpcId: !Ref AppVpc
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 80
+            ToPort: 80
+            CidrIp: 0.0.0.0/0
+        SecurityGroupEgress:
+          - IpProtocol: -1
+            CidrIp: 0.0.0.0/0
+        Tags:
+          - Key: Name
+            Value: ${self:custom.namePrefix}-alb-sg
+
+    EcsSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: ECS service ingress
+        VpcId: !Ref AppVpc
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 3000
+            ToPort: 3000
+            SourceSecurityGroupId: !Ref AlbSecurityGroup
+          - IpProtocol: tcp
+            FromPort: 8080
+            ToPort: 8080
+            SourceSecurityGroupId: !Ref AlbSecurityGroup
+        SecurityGroupEgress:
+          - IpProtocol: -1
+            CidrIp: 0.0.0.0/0
+        Tags:
+          - Key: Name
+            Value: ${self:custom.namePrefix}-ecs-sg
+
+    DatabaseSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Postgres ingress from ECS
+        VpcId: !Ref AppVpc
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 5432
+            ToPort: 5432
+            SourceSecurityGroupId: !Ref EcsSecurityGroup
+        SecurityGroupEgress:
+          - IpProtocol: -1
+            CidrIp: 0.0.0.0/0
+        Tags:
+          - Key: Name
+            Value: ${self:custom.namePrefix}-db-sg
+
+    BackendEcrRepository:
+      Type: AWS::ECR::Repository
+      Properties:
+        RepositoryName: ${self:custom.namePrefix}-backend
+        ImageScanningConfiguration:
+          ScanOnPush: true
+
+    FrontendEcrRepository:
+      Type: AWS::ECR::Repository
+      Properties:
+        RepositoryName: ${self:custom.namePrefix}-frontend
+        ImageScanningConfiguration:
+          ScanOnPush: true
+
+    SnapshotDeadLetterQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:custom.snapshotDlqName}
+        MessageRetentionPeriod: 1209600
+
+    SnapshotQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:custom.snapshotQueueName}
+        VisibilityTimeout: 120
+        ReceiveMessageWaitTimeSeconds: 10
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt SnapshotDeadLetterQueue.Arn
+          maxReceiveCount: 5
+
+    AppCluster:
+      Type: AWS::ECS::Cluster
+      Properties:
+        ClusterName: ${self:custom.namePrefix}-cluster
+
+    AppLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: /ecs/${self:custom.namePrefix}
+        RetentionInDays: 14
+
+    EcsExecutionRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:custom.namePrefix}-ecs-exec
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - ecs-tasks.amazonaws.com
+              Action: sts:AssumeRole
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        Policies:
+          - PolicyName: ${self:custom.namePrefix}-execution-secrets
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - secretsmanager:GetSecretValue
+                  Resource:
+                    - !Ref DatabasePasswordSecret
+                    - !Ref GoogleOauthClientSecretSecret
+                    - !Ref GoogleOauthStateSecretSecret
+
+    EcsTaskRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:custom.namePrefix}-ecs-task
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - ecs-tasks.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: ${self:custom.namePrefix}-sqs
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - sqs:DeleteMessage
+                    - sqs:GetQueueAttributes
+                    - sqs:GetQueueUrl
+                    - sqs:ReceiveMessage
+                    - sqs:SendMessage
+                    - sqs:ChangeMessageVisibility
+                  Resource:
+                    - !GetAtt SnapshotQueue.Arn
+                    - !GetAtt SnapshotDeadLetterQueue.Arn
+
+    DatabasePasswordSecret:
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Name: ${self:custom.namePrefix}/database/password
+        SecretString: ${self:custom.dbPassword}
+
+    GoogleOauthClientSecretSecret:
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Name: ${self:custom.namePrefix}/oauth/google-client-secret
+        SecretString: ${self:custom.googleOauthClientSecret}
+
+    GoogleOauthStateSecretSecret:
+      Type: AWS::SecretsManager::Secret
+      Properties:
+        Name: ${self:custom.namePrefix}/oauth/google-state-secret
+        SecretString: ${self:custom.googleOauthStateSecret}
+
+    DatabaseSubnetGroup:
+      Type: AWS::RDS::DBSubnetGroup
+      Properties:
+        DBSubnetGroupDescription: Private subnets for Morning Briefing database
+        DBSubnetGroupName: ${self:custom.namePrefix}-db-subnets
+        SubnetIds:
+          - !Ref DatabaseSubnetA
+          - !Ref DatabaseSubnetB
+
+    DatabaseInstance:
+      Type: AWS::RDS::DBInstance
+      Properties:
+        DBInstanceIdentifier: ${self:custom.namePrefix}-postgres
+        AllocatedStorage: 20
+        DBInstanceClass: db.t4g.micro
+        Engine: postgres
+        MasterUsername: ${self:custom.dbUser}
+        MasterUserPassword: ${self:custom.dbPassword}
+        DBName: ${self:custom.dbName}
+        PubliclyAccessible: false
+        BackupRetentionPeriod: 7
+        MultiAZ: false
+        StorageEncrypted: true
+        VPCSecurityGroups:
+          - !Ref DatabaseSecurityGroup
+        DBSubnetGroupName: !Ref DatabaseSubnetGroup
+        DeletionProtection: false
+
+    LoadBalancer:
+      Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+      Properties:
+        Name: ${self:custom.namePrefix}-alb
+        Scheme: internet-facing
+        Type: application
+        SecurityGroups:
+          - !Ref AlbSecurityGroup
+        Subnets:
+          - !Ref PublicSubnetA
+          - !Ref PublicSubnetB
+
+    FrontendTargetGroup:
+      Type: AWS::ElasticLoadBalancingV2::TargetGroup
+      Properties:
+        Name: ${self:custom.namePrefix}-fe
+        Port: 8080
+        Protocol: HTTP
+        TargetType: ip
+        VpcId: !Ref AppVpc
+        HealthCheckEnabled: true
+        HealthCheckPath: /
+        Matcher:
+          HttpCode: 200-399
+
+    BackendTargetGroup:
+      Type: AWS::ElasticLoadBalancingV2::TargetGroup
+      Properties:
+        Name: ${self:custom.namePrefix}-be
+        Port: 3000
+        Protocol: HTTP
+        TargetType: ip
+        VpcId: !Ref AppVpc
+        HealthCheckEnabled: true
+        HealthCheckPath: /health
+        Matcher:
+          HttpCode: 200-399
+
+    HttpListener:
+      Type: AWS::ElasticLoadBalancingV2::Listener
+      Properties:
+        LoadBalancerArn: !Ref LoadBalancer
+        Port: 80
+        Protocol: HTTP
+        DefaultActions:
+          - Type: forward
+            TargetGroupArn: !Ref FrontendTargetGroup
+
+    ApiListenerRule:
+      Type: AWS::ElasticLoadBalancingV2::ListenerRule
+      Properties:
+        ListenerArn: !Ref HttpListener
+        Priority: 10
+        Conditions:
+          - Field: path-pattern
+            Values:
+              - /api/*
+        Actions:
+          - Type: forward
+            TargetGroupArn: !Ref BackendTargetGroup
+
+    BackendTaskDefinition:
+      Type: AWS::ECS::TaskDefinition
+      Properties:
+        Family: ${self:custom.namePrefix}-backend
+        Cpu: 512
+        Memory: 1024
+        NetworkMode: awsvpc
+        RequiresCompatibilities:
+          - FARGATE
+        ExecutionRoleArn: !GetAtt EcsExecutionRole.Arn
+        TaskRoleArn: !GetAtt EcsTaskRole.Arn
+        ContainerDefinitions:
+          - Name: backend
+            Image: ${self:custom.backendImage}
+            Essential: true
+            PortMappings:
+              - ContainerPort: 3000
+                Protocol: tcp
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-group: !Ref AppLogGroup
+                awslogs-region: ${self:custom.region}
+                awslogs-stream-prefix: backend
+            Environment:
+              - Name: HOST
+                Value: 0.0.0.0
+              - Name: PORT
+                Value: '3000'
+              - Name: DB_HOST
+                Value: !GetAtt DatabaseInstance.Endpoint.Address
+              - Name: DB_PORT
+                Value: '5432'
+              - Name: DB_NAME
+                Value: ${self:custom.dbName}
+              - Name: DB_USER
+                Value: ${self:custom.dbUser}
+              - Name: DB_SCHEMA
+                Value: public
+              - Name: AWS_REGION
+                Value: ${self:custom.region}
+              - Name: SNAPSHOT_QUEUE_ENABLED
+                Value: 'true'
+              - Name: SNAPSHOT_QUEUE_URL
+                Value: !Ref SnapshotQueue
+              - Name: SNAPSHOT_QUEUE_NAME
+                Value: ${self:custom.snapshotQueueName}
+              - Name: SNAPSHOT_DLQ_NAME
+                Value: ${self:custom.snapshotDlqName}
+              - Name: SNAPSHOT_QUEUE_MAX_RECEIVE_COUNT
+                Value: '5'
+              - Name: SNAPSHOT_WORKER_WAIT_TIME_SECONDS
+                Value: '10'
+              - Name: SNAPSHOT_WORKER_VISIBILITY_TIMEOUT_SECONDS
+                Value: '60'
+              - Name: SNAPSHOT_WORKER_MAX_MESSAGES
+                Value: '5'
+              - Name: SNAPSHOT_WORKER_POLL_INTERVAL_MS
+                Value: '1000'
+              - Name: FRONTEND_BASE_URL
+                Value: !Sub 'http://${LoadBalancer.DNSName}/'
+              - Name: GOOGLE_OAUTH_CLIENT_ID
+                Value: ${self:custom.googleOauthClientId}
+              - Name: GOOGLE_OAUTH_REDIRECT_URI
+                Value: ${self:custom.googleOauthRedirectUri}
+            Secrets:
+              - Name: DB_PASSWORD
+                ValueFrom: !Ref DatabasePasswordSecret
+              - Name: GOOGLE_OAUTH_CLIENT_SECRET
+                ValueFrom: !Ref GoogleOauthClientSecretSecret
+              - Name: GOOGLE_OAUTH_STATE_SECRET
+                ValueFrom: !Ref GoogleOauthStateSecretSecret
+
+    WorkerTaskDefinition:
+      Type: AWS::ECS::TaskDefinition
+      Properties:
+        Family: ${self:custom.namePrefix}-worker
+        Cpu: 512
+        Memory: 1024
+        NetworkMode: awsvpc
+        RequiresCompatibilities:
+          - FARGATE
+        ExecutionRoleArn: !GetAtt EcsExecutionRole.Arn
+        TaskRoleArn: !GetAtt EcsTaskRole.Arn
+        ContainerDefinitions:
+          - Name: worker
+            Image: ${self:custom.backendImage}
+            Essential: true
+            Command:
+              - npm
+              - run
+              - snapshot:worker:prod
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-group: !Ref AppLogGroup
+                awslogs-region: ${self:custom.region}
+                awslogs-stream-prefix: worker
+            Environment:
+              - Name: DB_HOST
+                Value: !GetAtt DatabaseInstance.Endpoint.Address
+              - Name: DB_PORT
+                Value: '5432'
+              - Name: DB_NAME
+                Value: ${self:custom.dbName}
+              - Name: DB_USER
+                Value: ${self:custom.dbUser}
+              - Name: DB_SCHEMA
+                Value: public
+              - Name: AWS_REGION
+                Value: ${self:custom.region}
+              - Name: SNAPSHOT_QUEUE_ENABLED
+                Value: 'true'
+              - Name: SNAPSHOT_QUEUE_URL
+                Value: !Ref SnapshotQueue
+              - Name: SNAPSHOT_QUEUE_NAME
+                Value: ${self:custom.snapshotQueueName}
+              - Name: SNAPSHOT_DLQ_NAME
+                Value: ${self:custom.snapshotDlqName}
+              - Name: SNAPSHOT_QUEUE_MAX_RECEIVE_COUNT
+                Value: '5'
+              - Name: SNAPSHOT_WORKER_WAIT_TIME_SECONDS
+                Value: '10'
+              - Name: SNAPSHOT_WORKER_VISIBILITY_TIMEOUT_SECONDS
+                Value: '60'
+              - Name: SNAPSHOT_WORKER_MAX_MESSAGES
+                Value: '5'
+              - Name: SNAPSHOT_WORKER_POLL_INTERVAL_MS
+                Value: '1000'
+            Secrets:
+              - Name: DB_PASSWORD
+                ValueFrom: !Ref DatabasePasswordSecret
+
+    FrontendTaskDefinition:
+      Type: AWS::ECS::TaskDefinition
+      Properties:
+        Family: ${self:custom.namePrefix}-frontend
+        Cpu: 256
+        Memory: 512
+        NetworkMode: awsvpc
+        RequiresCompatibilities:
+          - FARGATE
+        ExecutionRoleArn: !GetAtt EcsExecutionRole.Arn
+        TaskRoleArn: !GetAtt EcsTaskRole.Arn
+        ContainerDefinitions:
+          - Name: frontend
+            Image: ${self:custom.frontendImage}
+            Essential: true
+            PortMappings:
+              - ContainerPort: 8080
+                Protocol: tcp
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-group: !Ref AppLogGroup
+                awslogs-region: ${self:custom.region}
+                awslogs-stream-prefix: frontend
+
+    BackendService:
+      Type: AWS::ECS::Service
+      DependsOn:
+        - HttpListener
+      Properties:
+        ServiceName: ${self:custom.namePrefix}-backend
+        Cluster: !Ref AppCluster
+        LaunchType: FARGATE
+        DesiredCount: ${self:custom.backendDesiredCount}
+        TaskDefinition: !Ref BackendTaskDefinition
+        DeploymentConfiguration:
+          MinimumHealthyPercent: 50
+          MaximumPercent: 200
+        NetworkConfiguration:
+          AwsvpcConfiguration:
+            AssignPublicIp: ENABLED
+            SecurityGroups:
+              - !Ref EcsSecurityGroup
+            Subnets:
+              - !Ref PublicSubnetA
+              - !Ref PublicSubnetB
+        LoadBalancers:
+          - ContainerName: backend
+            ContainerPort: 3000
+            TargetGroupArn: !Ref BackendTargetGroup
+
+    WorkerService:
+      Type: AWS::ECS::Service
+      Properties:
+        ServiceName: ${self:custom.namePrefix}-worker
+        Cluster: !Ref AppCluster
+        LaunchType: FARGATE
+        DesiredCount: ${self:custom.workerDesiredCount}
+        TaskDefinition: !Ref WorkerTaskDefinition
+        DeploymentConfiguration:
+          MinimumHealthyPercent: 0
+          MaximumPercent: 100
+        NetworkConfiguration:
+          AwsvpcConfiguration:
+            AssignPublicIp: ENABLED
+            SecurityGroups:
+              - !Ref EcsSecurityGroup
+            Subnets:
+              - !Ref PublicSubnetA
+              - !Ref PublicSubnetB
+
+    FrontendService:
+      Type: AWS::ECS::Service
+      DependsOn:
+        - HttpListener
+      Properties:
+        ServiceName: ${self:custom.namePrefix}-frontend
+        Cluster: !Ref AppCluster
+        LaunchType: FARGATE
+        DesiredCount: ${self:custom.frontendDesiredCount}
+        TaskDefinition: !Ref FrontendTaskDefinition
+        DeploymentConfiguration:
+          MinimumHealthyPercent: 50
+          MaximumPercent: 200
+        NetworkConfiguration:
+          AwsvpcConfiguration:
+            AssignPublicIp: ENABLED
+            SecurityGroups:
+              - !Ref EcsSecurityGroup
+            Subnets:
+              - !Ref PublicSubnetA
+              - !Ref PublicSubnetB
+        LoadBalancers:
+          - ContainerName: frontend
+            ContainerPort: 8080
+            TargetGroupArn: !Ref FrontendTargetGroup
+
+    NightlyRefreshEventRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:custom.namePrefix}-nightly-refresh
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - events.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: ${self:custom.namePrefix}-nightly-refresh
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - ecs:RunTask
+                  Resource:
+                    - !Ref BackendTaskDefinition
+                - Effect: Allow
+                  Action:
+                    - iam:PassRole
+                  Resource:
+                    - !GetAtt EcsExecutionRole.Arn
+                    - !GetAtt EcsTaskRole.Arn
+
+    NightlyRefreshRule:
+      Type: AWS::Events::Rule
+      Properties:
+        Name: ${self:custom.namePrefix}-nightly-refresh
+        ScheduleExpression: ${self:custom.nightlyRefreshSchedule}
+        State: ENABLED
+        Targets:
+          - Id: nightly-refresh-task
+            Arn: !GetAtt AppCluster.Arn
+            RoleArn: !GetAtt NightlyRefreshEventRole.Arn
+            EcsParameters:
+              LaunchType: FARGATE
+              TaskCount: 1
+              TaskDefinitionArn: !Ref BackendTaskDefinition
+              NetworkConfiguration:
+                AwsVpcConfiguration:
+                  AssignPublicIp: ENABLED
+                  SecurityGroups:
+                    - !Ref EcsSecurityGroup
+                  Subnets:
+                    - !Ref PublicSubnetA
+                    - !Ref PublicSubnetB
+            Input: !Sub |
+              {
+                "containerOverrides": [
+                  {
+                    "name": "backend",
+                    "command": ["npm", "run", "snapshot:refresh:nightly:prod"]
+                  }
+                ]
+              }
+
+  Outputs:
+    LoadBalancerDnsName:
+      Value: !GetAtt LoadBalancer.DNSName
+    ApplicationUrl:
+      Value: !Sub 'http://${LoadBalancer.DNSName}'
+    BackendEcrRepositoryUri:
+      Value: !GetAtt BackendEcrRepository.RepositoryUri
+    FrontendEcrRepositoryUri:
+      Value: !GetAtt FrontendEcrRepository.RepositoryUri
+    EcsClusterArn:
+      Value: !GetAtt AppCluster.Arn
+    EcsClusterName:
+      Value: !Ref AppCluster
+    BackendTaskDefinitionArn:
+      Value: !Ref BackendTaskDefinition
+    PublicSubnetAId:
+      Value: !Ref PublicSubnetA
+    PublicSubnetBId:
+      Value: !Ref PublicSubnetB
+    EcsSecurityGroupId:
+      Value: !Ref EcsSecurityGroup
+    SnapshotQueueUrl:
+      Value: !Ref SnapshotQueue
+    DatabaseEndpointAddress:
+      Value: !GetAtt DatabaseInstance.Endpoint.Address
