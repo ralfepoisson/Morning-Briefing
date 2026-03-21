@@ -26,9 +26,9 @@ COPY src/backend/ ./
 COPY --from=build /app/src/backend/dist ./dist
 COPY cicd/ci/backend-entrypoint.sh /usr/local/bin/backend-entrypoint.sh
 
-RUN chmod +x /usr/local/bin/backend-entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/backend-entrypoint.sh && chmod +x /usr/local/bin/backend-entrypoint.sh
 
 EXPOSE 3000
 
-ENTRYPOINT ["/usr/local/bin/backend-entrypoint.sh"]
+ENTRYPOINT ["/bin/bash", "/usr/local/bin/backend-entrypoint.sh"]
 CMD ["npm", "run", "start:prod"]
