@@ -27,6 +27,9 @@
       .when('/admin/message-broker', {
         template: '<message-broker-page></message-broker-page>'
       })
+      .when('/admin/users', {
+        template: '<user-admin-page></user-admin-page>'
+      })
       .when('/admin/widgets', {
         template: '<widgets-page></widgets-page>'
       })

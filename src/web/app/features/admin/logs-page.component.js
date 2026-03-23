@@ -111,9 +111,9 @@
     controller: LogsPageController
   });
 
-  LogsPageController.$inject = ['LogService', 'NotificationService'];
+  LogsPageController.$inject = ['LogService', 'NotificationService', 'CurrentUserService', '$location'];
 
-  function LogsPageController(LogService, NotificationService) {
+  function LogsPageController(LogService, NotificationService, CurrentUserService, $location) {
     var $ctrl = this;
 
     $ctrl.levelOptions = [
@@ -139,7 +139,11 @@
     $ctrl.expandedEntries = {};
 
     $ctrl.$onInit = function onInit() {
-      loadLogs();
+      ensureAdminAccess().then(function handleAccess(user) {
+        if (user) {
+          loadLogs();
+        }
+      });
     };
 
     $ctrl.refresh = function refresh() {
@@ -223,6 +227,22 @@
         NotificationService.error(getErrorMessage(error, 'Application logs are currently unavailable.'), 'Unable to load logs');
       }).finally(function clearLoading() {
         $ctrl.isLoading = false;
+      });
+    }
+
+    function ensureAdminAccess() {
+      return CurrentUserService.load().then(function handleCurrentUserLoaded(user) {
+        if (user && user.isAdmin) {
+          return user;
+        }
+
+        NotificationService.error('You need admin access to view that page.', 'Admin access required');
+        $location.path('/');
+        return null;
+      }).catch(function handleAccessError(error) {
+        NotificationService.error(getErrorMessage(error, 'We could not verify your access right now.'), 'Unable to verify access');
+        $location.path('/');
+        return null;
       });
     }
   }

@@ -40,6 +40,19 @@ test('GET /api/v1/admin/logs returns stored logs with default filters', async fu
         warn: 1,
         error: 2
       };
+    },
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris',
+          locale: 'en-GB',
+          email: 'ralfe@example.com',
+          isAdmin: true
+        };
+      }
     }
   });
 
@@ -120,6 +133,19 @@ test('GET /api/v1/admin/logs normalizes filters', async function () {
         warn: 0,
         error: 0
       };
+    },
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris',
+          locale: 'en-GB',
+          email: 'ralfe@example.com',
+          isAdmin: true
+        };
+      }
     }
   });
 

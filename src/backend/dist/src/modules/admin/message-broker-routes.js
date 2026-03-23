@@ -1,10 +1,18 @@
 import { GetQueueAttributesCommand } from '@aws-sdk/client-sqs';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
+import { DefaultUserService } from '../default-user/default-user-service.js';
 import { createSnapshotSqsClient } from '../snapshots/snapshot-sqs-client.js';
 import { getSnapshotQueueConfig } from '../snapshots/snapshot-queue-config.js';
 import { getWidgetDefinition } from '../widgets/widget-definitions.js';
 export async function registerMessageBrokerRoutes(app, dependencies = createMessageBrokerRouteDependencies()) {
-    app.get('/api/v1/admin/message-broker', async function handleGetMessageBrokerOverview() {
+    app.get('/api/v1/admin/message-broker', async function handleGetMessageBrokerOverview(request, reply) {
+        const currentUser = await dependencies.defaultUserService.getDefaultUser(request);
+        if (!currentUser.isAdmin) {
+            reply.code(403);
+            return {
+                message: 'Admin access is required.'
+            };
+        }
         const [pendingCount, processingCount, recentJobs, chartRows, todayCounts, queueStats] = await Promise.all([
             dependencies.prisma.snapshotGenerationJob.count({
                 where: {
@@ -55,11 +63,13 @@ export async function registerMessageBrokerRoutes(app, dependencies = createMess
     });
 }
 function createMessageBrokerRouteDependencies() {
+    const prisma = getPrismaClient();
     const queueConfig = getSnapshotQueueConfig();
     return {
-        prisma: getPrismaClient(),
+        prisma,
         sqs: queueConfig.enabled && queueConfig.queueUrl ? createSnapshotSqsClient() : null,
-        queueConfig
+        queueConfig,
+        defaultUserService: new DefaultUserService(prisma)
     };
 }
 async function countTodayStatuses(prisma) {

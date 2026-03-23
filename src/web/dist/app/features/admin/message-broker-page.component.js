@@ -152,9 +152,9 @@
     controller: MessageBrokerPageController
   });
 
-  MessageBrokerPageController.$inject = ['MessageBrokerService', 'NotificationService'];
+  MessageBrokerPageController.$inject = ['MessageBrokerService', 'NotificationService', 'CurrentUserService', '$location'];
 
-  function MessageBrokerPageController(MessageBrokerService, NotificationService) {
+  function MessageBrokerPageController(MessageBrokerService, NotificationService, CurrentUserService, $location) {
     var $ctrl = this;
 
     $ctrl.data = null;
@@ -162,7 +162,11 @@
     $ctrl.isLoading = false;
 
     $ctrl.$onInit = function onInit() {
-      loadOverview();
+      ensureAdminAccess().then(function handleAccess(user) {
+        if (user) {
+          loadOverview();
+        }
+      });
     };
 
     $ctrl.refresh = function refresh() {
@@ -217,6 +221,22 @@
         NotificationService.error(getErrorMessage(error, 'Message broker metrics are currently unavailable.'), 'Unable to load broker metrics');
       }).finally(function clearLoading() {
         $ctrl.isLoading = false;
+      });
+    }
+
+    function ensureAdminAccess() {
+      return CurrentUserService.load().then(function handleCurrentUserLoaded(user) {
+        if (user && user.isAdmin) {
+          return user;
+        }
+
+        NotificationService.error('You need admin access to view that page.', 'Admin access required');
+        $location.path('/');
+        return null;
+      }).catch(function handleAccessError(error) {
+        NotificationService.error(getErrorMessage(error, 'We could not verify your access right now.'), 'Unable to verify access');
+        $location.path('/');
+        return null;
       });
     }
   }

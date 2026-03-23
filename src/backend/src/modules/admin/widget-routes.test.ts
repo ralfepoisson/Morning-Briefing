@@ -84,7 +84,10 @@ test('GET /api/v1/admin/widgets returns widgets with latest snapshot state', asy
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+          locale: 'en-GB',
+          email: 'ralfe@example.com',
+          isAdmin: true
         };
       }
     },
@@ -192,7 +195,10 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+          locale: 'en-GB',
+          email: 'ralfe@example.com',
+          isAdmin: true
         };
       }
     },
@@ -290,7 +296,10 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot falls back to dir
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+          locale: 'en-GB',
+          email: 'ralfe@example.com',
+          isAdmin: true
         };
       }
     },

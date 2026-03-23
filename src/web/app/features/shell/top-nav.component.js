@@ -28,12 +28,16 @@
       '      </div>' +
       '      <a class="nav-link" ng-if="$ctrl.isAuthenticated()" ng-class="{active: $ctrl.isActiveRoute(\'/connectors\')}" href="#/connectors">Connectors</a>' +
       '      <a class="nav-link" ng-if="$ctrl.isAuthenticated()" ng-class="{active: $ctrl.isActiveRoute(\'/rss-feeds\')}" href="#/rss-feeds">RSS Feeds</a>' +
-      '      <div class="dashboard-menu dashboard-menu--compact" ng-if="$ctrl.isAuthenticated()" ng-class="{\'dashboard-menu--open\': $ctrl.isAdminMenuOpen}">' +
+      '      <div class="dashboard-menu dashboard-menu--compact" ng-if="$ctrl.canAccessAdmin()" ng-class="{\'dashboard-menu--open\': $ctrl.isAdminMenuOpen}">' +
       '        <button class="dashboard-menu__trigger dashboard-menu__trigger--compact" type="button" ng-click="$ctrl.toggleAdminMenu()" aria-haspopup="true" aria-expanded="{{$ctrl.isAdminMenuOpen}}">' +
       '          <span class="dashboard-menu__label">Admin</span>' +
       '          <i class="fa-solid" ng-class="$ctrl.isAdminMenuOpen ? \'fa-chevron-up\' : \'fa-chevron-down\'" aria-hidden="true"></i>' +
       '        </button>' +
       '        <div class="dashboard-menu__panel dashboard-menu__panel--compact" ng-if="$ctrl.isAdminMenuOpen">' +
+      '          <a class="dashboard-menu__item dashboard-menu__item--link" ng-class="{\'dashboard-menu__item--active\': $ctrl.isActiveRoute(\'/admin/users\')}" href="#/admin/users" ng-click="$ctrl.closeAdminMenu()">' +
+      '            <span class="dashboard-menu__item-title">Users</span>' +
+      '            <span class="dashboard-menu__item-copy">Grant or remove admin access</span>' +
+      '          </a>' +
       '          <a class="dashboard-menu__item dashboard-menu__item--link" ng-class="{\'dashboard-menu__item--active\': $ctrl.isActiveRoute(\'/admin/widgets\')}" href="#/admin/widgets" ng-click="$ctrl.closeAdminMenu()">' +
       '            <span class="dashboard-menu__item-title">Widgets</span>' +
       '            <span class="dashboard-menu__item-copy">Snapshot status and manual regeneration</span>' +
@@ -62,9 +66,9 @@
     controller: TopNavController
   });
 
-  TopNavController.$inject = ['UiShellService', 'DashboardService', '$document', '$scope', '$location', 'AuthService'];
+  TopNavController.$inject = ['UiShellService', 'DashboardService', '$document', '$scope', '$location', 'AuthService', 'CurrentUserService'];
 
-  function TopNavController(UiShellService, DashboardService, $document, $scope, $location, AuthService) {
+  function TopNavController(UiShellService, DashboardService, $document, $scope, $location, AuthService, CurrentUserService) {
     var $ctrl = this;
 
     $ctrl.ui = UiShellService.state;
@@ -80,6 +84,7 @@
       refreshAuthState();
       if (AuthService.isAuthenticated()) {
         DashboardService.load();
+        loadCurrentUser(false);
       }
       bindWatchers();
       bindDocumentHandler();
@@ -142,6 +147,10 @@
       return AuthService.isAuthenticated();
     };
 
+    $ctrl.canAccessAdmin = function canAccessAdmin() {
+      return AuthService.isAuthenticated() && CurrentUserService.isAdmin();
+    };
+
     $ctrl.signOut = function signOut() {
       $ctrl.isDashboardMenuOpen = false;
       $ctrl.isAdminMenuOpen = false;
@@ -164,6 +173,9 @@
 
           if (session) {
             DashboardService.load();
+            loadCurrentUser(true);
+          } else {
+            CurrentUserService.clear();
           }
         },
         true
@@ -197,6 +209,10 @@
 
     function refreshAuthState() {
       $ctrl.auth.session = AuthService.getSession();
+    }
+
+    function loadCurrentUser(force) {
+      CurrentUserService.load(force).catch(function ignoreCurrentUserError() {});
     }
   }
 })();

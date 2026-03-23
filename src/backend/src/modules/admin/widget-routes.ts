@@ -68,13 +68,21 @@ export async function registerAdminWidgetRoutes(
   app: FastifyInstance,
   dependencies: AdminWidgetRouteDependencies = createAdminWidgetRouteDependencies()
 ): Promise<void> {
-  app.get('/api/v1/admin/widgets', async function handleListWidgets(request) {
+  app.get('/api/v1/admin/widgets', async function handleListWidgets(request, reply) {
     const user = await dependencies.defaultUserService.getDefaultUser(request);
+
+    if (!user.isAdmin) {
+      reply.code(403);
+      return {
+        message: 'Admin access is required.'
+      };
+    }
+
     const widgets = await dependencies.prisma.dashboardWidget.findMany({
       where: {
+        tenantId: user.tenantId,
         archivedAt: null,
         dashboard: {
-          ownerUserId: user.userId,
           archivedAt: null
         }
       },
@@ -145,12 +153,20 @@ export async function registerAdminWidgetRoutes(
     }
 
     const user = await dependencies.defaultUserService.getDefaultUser(request);
+
+    if (!user.isAdmin) {
+      reply.code(403);
+      return {
+        message: 'Admin access is required.'
+      };
+    }
+
     const widget = await dependencies.prisma.dashboardWidget.findFirst({
       where: {
         id: params.widgetId,
+        tenantId: user.tenantId,
         archivedAt: null,
         dashboard: {
-          ownerUserId: user.userId,
           archivedAt: null
         }
       },

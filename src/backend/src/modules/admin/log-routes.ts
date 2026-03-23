@@ -1,4 +1,6 @@
 import type { FastifyInstance } from 'fastify';
+import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
+import { DefaultUserService } from '../default-user/default-user-service.js';
 import {
   type ApplicationLogEntry,
   type ApplicationLogLevel
@@ -11,16 +13,23 @@ import {
 type LogRouteDependencies = {
   listLogs: typeof listPersistedApplicationLogs;
   summarizeLogs: typeof summarizePersistedApplicationLogs;
+  defaultUserService: Pick<DefaultUserService, 'getDefaultUser'>;
 };
 
 export async function registerLogRoutes(
   app: FastifyInstance,
-  dependencies: LogRouteDependencies = {
-    listLogs: listPersistedApplicationLogs,
-    summarizeLogs: summarizePersistedApplicationLogs
-  }
+  dependencies: LogRouteDependencies = createLogRouteDependencies()
 ): Promise<void> {
   app.get('/api/v1/admin/logs', async function handleGetLogs(request, reply) {
+    const currentUser = await dependencies.defaultUserService.getDefaultUser(request);
+
+    if (!currentUser.isAdmin) {
+      reply.code(403);
+      return {
+        message: 'Admin access is required.'
+      };
+    }
+
     const query = request.query as {
       q?: string;
       levels?: string;
@@ -59,6 +68,16 @@ export async function registerLogRoutes(
       };
     }
   });
+}
+
+function createLogRouteDependencies(): LogRouteDependencies {
+  const prisma = getPrismaClient();
+
+  return {
+    listLogs: listPersistedApplicationLogs,
+    summarizeLogs: summarizePersistedApplicationLogs,
+    defaultUserService: new DefaultUserService(prisma)
+  };
 }
 
 function parseLevels(value?: string): ApplicationLogLevel[] {

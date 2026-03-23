@@ -2,6 +2,7 @@ import { GetQueueAttributesCommand, type SQSClient } from '@aws-sdk/client-sqs';
 import type { PrismaClient } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
+import { DefaultUserService } from '../default-user/default-user-service.js';
 import { createSnapshotSqsClient } from '../snapshots/snapshot-sqs-client.js';
 import { getSnapshotQueueConfig } from '../snapshots/snapshot-queue-config.js';
 import { getWidgetDefinition } from '../widgets/widget-definitions.js';
@@ -13,6 +14,7 @@ type MessageBrokerRouteDependencies = {
   >;
   sqs: Pick<SQSClient, 'send'> | null;
   queueConfig: ReturnType<typeof getSnapshotQueueConfig>;
+  defaultUserService: Pick<DefaultUserService, 'getDefaultUser'>;
 };
 
 type DailyChartRow = {
@@ -46,7 +48,16 @@ export async function registerMessageBrokerRoutes(
   app: FastifyInstance,
   dependencies: MessageBrokerRouteDependencies = createMessageBrokerRouteDependencies()
 ): Promise<void> {
-  app.get('/api/v1/admin/message-broker', async function handleGetMessageBrokerOverview() {
+  app.get('/api/v1/admin/message-broker', async function handleGetMessageBrokerOverview(request, reply) {
+    const currentUser = await dependencies.defaultUserService.getDefaultUser(request);
+
+    if (!currentUser.isAdmin) {
+      reply.code(403);
+      return {
+        message: 'Admin access is required.'
+      };
+    }
+
     const [pendingCount, processingCount, recentJobs, chartRows, todayCounts, queueStats] = await Promise.all([
       dependencies.prisma.snapshotGenerationJob.count({
         where: {
@@ -99,12 +110,14 @@ export async function registerMessageBrokerRoutes(
 }
 
 function createMessageBrokerRouteDependencies(): MessageBrokerRouteDependencies {
+  const prisma = getPrismaClient();
   const queueConfig = getSnapshotQueueConfig();
 
   return {
-    prisma: getPrismaClient(),
+    prisma,
     sqs: queueConfig.enabled && queueConfig.queueUrl ? createSnapshotSqsClient() : null,
-    queueConfig
+    queueConfig,
+    defaultUserService: new DefaultUserService(prisma)
   };
 }
 

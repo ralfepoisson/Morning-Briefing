@@ -12,6 +12,9 @@ export type DefaultUserContext = {
   userId: string;
   displayName: string;
   timezone: string;
+  locale: string;
+  email: string;
+  isAdmin: boolean;
 };
 
 type Life2JwtPayload = {
@@ -95,33 +98,23 @@ export class DefaultUserService {
       }
     });
 
-    await this.prisma.appUser.upsert({
-      where: {
-        id: userId
-      },
-      update: {
-        tenantId,
-        email,
-        displayName,
-        timezone,
-        locale,
-        isActive: true
-      },
-      create: {
-        id: userId,
-        tenantId,
-        email,
-        displayName,
-        timezone,
-        locale
-      }
+    const user = await this.upsertAppUser({
+      id: userId,
+      tenantId,
+      email,
+      displayName,
+      timezone,
+      locale
     });
 
     return {
       tenantId,
       userId,
       displayName,
-      timezone
+      timezone,
+      locale,
+      email,
+      isAdmin: user.isAdmin
     };
   }
 
@@ -140,34 +133,90 @@ export class DefaultUserService {
       }
     });
 
-    const user = await this.prisma.appUser.upsert({
-      where: {
-        tenantId_email: {
-          tenantId: tenant.id,
-          email: DEFAULT_USER_EMAIL
-        }
-      },
-      update: {
-        displayName: 'Ralfe',
-        timezone: 'Europe/Paris',
-        locale: 'en-GB',
-        isActive: true
-      },
-      create: {
-        tenantId: tenant.id,
-        email: DEFAULT_USER_EMAIL,
-        displayName: 'Ralfe',
-        timezone: 'Europe/Paris',
-        locale: 'en-GB'
-      }
+    const user = await this.upsertAppUser({
+      id: null,
+      tenantId: tenant.id,
+      email: DEFAULT_USER_EMAIL,
+      displayName: 'Ralfe',
+      timezone: 'Europe/Paris',
+      locale: 'en-GB'
     });
 
     return {
       tenantId: tenant.id,
       userId: user.id,
       displayName: user.displayName,
-      timezone: user.timezone
+      timezone: user.timezone,
+      locale: user.locale,
+      email: user.email,
+      isAdmin: user.isAdmin
     };
+  }
+
+  private async upsertAppUser(input: {
+    id: string | null;
+    tenantId: string;
+    email: string;
+    displayName: string;
+    timezone: string;
+    locale: string;
+  }) {
+    const existingUser = input.id
+      ? await this.prisma.appUser.findUnique({
+        where: {
+          id: input.id
+        }
+      })
+      : await this.prisma.appUser.findUnique({
+        where: {
+          tenantId_email: {
+            tenantId: input.tenantId,
+            email: input.email
+          }
+        }
+      });
+
+    if (existingUser) {
+      const shouldGrantBootstrapAdminAccess = !existingUser.isAdmin && await this.shouldGrantBootstrapAdminAccess(input.tenantId);
+
+      return this.prisma.appUser.update({
+        where: {
+          id: existingUser.id
+        },
+        data: {
+          tenantId: input.tenantId,
+          email: input.email,
+          displayName: input.displayName,
+          timezone: input.timezone,
+          locale: input.locale,
+          isAdmin: shouldGrantBootstrapAdminAccess ? true : existingUser.isAdmin,
+          isActive: true
+        }
+      });
+    }
+
+    return this.prisma.appUser.create({
+      data: {
+        id: input.id || undefined,
+        tenantId: input.tenantId,
+        email: input.email,
+        displayName: input.displayName,
+        timezone: input.timezone,
+        locale: input.locale,
+        isAdmin: await this.shouldGrantBootstrapAdminAccess(input.tenantId)
+      }
+    });
+  }
+
+  private async shouldGrantBootstrapAdminAccess(tenantId: string): Promise<boolean> {
+    const adminCount = await this.prisma.appUser.count({
+      where: {
+        tenantId,
+        isAdmin: true
+      }
+    });
+
+    return adminCount === 0;
   }
 }
 

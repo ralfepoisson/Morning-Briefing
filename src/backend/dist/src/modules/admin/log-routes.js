@@ -1,9 +1,15 @@
+import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
+import { DefaultUserService } from '../default-user/default-user-service.js';
 import { listPersistedApplicationLogs, summarizePersistedApplicationLogs } from './application-log-repository.js';
-export async function registerLogRoutes(app, dependencies = {
-    listLogs: listPersistedApplicationLogs,
-    summarizeLogs: summarizePersistedApplicationLogs
-}) {
+export async function registerLogRoutes(app, dependencies = createLogRouteDependencies()) {
     app.get('/api/v1/admin/logs', async function handleGetLogs(request, reply) {
+        const currentUser = await dependencies.defaultUserService.getDefaultUser(request);
+        if (!currentUser.isAdmin) {
+            reply.code(403);
+            return {
+                message: 'Admin access is required.'
+            };
+        }
         const query = request.query;
         const levels = parseLevels(query.levels);
         const limit = parseLimit(query.limit);
@@ -37,6 +43,14 @@ export async function registerLogRoutes(app, dependencies = {
             };
         }
     });
+}
+function createLogRouteDependencies() {
+    const prisma = getPrismaClient();
+    return {
+        listLogs: listPersistedApplicationLogs,
+        summarizeLogs: summarizePersistedApplicationLogs,
+        defaultUserService: new DefaultUserService(prisma)
+    };
 }
 function parseLevels(value) {
     const validLevels = ['info', 'warn', 'error'];

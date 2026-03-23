@@ -106,9 +106,9 @@
     controller: WidgetsPageController
   });
 
-  WidgetsPageController.$inject = ['AdminWidgetService', 'NotificationService'];
+  WidgetsPageController.$inject = ['AdminWidgetService', 'NotificationService', 'CurrentUserService', '$location'];
 
-  function WidgetsPageController(AdminWidgetService, NotificationService) {
+  function WidgetsPageController(AdminWidgetService, NotificationService, CurrentUserService, $location) {
     var $ctrl = this;
 
     $ctrl.data = null;
@@ -117,7 +117,11 @@
     $ctrl.snapshotModal = buildSnapshotModalState();
 
     $ctrl.$onInit = function onInit() {
-      loadWidgets();
+      ensureAdminAccess().then(function handleAccess(user) {
+        if (user) {
+          loadWidgets();
+        }
+      });
     };
 
     $ctrl.refresh = function refresh() {
@@ -221,6 +225,22 @@
         NotificationService.error(getErrorMessage(error, 'Widgets are currently unavailable.'), 'Unable to load widgets');
       }).finally(function clearLoading() {
         $ctrl.isLoading = false;
+      });
+    }
+
+    function ensureAdminAccess() {
+      return CurrentUserService.load().then(function handleCurrentUserLoaded(user) {
+        if (user && user.isAdmin) {
+          return user;
+        }
+
+        NotificationService.error('You need admin access to view that page.', 'Admin access required');
+        $location.path('/');
+        return null;
+      }).catch(function handleAccessError(error) {
+        NotificationService.error(getErrorMessage(error, 'We could not verify your access right now.'), 'Unable to verify access');
+        $location.path('/');
+        return null;
       });
     }
   }

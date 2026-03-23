@@ -91,6 +91,19 @@ test('GET /api/v1/admin/message-broker returns queue metrics, chart data, and re
       workerMaxMessages: 5,
       workerPollIntervalMs: 1000,
       queueMaxReceiveCount: 5
+    },
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris',
+          locale: 'en-GB',
+          email: 'ralfe@example.com',
+          isAdmin: true
+        };
+      }
     }
   });
 
@@ -189,6 +202,19 @@ test('GET /api/v1/admin/message-broker reports an unconfigured queue when no que
       workerMaxMessages: 5,
       workerPollIntervalMs: 1000,
       queueMaxReceiveCount: 5
+    },
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris',
+          locale: 'en-GB',
+          email: 'ralfe@example.com',
+          isAdmin: true
+        };
+      }
     }
   });
 

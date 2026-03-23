@@ -9,6 +9,7 @@ import { registerDashboardRoutes } from '../modules/dashboards/dashboard-routes.
 import { registerReferenceCityRoutes } from '../modules/reference-data/reference-city-routes.js';
 import { registerRssFeedRoutes } from '../modules/rss-feeds/rss-feed-routes.js';
 import { registerSnapshotRoutes } from '../modules/snapshots/snapshot-routes.js';
+import { registerUserRoutes } from '../modules/users/user-routes.js';
 import { registerWidgetRoutes } from '../modules/widgets/widget-routes.js';
 
 export async function buildApp() {
@@ -55,6 +56,7 @@ export async function buildApp() {
   await registerReferenceCityRoutes(app);
   await registerRssFeedRoutes(app);
   await registerSnapshotRoutes(app);
+  await registerUserRoutes(app);
   await registerWidgetRoutes(app);
 
   return app;
