@@ -123,6 +123,7 @@ export class DefaultUserService {
                 }
             });
         if (existingUser) {
+            const shouldGrantBootstrapAdminAccess = !existingUser.isAdmin && await this.shouldGrantBootstrapAdminAccess(input.tenantId);
             return this.prisma.appUser.update({
                 where: {
                     id: existingUser.id
@@ -133,6 +134,7 @@ export class DefaultUserService {
                     displayName: input.displayName,
                     timezone: input.timezone,
                     locale: input.locale,
+                    isAdmin: shouldGrantBootstrapAdminAccess ? true : existingUser.isAdmin,
                     isActive: true
                 }
             });
