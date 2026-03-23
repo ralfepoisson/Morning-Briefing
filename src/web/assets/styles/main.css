@@ -1841,8 +1841,10 @@ body.theme-light .widget-card {
 
 .widget-library-card__icon i {
   display: block;
-  font-size: 1.4rem;
-  line-height: 1;
+    font-size: 2.4rem;
+    line-height: 1;
+    padding-top: 6px;
+    padding-left: 3px;
 }
 
 .widget-library-card--placeholder {
