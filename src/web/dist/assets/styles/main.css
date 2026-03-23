@@ -1489,10 +1489,6 @@ body.theme-light .widget-card {
   line-height: 1.35;
 }
 
-.widget-library-card__icon i {
-  font-size: 0.9rem;
-}
-
 .tasks-card {
   display: flex;
   flex: 1 1 auto;
@@ -1836,11 +1832,19 @@ body.theme-light .widget-card {
   justify-content: center;
   grid-column: 1;
   grid-row: 1 / span 2;
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
+  width: 50px;
+  height: 50px;
+  border-radius: 16px;
   background: rgba(121, 224, 192, 0.14);
   color: var(--accent);
+}
+
+.widget-library-card__icon i {
+  display: block;
+    font-size: 2.4rem;
+    line-height: 1;
+    padding-top: 6px;
+    padding-left: 3px;
 }
 
 .widget-library-card--placeholder {

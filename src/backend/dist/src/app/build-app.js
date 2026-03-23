@@ -25,6 +25,9 @@ export async function buildApp() {
         };
     });
     app.addHook('onRequest', async function authenticateApiRequests(request, reply) {
+        if (request.method === 'OPTIONS') {
+            return;
+        }
         if (!isProtectedApiRoute(request.url)) {
             return;
         }
