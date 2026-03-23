@@ -19,6 +19,11 @@ test('GET /api/v1/dashboards/:dashboardId/snapshots/latest returns the latest sn
         };
       }
     },
+    dashboardService: {
+      async listForOwner() {
+        throw new Error('not used');
+      }
+    },
     snapshotService: {
       async getPersistedLatestForDashboard(dashboardId, user) {
         assert.equal(dashboardId, 'dash-1');
@@ -55,6 +60,11 @@ test('GET /api/v1/dashboards/:dashboardId/snapshots/latest returns 404 when dash
         };
       }
     },
+    dashboardService: {
+      async listForOwner() {
+        return [];
+      }
+    },
     snapshotService: {
       async getPersistedLatestForDashboard() {
         return null;
@@ -72,6 +82,54 @@ test('GET /api/v1/dashboards/:dashboardId/snapshots/latest returns 404 when dash
     assert.deepEqual(response.json(), {
       message: 'Dashboard not found.'
     });
+  } finally {
+    await app.close();
+  }
+});
+
+test('GET /api/v1/dashboards/:dashboardId/snapshots/latest returns null when the dashboard exists without a snapshot yet', async function () {
+  const app = Fastify();
+
+  await registerSnapshotRoutes(app, {
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
+        };
+      }
+    },
+    dashboardService: {
+      async listForOwner() {
+        return [
+          {
+            id: 'dash-1',
+            name: 'Morning Briefing',
+            description: '',
+            theme: 'aurora',
+            createdAt: '2026-03-23T10:00:00.000Z',
+            updatedAt: '2026-03-23T10:00:00.000Z'
+          }
+        ];
+      }
+    },
+    snapshotService: {
+      async getPersistedLatestForDashboard() {
+        return null;
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/dashboards/dash-1/snapshots/latest'
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body, 'null');
   } finally {
     await app.close();
   }
