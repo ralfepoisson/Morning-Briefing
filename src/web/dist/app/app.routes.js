@@ -12,6 +12,12 @@
       .when('/', {
         template: '<dashboard-page></dashboard-page>'
       })
+      .when('/signed-out', {
+        template: '<auth-status-page></auth-status-page>'
+      })
+      .when('/auth/callback', {
+        template: '<auth-callback-page></auth-callback-page>'
+      })
       .when('/connectors', {
         template: '<connectors-page></connectors-page>'
       })

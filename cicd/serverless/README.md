@@ -26,6 +26,7 @@ export STAGE=dev
 export DB_PASSWORD='replace-this'
 export HOSTED_ZONE_NAME='ralfepoisson.com'
 export FRONTEND_DOMAIN_NAME='briefing.ralfepoisson.com'
+export IMPORT_REFERENCE_CITIES='true'
 export GOOGLE_OAUTH_CLIENT_ID='optional'
 export GOOGLE_OAUTH_CLIENT_SECRET='optional'
 export GOOGLE_OAUTH_REDIRECT_URI='https://briefing.ralfepoisson.com/api/v1/connections/google-calendar/oauth/callback'
@@ -41,17 +42,20 @@ The deploy script will:
 3. Build and push the real frontend and backend images
 4. Re-deploy the stack using those images
 5. Run Prisma migrations and seed inside ECS
-6. Re-deploy with the frontend, backend, and worker services scaled to `1`
+6. Optionally import the GeoNames reference city catalog inside ECS when `IMPORT_REFERENCE_CITIES=true`
+7. Re-deploy with the frontend, backend, and worker services scaled to `1`
 
 ## Useful overrides
 
 - `IMAGE_TAG` to control the Docker tag instead of using the current git SHA
 - `DB_NAME` and `DB_USER` to override the default database names
 - `HOSTED_ZONE_NAME` and `FRONTEND_DOMAIN_NAME` to override the default Route53/ACM settings
+- `IMPORT_REFERENCE_CITIES=true` to run the one-off production city catalog import during deploy
 - `NIGHTLY_REFRESH_SCHEDULE` to change the EventBridge schedule expression
 
 ## Notes
 
 - The deploy script expects `aws`, `docker`, and `npm` to be available locally or in CI.
 - The deploy script looks up the Route53 hosted zone ID automatically from `HOSTED_ZONE_NAME`.
+- The reference city import downloads the GeoNames `cities5000` dataset from inside the ECS task and can take a few minutes the first time.
 - The initial database password is stored in AWS Secrets Manager for ECS task injection, but the RDS master password is also set from the same deployment input. Rotate it after the first deployment if this environment will be long-lived.

@@ -26,7 +26,7 @@ export async function registerSnapshotRoutes(
       };
     }
 
-    const user = await defaultUserService.getDefaultUser();
+    const user = await defaultUserService.getDefaultUser(request);
     const snapshot = await snapshotService.getPersistedLatestForDashboard(params.dashboardId, user);
 
     if (!snapshot) {

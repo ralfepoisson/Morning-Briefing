@@ -2,6 +2,10 @@ FROM node:20-bookworm-slim AS build
 
 WORKDIR /app/src/backend
 
+ENV DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/morning_briefing?schema=public
+
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
 COPY src/backend/package*.json ./
 RUN npm ci
 
@@ -18,11 +22,16 @@ ENV PORT=3000
 ENV DB_PORT=5432
 ENV DB_ADMIN_NAME=postgres
 ENV DB_SCHEMA=public
+ENV DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/morning_briefing?schema=public
+
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 COPY src/backend/package*.json ./
 RUN npm ci
 
 COPY src/backend/ ./
+RUN npx prisma generate
+
 COPY --from=build /app/src/backend/dist ./dist
 COPY cicd/ci/backend-entrypoint.sh /usr/local/bin/backend-entrypoint.sh
 

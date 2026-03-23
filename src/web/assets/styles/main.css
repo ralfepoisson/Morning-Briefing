@@ -174,6 +174,18 @@ body.theme-light::before {
   gap: 0.55rem !important;
 }
 
+.top-nav-session {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding-left: 0.2rem;
+}
+
+.top-nav-session__label {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
 .dashboard-menu {
   position: relative;
 }
@@ -1707,6 +1719,46 @@ body.theme-light .widget-card {
   margin-bottom: 0.5rem;
 }
 
+.auth-status-page {
+  min-height: calc(100vh - 180px);
+  display: grid;
+  place-items: center;
+}
+
+.auth-status-page__panel {
+  width: min(560px, 100%);
+  padding: 2rem;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.empty-state__eyebrow {
+  display: inline-block;
+  margin-bottom: 0.65rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--accent);
+}
+
+.empty-state__title {
+  margin-bottom: 0.75rem;
+}
+
+.empty-state__copy {
+  margin: 0 auto 1.4rem;
+  max-width: 36rem;
+  color: var(--muted);
+}
+
+.auth-status-page__error {
+  max-width: 34rem;
+  color: #f0b0a8;
+}
+
 .drawer-shell {
   position: fixed;
   inset: 0;
@@ -1763,10 +1815,12 @@ body.theme-light .widget-card {
 .widget-library-card strong,
 .widget-library-card span {
   display: block;
+  grid-column: 2;
 }
 
 .widget-library-card strong {
   font-size: 0.98rem;
+  line-height: 1.2;
 }
 
 .widget-library-card span {
@@ -1780,11 +1834,19 @@ body.theme-light .widget-card {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  grid-column: 1;
+  grid-row: 1 / span 2;
   width: 42px;
   height: 42px;
   border-radius: 14px;
   background: rgba(121, 224, 192, 0.14);
   color: var(--accent);
+}
+
+.widget-library-card__icon i {
+  display: block;
+  font-size: 1.18rem;
+  line-height: 1;
 }
 
 .widget-library-card--placeholder {
@@ -2038,6 +2100,11 @@ body.theme-light .widget-card {
 
   .message-broker-hero {
     flex-direction: column;
+  }
+
+  .top-nav-session {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .logs-page .message-broker-summary {

@@ -5,15 +5,15 @@ import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
 export async function registerDashboardRoutes(app, dependencies = createDashboardRouteDependencies()) {
     const service = dependencies.dashboardService;
     const defaultUserService = dependencies.defaultUserService;
-    app.get('/api/v1/me', async function handleGetMe() {
-        const user = await defaultUserService.getDefaultUser();
+    app.get('/api/v1/me', async function handleGetMe(request) {
+        const user = await defaultUserService.getDefaultUser(request);
         return {
             id: user.userId,
             displayName: user.displayName
         };
     });
-    app.get('/api/v1/dashboards', async function handleListDashboards() {
-        const user = await defaultUserService.getDefaultUser();
+    app.get('/api/v1/dashboards', async function handleListDashboards(request) {
+        const user = await defaultUserService.getDefaultUser(request);
         const dashboards = await service.listForOwner(user.userId);
         return {
             items: dashboards
@@ -27,7 +27,7 @@ export async function registerDashboardRoutes(app, dependencies = createDashboar
                 message: 'Dashboard name is required.'
             };
         }
-        const user = await defaultUserService.getDefaultUser();
+        const user = await defaultUserService.getDefaultUser(request);
         const dashboard = await service.create({
             ownerUserId: user.userId,
             name: body.name,
@@ -52,7 +52,7 @@ export async function registerDashboardRoutes(app, dependencies = createDashboar
                 message: 'Dashboard name is required.'
             };
         }
-        const user = await defaultUserService.getDefaultUser();
+        const user = await defaultUserService.getDefaultUser(request);
         const dashboard = await service.update({
             dashboardId: params.dashboardId,
             ownerUserId: user.userId,
@@ -75,7 +75,7 @@ export async function registerDashboardRoutes(app, dependencies = createDashboar
                 message: 'Dashboard id is required.'
             };
         }
-        const user = await defaultUserService.getDefaultUser();
+        const user = await defaultUserService.getDefaultUser(request);
         const archived = await service.archive({
             dashboardId: params.dashboardId,
             ownerUserId: user.userId

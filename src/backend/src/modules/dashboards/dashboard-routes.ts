@@ -16,8 +16,8 @@ export async function registerDashboardRoutes(
   const service = dependencies.dashboardService;
   const defaultUserService = dependencies.defaultUserService;
 
-  app.get('/api/v1/me', async function handleGetMe() {
-    const user = await defaultUserService.getDefaultUser();
+  app.get('/api/v1/me', async function handleGetMe(request) {
+    const user = await defaultUserService.getDefaultUser(request);
 
     return {
       id: user.userId,
@@ -25,8 +25,8 @@ export async function registerDashboardRoutes(
     };
   });
 
-  app.get('/api/v1/dashboards', async function handleListDashboards() {
-    const user = await defaultUserService.getDefaultUser();
+  app.get('/api/v1/dashboards', async function handleListDashboards(request) {
+    const user = await defaultUserService.getDefaultUser(request);
     const dashboards = await service.listForOwner(user.userId);
 
     return {
@@ -48,7 +48,7 @@ export async function registerDashboardRoutes(
       };
     }
 
-    const user = await defaultUserService.getDefaultUser();
+    const user = await defaultUserService.getDefaultUser(request);
     const dashboard = await service.create({
       ownerUserId: user.userId,
       name: body.name,
@@ -81,7 +81,7 @@ export async function registerDashboardRoutes(
       };
     }
 
-    const user = await defaultUserService.getDefaultUser();
+    const user = await defaultUserService.getDefaultUser(request);
     const dashboard = await service.update({
       dashboardId: params.dashboardId,
       ownerUserId: user.userId,
@@ -109,7 +109,7 @@ export async function registerDashboardRoutes(
       };
     }
 
-    const user = await defaultUserService.getDefaultUser();
+    const user = await defaultUserService.getDefaultUser(request);
     const archived = await service.archive({
       dashboardId: params.dashboardId,
       ownerUserId: user.userId

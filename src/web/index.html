@@ -24,10 +24,16 @@
     <script src="./node_modules/angularjs-toaster/toaster.min.js"></script>
     <script src="./node_modules/interactjs/dist/interact.min.js"></script>
 
+    <script src="./config.js"></script>
+    <script src="./app/bootstrap-auth.js"></script>
     <script src="./app/app.module.js"></script>
     <script src="./app/app.routes.js"></script>
+    <script src="./app/app.run.js"></script>
     <script src="./app/core/services/local-storage.service.js"></script>
+    <script src="./app/core/services/session-storage.service.js"></script>
     <script src="./app/core/services/notification.service.js"></script>
+    <script src="./app/core/services/auth.service.js"></script>
+    <script src="./app/core/services/auth-http.interceptor.js"></script>
     <script src="./app/core/services/ui-shell.service.js"></script>
     <script src="./app/core/services/dashboard.service.js"></script>
     <script src="./app/core/services/dashboard-snapshot.service.js"></script>
@@ -52,6 +58,8 @@
     <script src="./app/shared/directives/draggable-widget.directive.js"></script>
     <script src="./app/shared/directives/overflow-autopan.directive.js"></script>
     <script src="./app/shared/directives/widget-renderer.directive.js"></script>
+    <script src="./app/features/auth/auth-callback-page.component.js"></script>
+    <script src="./app/features/auth/auth-status-page.component.js"></script>
     <script src="./app/features/shell/top-nav.component.js"></script>
     <script src="./app/features/dashboard/dashboard-page.component.js"></script>
     <script src="./app/features/admin/logs-page.component.js"></script>

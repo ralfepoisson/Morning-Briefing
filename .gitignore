@@ -9,3 +9,4 @@ src/web/node_modules/
 !.env.example
 
 cicd/export_credentials.sh
+cicd/serverless/.serverless/

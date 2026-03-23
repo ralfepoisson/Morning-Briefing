@@ -4,8 +4,8 @@ import { formatSnapshotDateForTimezone } from '../snapshots/snapshot-date.js';
 import { buildSnapshotJobIdempotencyKey } from '../snapshots/snapshot-job-utils.js';
 import { createSnapshotJobPublisherFromEnvironment, createSnapshotService } from '../snapshots/snapshot-runtime.js';
 export async function registerAdminWidgetRoutes(app, dependencies = createAdminWidgetRouteDependencies()) {
-    app.get('/api/v1/admin/widgets', async function handleListWidgets() {
-        const user = await dependencies.defaultUserService.getDefaultUser();
+    app.get('/api/v1/admin/widgets', async function handleListWidgets(request) {
+        const user = await dependencies.defaultUserService.getDefaultUser(request);
         const widgets = await dependencies.prisma.dashboardWidget.findMany({
             where: {
                 archivedAt: null,
@@ -34,6 +34,12 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
                         generatedAt: 'desc'
                     },
                     take: 1
+                },
+                snapshotJobs: {
+                    orderBy: {
+                        createdAt: 'desc'
+                    },
+                    take: 20
                 }
             },
             orderBy: [
@@ -56,6 +62,7 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
     });
     app.post('/api/v1/admin/widgets/:widgetId/regenerate-snapshot', async function handleRegenerateWidgetSnapshot(request, reply) {
         const params = request.params;
+        const body = request.body;
         if (!params.widgetId) {
             reply.code(400);
             return {
@@ -68,7 +75,7 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
                 message: 'Snapshot regeneration is currently unavailable.'
             };
         }
-        const user = await dependencies.defaultUserService.getDefaultUser();
+        const user = await dependencies.defaultUserService.getDefaultUser(request);
         const widget = await dependencies.prisma.dashboardWidget.findFirst({
             where: {
                 id: params.widgetId,
@@ -107,6 +114,7 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
         }
         const snapshotDate = formatSnapshotDateForTimezone(new Date(), user.timezone || 'UTC');
         const requestedAt = new Date();
+        const bypassDuplicateCheck = body?.bypassDuplicateCheck === true;
         const jobInput = {
             widgetId: widget.id,
             dashboardId: widget.dashboardId,
@@ -116,6 +124,7 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
             widgetConfigHash: widget.configHash,
             snapshotDate,
             triggerSource: 'manual_refresh',
+            bypassDuplicateCheck,
             correlationId: request.id,
             causationId: request.id,
             requestedAt
@@ -129,6 +138,7 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
                     widgetId: widget.id,
                     snapshotDate: published.snapshotDate,
                     triggerSource: published.triggerSource,
+                    bypassDuplicateCheck: published.bypassDuplicateCheck,
                     requestedAt: published.requestedAt
                 }
             };
@@ -142,7 +152,8 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
                     snapshotDate,
                     widgetConfigHash: widget.configHash,
                     triggerSource: 'manual_refresh',
-                    requestedAt
+                    requestedAt,
+                    bypassDuplicateCheck
                 }),
                 widgetId: widget.id,
                 dashboardId: widget.dashboardId,
@@ -153,6 +164,7 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
                 snapshotDate,
                 snapshotPeriod: 'day',
                 triggerSource: 'manual_refresh',
+                bypassDuplicateCheck,
                 correlationId: request.id,
                 causationId: request.id,
                 requestedAt: requestedAt.toISOString()
@@ -165,7 +177,8 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
                 job: {
                     widgetId: widget.id,
                     snapshotDate,
-                    triggerSource: 'manual_refresh'
+                    triggerSource: 'manual_refresh',
+                    bypassDuplicateCheck
                 }
             };
         }
@@ -182,6 +195,18 @@ function createAdminWidgetRouteDependencies() {
 }
 function mapAdminWidgetRecord(widget) {
     const latestSnapshot = widget.snapshots && widget.snapshots.length ? widget.snapshots[0] : null;
+    const duplicateSkipCount = (widget.snapshotJobs || []).reduce(function countDuplicates(total, job) {
+        return total + (job.duplicateSkipCount || 0);
+    }, 0);
+    const latestDuplicateAt = (widget.snapshotJobs || []).reduce(function findLatest(current, job) {
+        if (!job.lastDuplicateAt) {
+            return current;
+        }
+        if (!current || job.lastDuplicateAt.getTime() > current.getTime()) {
+            return job.lastDuplicateAt;
+        }
+        return current;
+    }, null);
     return {
         id: widget.id,
         dashboardId: widget.dashboardId,
@@ -195,6 +220,8 @@ function mapAdminWidgetRecord(widget) {
         latestSnapshotStatus: latestSnapshot ? latestSnapshot.status : null,
         latestErrorMessage: latestSnapshot ? latestSnapshot.errorMessage : null,
         latestSnapshotContent: latestSnapshot ? latestSnapshot.contentJson ?? null : null,
+        duplicateSkipCount,
+        latestDuplicateAt: latestDuplicateAt ? latestDuplicateAt.toISOString() : null,
         isFailing: !!(latestSnapshot && latestSnapshot.status === 'FAILED'),
         createdAt: widget.createdAt.toISOString(),
         updatedAt: widget.updatedAt.toISOString()

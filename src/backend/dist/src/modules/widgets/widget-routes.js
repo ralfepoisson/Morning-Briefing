@@ -14,7 +14,7 @@ export async function registerWidgetRoutes(app, dependencies = createWidgetRoute
                 message: 'Dashboard id is required.'
             };
         }
-        const user = await defaultUserService.getDefaultUser();
+        const user = await defaultUserService.getDefaultUser(request);
         const widgets = await widgetService.listForDashboard(params.dashboardId, user.userId);
         return {
             items: widgets
@@ -36,7 +36,7 @@ export async function registerWidgetRoutes(app, dependencies = createWidgetRoute
             };
         }
         try {
-            const user = await defaultUserService.getDefaultUser();
+            const user = await defaultUserService.getDefaultUser(request);
             const widget = await widgetService.create({
                 dashboardId: params.dashboardId,
                 ownerUserId: user.userId,
@@ -86,7 +86,7 @@ export async function registerWidgetRoutes(app, dependencies = createWidgetRoute
             };
         }
         try {
-            const user = await defaultUserService.getDefaultUser();
+            const user = await defaultUserService.getDefaultUser(request);
             const widget = await widgetService.update({
                 dashboardId: params.dashboardId,
                 widgetId: params.widgetId,
@@ -132,7 +132,7 @@ export async function registerWidgetRoutes(app, dependencies = createWidgetRoute
                 message: 'Widget id is required.'
             };
         }
-        const user = await defaultUserService.getDefaultUser();
+        const user = await defaultUserService.getDefaultUser(request);
         const archived = await widgetService.archive({
             dashboardId: params.dashboardId,
             widgetId: params.widgetId,

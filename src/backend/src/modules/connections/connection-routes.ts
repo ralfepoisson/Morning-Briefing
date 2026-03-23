@@ -24,7 +24,7 @@ export async function registerConnectionRoutes(
 
   app.get('/api/v1/connections', async function handleListConnections(request) {
     const query = request.query as { type?: string };
-    const user = await defaultUserService.getDefaultUser();
+    const user = await defaultUserService.getDefaultUser(request);
     const items = await connectionService.listForTenant(user.tenantId, query.type);
 
     return {
@@ -46,7 +46,7 @@ export async function registerConnectionRoutes(
     }
 
     try {
-      const user = await defaultUserService.getDefaultUser();
+      const user = await defaultUserService.getDefaultUser(request);
       const connection = await connectionService.create({
         tenantId: user.tenantId,
         type: body.type.trim(),
@@ -92,7 +92,7 @@ export async function registerConnectionRoutes(
     }
 
     try {
-      const user = await defaultUserService.getDefaultUser();
+      const user = await defaultUserService.getDefaultUser(request);
       const connection = await connectionService.update({
         tenantId: user.tenantId,
         connectionId: params.connectionId.trim(),
@@ -129,7 +129,7 @@ export async function registerConnectionRoutes(
       returnTo?: string;
       connectionId?: string;
     };
-    const user = await defaultUserService.getDefaultUser();
+    const user = await defaultUserService.getDefaultUser(request);
     const returnTo = googleCalendarOAuthClient.normalizeReturnTo(query.returnTo);
     const authorizationUrl = googleCalendarOAuthClient.createAuthorizationUrl({
       tenantId: user.tenantId,
@@ -168,7 +168,7 @@ export async function registerConnectionRoutes(
         throw new Error('Google OAuth authorization code is missing.');
       }
 
-      const user = await defaultUserService.getDefaultUser();
+      const user = await defaultUserService.getDefaultUser(request);
 
       if (user.userId !== state.userId || user.tenantId !== state.tenantId) {
         throw new Error('Google OAuth state is invalid.');

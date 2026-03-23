@@ -12,7 +12,7 @@ export async function registerSnapshotRoutes(app, dependencies = createSnapshotR
                 message: 'Dashboard id is required.'
             };
         }
-        const user = await defaultUserService.getDefaultUser();
+        const user = await defaultUserService.getDefaultUser(request);
         const snapshot = await snapshotService.getPersistedLatestForDashboard(params.dashboardId, user);
         if (!snapshot) {
             reply.code(404);

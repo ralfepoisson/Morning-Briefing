@@ -68,8 +68,8 @@ export async function registerAdminWidgetRoutes(
   app: FastifyInstance,
   dependencies: AdminWidgetRouteDependencies = createAdminWidgetRouteDependencies()
 ): Promise<void> {
-  app.get('/api/v1/admin/widgets', async function handleListWidgets() {
-    const user = await dependencies.defaultUserService.getDefaultUser();
+  app.get('/api/v1/admin/widgets', async function handleListWidgets(request) {
+    const user = await dependencies.defaultUserService.getDefaultUser(request);
     const widgets = await dependencies.prisma.dashboardWidget.findMany({
       where: {
         archivedAt: null,
@@ -144,7 +144,7 @@ export async function registerAdminWidgetRoutes(
       };
     }
 
-    const user = await dependencies.defaultUserService.getDefaultUser();
+    const user = await dependencies.defaultUserService.getDefaultUser(request);
     const widget = await dependencies.prisma.dashboardWidget.findFirst({
       where: {
         id: params.widgetId,

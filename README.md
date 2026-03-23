@@ -399,3 +399,302 @@ The MVP should remain deliberately simple, but the model should already leave ro
 - connector abstraction
 - snapshot-based delivery
 - later AI-assisted briefing enrichment
+
+# Evidence-Driven Strategy Layer
+
+HelmOS is not only a system for **designing a business**, but for **testing whether that business should exist**.
+
+Traditional startup tools often help founders produce:
+
+-   well-structured ideas
+-   compelling narratives
+-   polished business cases
+
+However, these artefacts frequently lack **empirical grounding**, leading to overconfidence and poor decision-making.
+
+HelmOS introduces an **evidence-driven strategy layer**, where all strategic artefacts are treated as:
+
+> **Hypotheses to be tested, not truths to be documented**
+
+Every core component of a business concept (problem, customer, value proposition, pricing, etc.) is explicitly linked to:
+
+-   underlying assumptions
+-   required evidence
+-   current validation status
+
+This transforms HelmOS from a documentation tool into a **decision-support system for venture creation**.
+
+---
+
+# Closed-Loop Learning System
+
+HelmOS operates as a **closed-loop learning system** for building companies.
+
+Rather than following a linear process (idea → plan → execution), the platform continuously cycles through:
+
+**IDEATE → RESEARCH → HYPOTHESISE → TEST → LEARN → REFINE**
+
+### Loop Stages
+
+1.  **Ideation**
+    -   Founder defines initial problem, customer, and concept
+    -   Outputs are treated as _provisional hypotheses_
+2.  **Market Research (Secondary Evidence)**
+    -   Agents analyse:
+        -   competitors
+        -   existing solutions
+        -   industry reports
+        -   market signals
+    -   Output: **context and identified knowledge gaps**
+3.  **Hypothesis Generation**
+    -   Agents derive:
+        -   explicit hypotheses
+        -   key uncertainties
+        -   prioritised risks
+4.  **Validation Design**
+    -   System proposes:
+        -   test methods (interviews, landing pages, experiments)
+        -   required signals
+        -   success/failure criteria
+5.  **Testing (Primary Evidence)**
+    -   Founder executes or delegates experiments
+    -   System captures:
+        -   behavioural data
+        -   engagement signals
+        -   commitment indicators
+6.  **Evaluation**
+    -   Results are analysed
+    -   Hypotheses are:
+        -   supported
+        -   rejected
+        -   or remain inconclusive
+7.  **Refinement**
+    -   Business concept is updated based on evidence
+    -   Weak assumptions are either improved or discarded
+
+The loop then repeats.
+
+---
+
+## Key Principle
+
+> **Progress is measured by reduction of uncertainty, not completion of documents.**
+
+---
+
+# Epistemic State Model
+
+HelmOS tracks the **epistemic state** of a business concept.
+
+Instead of only asking:
+
+> “Is this well described?”
+
+The system asks:
+
+> “How well do we actually know this is true?”
+
+Each element of the business (problem, customer, value proposition, etc.) is associated with:
+
+### 1\. Clarity
+
+-   Is the concept clearly defined?
+
+### 2\. Evidence Strength
+
+-   What type of evidence supports it?
+
+### 3\. Confidence Level
+
+-   How likely is it to hold under real-world conditions?
+
+---
+
+## Evidence Hierarchy
+
+HelmOS distinguishes between different types of evidence:
+
+| Evidence Type | Description | Strength |
+| --- | --- | --- |
+| Assumption | Internal belief or reasoning | Weak |
+| Stated Feedback | Surveys, opinions | Low |
+| Observed Behaviour | User actions, engagement | Medium |
+| Commitment | Payment, time investment, real adoption | Strong |
+
+Agents should prioritise moving concepts **up the evidence hierarchy**.
+
+---
+
+## Example
+
+A value proposition may be:
+
+-   Clearly written ✔
+-   But only assumption-backed ❌
+
+HelmOS should explicitly surface this gap.
+
+---
+
+# Market Research as Input, Not Validation
+
+HelmOS treats market research as **contextual input**, not proof of viability.
+
+### Purpose of Market Research
+
+-   Understand the landscape
+-   Identify competitors and alternatives
+-   Detect patterns and trends
+-   Highlight known problems
+
+### Limitations
+
+Market research does **not**:
+
+-   prove demand for a specific solution
+-   validate willingness to pay
+-   confirm product-market fit
+
+---
+
+## System Behaviour
+
+Market research agents should:
+
+1.  **Summarise the landscape**
+2.  **Identify gaps and unknowns**
+3.  **Highlight risks and saturation**
+4.  **Generate testable hypotheses**
+
+Example outputs:
+
+-   “Market is crowded → differentiation required”
+-   “No clear dominant solution → potential opportunity”
+-   “No evidence of willingness to pay in this segment”
+
+---
+
+## Key Principle
+
+> **Secondary research informs hypotheses. Primary evidence validates them.**
+
+---
+
+# Hypothesis-Driven Validation Framework
+
+HelmOS provides a structured system for testing business assumptions.
+
+Each hypothesis includes:
+
+-   statement (e.g. “X segment has problem Y”)
+-   target segment
+-   expected outcome
+-   validation method
+-   success criteria
+-   evidence collected
+
+---
+
+## Validation Methods
+
+The system supports multiple validation approaches:
+
+### Weak Evidence
+
+-   surveys
+-   opinion-based interviews
+
+### Medium Evidence
+
+-   click-through behaviour
+-   sign-ups
+-   usage engagement
+
+### Strong Evidence
+
+-   pre-orders
+-   payments
+-   time commitment
+-   switching behaviour
+
+---
+
+## Agent Responsibilities
+
+Agents should:
+
+-   challenge vague or unfalsifiable hypotheses
+-   recommend stronger validation methods where possible
+-   discourage over-reliance on opinion-based validation
+-   guide founders toward **behavioural and commitment-based evidence**
+
+---
+
+# Augmented Value Proposition Modelling
+
+HelmOS extends traditional frameworks such as the Value Proposition Canvas.
+
+In addition to:
+
+-   jobs
+-   pains
+-   gains
+
+HelmOS captures:
+
+### Reality Layer
+
+-   current alternatives (including “do nothing”)
+-   frequency of the problem
+-   severity of the problem
+-   switching barriers
+-   economic context (who pays, budget source)
+
+### Evidence Layer
+
+-   assumption vs validated insight
+-   type of supporting evidence
+-   confidence level
+
+---
+
+## Key Principle
+
+> A value proposition is only as strong as the evidence supporting it.
+
+---
+
+# From Business Description to Business Validation
+
+Traditional tools help founders:
+
+> describe a business
+
+HelmOS is designed to help founders:
+
+> **decide whether a business is worth building**
+
+This requires:
+
+-   explicit assumptions
+-   structured experimentation
+-   continuous learning
+-   evidence-based refinement
+
+---
+
+# Strategic Differentiation
+
+HelmOS differentiates itself by:
+
+-   integrating **strategy + execution + validation**
+-   embedding **scientific thinking into entrepreneurship**
+-   treating **AI as both creator and challenger**
+-   prioritising **truth over narrative quality**
+
+---
+
+## Final Principle
+
+> HelmOS is not a tool for writing better business plans.  
+> It is a system for **discovering viable businesses under uncertainty**.

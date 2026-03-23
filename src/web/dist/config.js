@@ -1,3 +1,6 @@
-window.__MORNING_BRIEFING_CONFIG__ = window.__MORNING_BRIEFING_CONFIG__ || {
-  apiBaseUrl: '/api/v1'
-};
+window.__MORNING_BRIEFING_CONFIG__ = Object.assign({
+  apiBaseUrl: '/api/v1',
+  authServiceSignInUrl: '',
+  authServiceSignOutUrl: '',
+  appBaseUrl: ''
+}, window.__MORNING_BRIEFING_CONFIG__ || {});

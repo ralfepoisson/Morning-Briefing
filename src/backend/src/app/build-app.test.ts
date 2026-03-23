@@ -31,3 +31,41 @@ test('buildApp registers dashboard archive route', async function () {
     await app.close();
   }
 });
+
+test('protected api routes reject requests without an authorization header', async function () {
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/dashboards'
+    });
+
+    assert.equal(response.statusCode, 401);
+    assert.deepEqual(response.json(), {
+      message: 'Authorization header is required.'
+    });
+  } finally {
+    await app.close();
+  }
+});
+
+test('protected api routes allow CORS preflight requests without an authorization header', async function () {
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/v1/dashboards',
+      headers: {
+        origin: 'http://localhost:8080',
+        'access-control-request-method': 'POST'
+      }
+    });
+
+    assert.equal(response.statusCode, 204);
+    assert.equal(response.headers['access-control-allow-origin'], 'http://localhost:8080');
+  } finally {
+    await app.close();
+  }
+});

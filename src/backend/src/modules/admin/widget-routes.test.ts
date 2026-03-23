@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import { registerAdminWidgetRoutes } from './widget-routes.js';
+import { formatSnapshotDateForTimezone } from '../snapshots/snapshot-date.js';
 
 test('GET /api/v1/admin/widgets returns widgets with latest snapshot state', async function () {
   const app = Fastify();
@@ -159,6 +160,7 @@ test('GET /api/v1/admin/widgets returns widgets with latest snapshot state', asy
 test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual refresh', async function () {
   const app = Fastify();
   let publishedInput = null;
+  const expectedSnapshotDate = formatSnapshotDateForTimezone(new Date(), 'Europe/Paris');
 
   await registerAdminWidgetRoutes(app, {
     prisma: {
@@ -237,12 +239,12 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual
     assert.equal(response.statusCode, 202);
     assert.equal((publishedInput as { triggerSource: string }).triggerSource, 'manual_refresh');
     assert.equal((publishedInput as { bypassDuplicateCheck: boolean }).bypassDuplicateCheck, true);
-    assert.equal((publishedInput as { snapshotDate: string }).snapshotDate, '2026-03-21');
+    assert.equal((publishedInput as { snapshotDate: string }).snapshotDate, expectedSnapshotDate);
     assert.deepEqual(response.json(), {
       status: 'queued',
       job: {
         widgetId: 'widget-1',
-        snapshotDate: '2026-03-21',
+        snapshotDate: expectedSnapshotDate,
         triggerSource: 'manual_refresh',
         bypassDuplicateCheck: true,
         requestedAt: '2026-03-20T07:30:00.000Z'
@@ -256,6 +258,7 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual
 test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot falls back to direct generation when queue publishing fails', async function () {
   const app = Fastify();
   let generatedInput = null;
+  const expectedSnapshotDate = formatSnapshotDateForTimezone(new Date(), 'Europe/Paris');
 
   await registerAdminWidgetRoutes(app, {
     prisma: {
@@ -318,14 +321,14 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot falls back to dir
 
     assert.equal(response.statusCode, 200);
     assert.equal((generatedInput as { triggerSource: string }).triggerSource, 'manual_refresh');
-    assert.equal((generatedInput as { snapshotDate: string }).snapshotDate, '2026-03-21');
+    assert.equal((generatedInput as { snapshotDate: string }).snapshotDate, expectedSnapshotDate);
     assert.deepEqual(response.json(), {
       status: 'generated',
       mode: 'direct',
       message: 'connect ECONNREFUSED 127.0.0.1:4566',
       job: {
         widgetId: 'widget-1',
-        snapshotDate: '2026-03-21',
+        snapshotDate: expectedSnapshotDate,
         triggerSource: 'manual_refresh',
         bypassDuplicateCheck: true
       }

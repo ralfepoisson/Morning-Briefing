@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import { assertAuthenticatedRequest } from '../modules/default-user/default-user-service.js';
 import { registerLogRoutes } from '../modules/admin/log-routes.js';
 import { registerMessageBrokerRoutes } from '../modules/admin/message-broker-routes.js';
 import { registerAdminWidgetRoutes } from '../modules/admin/widget-routes.js';
@@ -17,13 +18,33 @@ export async function buildApp() {
 
   await app.register(cors, {
     origin: true,
-    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
+    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type']
   });
 
   app.get('/health', async function handleHealth() {
     return {
       status: 'ok'
     };
+  });
+
+  app.addHook('onRequest', async function authenticateApiRequests(request, reply) {
+    if (request.method === 'OPTIONS') {
+      return;
+    }
+
+    if (!isProtectedApiRoute(request.url)) {
+      return;
+    }
+
+    try {
+      assertAuthenticatedRequest(request);
+    } catch (error) {
+      reply.code(401);
+      return reply.send({
+        message: error instanceof Error ? error.message : 'Authentication is required.'
+      });
+    }
   });
 
   await registerDashboardRoutes(app);
@@ -37,4 +58,15 @@ export async function buildApp() {
   await registerWidgetRoutes(app);
 
   return app;
+}
+
+function isProtectedApiRoute(url: string): boolean {
+  const pathname = url.split('?')[0];
+
+  if (!pathname.startsWith('/api/v1')) {
+    return false;
+  }
+
+  return pathname !== '/api/v1/connections/google-calendar/oauth/start' &&
+    pathname !== '/api/v1/connections/google-calendar/oauth/callback';
 }

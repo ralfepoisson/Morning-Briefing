@@ -442,6 +442,9 @@ resources:
         Cpu: 512
         Memory: 1024
         NetworkMode: awsvpc
+        RuntimePlatform:
+          CpuArchitecture: ARM64
+          OperatingSystemFamily: LINUX
         RequiresCompatibilities:
           - FARGATE
         ExecutionRoleArn: !GetAtt EcsExecutionRole.Arn
@@ -515,6 +518,9 @@ resources:
         Cpu: 512
         Memory: 1024
         NetworkMode: awsvpc
+        RuntimePlatform:
+          CpuArchitecture: ARM64
+          OperatingSystemFamily: LINUX
         RequiresCompatibilities:
           - FARGATE
         ExecutionRoleArn: !GetAtt EcsExecutionRole.Arn
@@ -575,6 +581,9 @@ resources:
         Cpu: 256
         Memory: 512
         NetworkMode: awsvpc
+        RuntimePlatform:
+          CpuArchitecture: ARM64
+          OperatingSystemFamily: LINUX
         RequiresCompatibilities:
           - FARGATE
         ExecutionRoleArn: !GetAtt EcsExecutionRole.Arn

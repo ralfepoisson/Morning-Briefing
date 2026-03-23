@@ -27,7 +27,7 @@ export async function registerWidgetRoutes(
       };
     }
 
-    const user = await defaultUserService.getDefaultUser();
+    const user = await defaultUserService.getDefaultUser(request);
     const widgets = await widgetService.listForDashboard(params.dashboardId, user.userId);
 
     return {
@@ -54,7 +54,7 @@ export async function registerWidgetRoutes(
     }
 
     try {
-      const user = await defaultUserService.getDefaultUser();
+      const user = await defaultUserService.getDefaultUser(request);
       const widget = await widgetService.create({
         dashboardId: params.dashboardId,
         ownerUserId: user.userId,
@@ -120,7 +120,7 @@ export async function registerWidgetRoutes(
     }
 
     try {
-      const user = await defaultUserService.getDefaultUser();
+      const user = await defaultUserService.getDefaultUser(request);
       const widget = await widgetService.update({
         dashboardId: params.dashboardId,
         widgetId: params.widgetId,
@@ -175,7 +175,7 @@ export async function registerWidgetRoutes(
       };
     }
 
-    const user = await defaultUserService.getDefaultUser();
+    const user = await defaultUserService.getDefaultUser(request);
     const archived = await widgetService.archive({
       dashboardId: params.dashboardId,
       widgetId: params.widgetId,

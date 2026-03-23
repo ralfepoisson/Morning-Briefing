@@ -9,7 +9,7 @@ export async function registerConnectionRoutes(app, dependencies = createConnect
     const googleCalendarOAuthClient = dependencies.googleCalendarOAuthClient;
     app.get('/api/v1/connections', async function handleListConnections(request) {
         const query = request.query;
-        const user = await defaultUserService.getDefaultUser();
+        const user = await defaultUserService.getDefaultUser(request);
         const items = await connectionService.listForTenant(user.tenantId, query.type);
         return {
             items: items
@@ -24,7 +24,7 @@ export async function registerConnectionRoutes(app, dependencies = createConnect
             };
         }
         try {
-            const user = await defaultUserService.getDefaultUser();
+            const user = await defaultUserService.getDefaultUser(request);
             const connection = await connectionService.create({
                 tenantId: user.tenantId,
                 type: body.type.trim(),
@@ -59,7 +59,7 @@ export async function registerConnectionRoutes(app, dependencies = createConnect
             };
         }
         try {
-            const user = await defaultUserService.getDefaultUser();
+            const user = await defaultUserService.getDefaultUser(request);
             const connection = await connectionService.update({
                 tenantId: user.tenantId,
                 connectionId: params.connectionId.trim(),
@@ -87,7 +87,7 @@ export async function registerConnectionRoutes(app, dependencies = createConnect
     });
     app.get('/api/v1/connections/google-calendar/oauth/start', async function handleStartGoogleCalendarOAuth(request, reply) {
         const query = request.query;
-        const user = await defaultUserService.getDefaultUser();
+        const user = await defaultUserService.getDefaultUser(request);
         const returnTo = googleCalendarOAuthClient.normalizeReturnTo(query.returnTo);
         const authorizationUrl = googleCalendarOAuthClient.createAuthorizationUrl({
             tenantId: user.tenantId,
@@ -114,7 +114,7 @@ export async function registerConnectionRoutes(app, dependencies = createConnect
             if (!query.code || typeof query.code !== 'string' || !query.code.trim()) {
                 throw new Error('Google OAuth authorization code is missing.');
             }
-            const user = await defaultUserService.getDefaultUser();
+            const user = await defaultUserService.getDefaultUser(request);
             if (user.userId !== state.userId || user.tenantId !== state.tenantId) {
                 throw new Error('Google OAuth state is invalid.');
             }

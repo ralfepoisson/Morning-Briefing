@@ -18,6 +18,7 @@ NIGHTLY_REFRESH_SCHEDULE="${NIGHTLY_REFRESH_SCHEDULE:-cron(0 4 * * ? *)}"
 FRONTEND_DESIRED_COUNT="${FRONTEND_DESIRED_COUNT:-1}"
 BACKEND_DESIRED_COUNT="${BACKEND_DESIRED_COUNT:-1}"
 WORKER_DESIRED_COUNT="${WORKER_DESIRED_COUNT:-1}"
+IMPORT_REFERENCE_CITIES="${IMPORT_REFERENCE_CITIES:-false}"
 STACK_NAME="morning-briefing-platform-${STAGE}"
 IMAGE_TAG="${IMAGE_TAG:-$(git -C "${ROOT_DIR}" rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)}"
 PLACEHOLDER_BACKEND_IMAGE="public.ecr.aws/docker/library/node:20-bookworm-slim"
@@ -141,6 +142,11 @@ BACKEND_IMAGE_TAG="${BACKEND_IMAGE}" FRONTEND_IMAGE_TAG="${FRONTEND_IMAGE}" "${R
 
 deploy_stack "${BACKEND_IMAGE}" "${FRONTEND_IMAGE}" 0 0 0
 "${SERVERLESS_DIR}/scripts/run-migrations.sh"
+
 deploy_stack "${BACKEND_IMAGE}" "${FRONTEND_IMAGE}" "${FRONTEND_DESIRED_COUNT}" "${BACKEND_DESIRED_COUNT}" "${WORKER_DESIRED_COUNT}"
+
+if [[ "${IMPORT_REFERENCE_CITIES}" == "true" ]]; then
+  "${SERVERLESS_DIR}/scripts/run-reference-city-import.sh"
+fi
 
 echo "Application URL: $(stack_output ApplicationUrl)"

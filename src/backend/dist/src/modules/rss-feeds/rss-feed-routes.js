@@ -5,8 +5,8 @@ import { RssFeedService } from './rss-feed-service.js';
 export async function registerRssFeedRoutes(app, dependencies = createRssFeedRouteDependencies()) {
     const rssFeedService = dependencies.rssFeedService;
     const defaultUserService = dependencies.defaultUserService;
-    app.get('/api/v1/rss-feeds', async function handleListRssFeeds() {
-        const user = await defaultUserService.getDefaultUser();
+    app.get('/api/v1/rss-feeds', async function handleListRssFeeds(request) {
+        const user = await defaultUserService.getDefaultUser(request);
         const items = await rssFeedService.listForTenant(user.tenantId);
         return {
             items
@@ -15,7 +15,7 @@ export async function registerRssFeedRoutes(app, dependencies = createRssFeedRou
     app.post('/api/v1/rss-feeds/categories', async function handleCreateCategory(request, reply) {
         const body = request.body;
         try {
-            const user = await defaultUserService.getDefaultUser();
+            const user = await defaultUserService.getDefaultUser(request);
             const category = await rssFeedService.createCategory({
                 tenantId: user.tenantId,
                 name: typeof body?.name === 'string' ? body.name : '',
@@ -44,7 +44,7 @@ export async function registerRssFeedRoutes(app, dependencies = createRssFeedRou
             };
         }
         try {
-            const user = await defaultUserService.getDefaultUser();
+            const user = await defaultUserService.getDefaultUser(request);
             const category = await rssFeedService.updateCategory({
                 tenantId: user.tenantId,
                 categoryId: params.categoryId,
@@ -78,7 +78,7 @@ export async function registerRssFeedRoutes(app, dependencies = createRssFeedRou
             };
         }
         try {
-            const user = await defaultUserService.getDefaultUser();
+            const user = await defaultUserService.getDefaultUser(request);
             await rssFeedService.deleteCategory(user.tenantId, params.categoryId);
             reply.code(204);
             return null;
@@ -103,7 +103,7 @@ export async function registerRssFeedRoutes(app, dependencies = createRssFeedRou
             };
         }
         try {
-            const user = await defaultUserService.getDefaultUser();
+            const user = await defaultUserService.getDefaultUser(request);
             const category = await rssFeedService.addFeed({
                 tenantId: user.tenantId,
                 categoryId: params.categoryId,
@@ -138,7 +138,7 @@ export async function registerRssFeedRoutes(app, dependencies = createRssFeedRou
             };
         }
         try {
-            const user = await defaultUserService.getDefaultUser();
+            const user = await defaultUserService.getDefaultUser(request);
             const category = await rssFeedService.removeFeed(user.tenantId, params.categoryId, params.feedId);
             return category;
         }

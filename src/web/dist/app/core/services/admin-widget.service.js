@@ -13,7 +13,9 @@
     };
 
     this.regenerateSnapshot = function regenerateSnapshot(widgetId) {
-      return $http.post(ApiConfig.baseUrl + '/admin/widgets/' + widgetId + '/regenerate-snapshot').then(function handleResponse(response) {
+      return $http.post(ApiConfig.baseUrl + '/admin/widgets/' + widgetId + '/regenerate-snapshot', {
+        bypassDuplicateCheck: true
+      }).then(function handleResponse(response) {
         return response.data;
       });
     };

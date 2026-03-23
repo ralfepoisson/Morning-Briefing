@@ -9,7 +9,7 @@
       '      <img class="brand-logo" ng-src="{{$ctrl.ui.theme === \'light\' ? \'./assets/img/logo-light.png\' : \'./assets/img/logo-dark.png\'}}" alt="Morning Briefing logo" />' +
       '    </a>' +
       '    <div class="top-nav-links d-flex align-items-center gap-2 ms-auto">' +
-      '      <div class="dashboard-menu" ng-class="{\'dashboard-menu--open\': $ctrl.isDashboardMenuOpen}">' +
+      '      <div class="dashboard-menu" ng-if="$ctrl.isAuthenticated()" ng-class="{\'dashboard-menu--open\': $ctrl.isDashboardMenuOpen}">' +
       '        <button class="dashboard-menu__trigger" type="button" ng-click="$ctrl.toggleDashboardMenu()" aria-haspopup="true" aria-expanded="{{$ctrl.isDashboardMenuOpen}}">' +
       '          <span class="dashboard-menu__eyebrow">Dashboards</span>' +
       '          <span class="dashboard-menu__label">{{$ctrl.getActiveDashboardName()}}</span>' +
@@ -26,9 +26,9 @@
       '          </button>' +
       '        </div>' +
       '      </div>' +
-      '      <a class="nav-link" ng-class="{active: $ctrl.isActiveRoute(\'/connectors\')}" href="#/connectors">Connectors</a>' +
-      '      <a class="nav-link" ng-class="{active: $ctrl.isActiveRoute(\'/rss-feeds\')}" href="#/rss-feeds">RSS Feeds</a>' +
-      '      <div class="dashboard-menu dashboard-menu--compact" ng-class="{\'dashboard-menu--open\': $ctrl.isAdminMenuOpen}">' +
+      '      <a class="nav-link" ng-if="$ctrl.isAuthenticated()" ng-class="{active: $ctrl.isActiveRoute(\'/connectors\')}" href="#/connectors">Connectors</a>' +
+      '      <a class="nav-link" ng-if="$ctrl.isAuthenticated()" ng-class="{active: $ctrl.isActiveRoute(\'/rss-feeds\')}" href="#/rss-feeds">RSS Feeds</a>' +
+      '      <div class="dashboard-menu dashboard-menu--compact" ng-if="$ctrl.isAuthenticated()" ng-class="{\'dashboard-menu--open\': $ctrl.isAdminMenuOpen}">' +
       '        <button class="dashboard-menu__trigger dashboard-menu__trigger--compact" type="button" ng-click="$ctrl.toggleAdminMenu()" aria-haspopup="true" aria-expanded="{{$ctrl.isAdminMenuOpen}}">' +
       '          <span class="dashboard-menu__label">Admin</span>' +
       '          <i class="fa-solid" ng-class="$ctrl.isAdminMenuOpen ? \'fa-chevron-up\' : \'fa-chevron-down\'" aria-hidden="true"></i>' +
@@ -52,25 +52,35 @@
       '        <button type="button" class="theme-toggle__button" ng-class="{active: $ctrl.ui.theme === \'light\'}" ng-click="$ctrl.setTheme(\'light\')">Light</button>' +
       '        <button type="button" class="theme-toggle__button" ng-class="{active: $ctrl.ui.theme === \'dark\'}" ng-click="$ctrl.setTheme(\'dark\')">Dark</button>' +
       '      </div>' +
+      '      <div class="top-nav-session" ng-if="$ctrl.auth.session">' +
+      '        <span class="top-nav-session__label">{{$ctrl.auth.session.displayName}}</span>' +
+      '        <button type="button" class="btn btn-sm btn-outline-secondary" ng-click="$ctrl.signOut()">Sign out</button>' +
+      '      </div>' +
       '    </div>' +
       '  </div>' +
       '</nav>',
     controller: TopNavController
   });
 
-  TopNavController.$inject = ['UiShellService', 'DashboardService', '$document', '$scope', '$location'];
+  TopNavController.$inject = ['UiShellService', 'DashboardService', '$document', '$scope', '$location', 'AuthService'];
 
-  function TopNavController(UiShellService, DashboardService, $document, $scope, $location) {
+  function TopNavController(UiShellService, DashboardService, $document, $scope, $location, AuthService) {
     var $ctrl = this;
 
     $ctrl.ui = UiShellService.state;
     $ctrl.dashboards = DashboardService.list();
     $ctrl.isDashboardMenuOpen = false;
     $ctrl.isAdminMenuOpen = false;
+    $ctrl.auth = {
+      session: null
+    };
 
     $ctrl.$onInit = function onInit() {
       applyTheme($ctrl.ui.theme);
-      DashboardService.load();
+      refreshAuthState();
+      if (AuthService.isAuthenticated()) {
+        DashboardService.load();
+      }
       bindWatchers();
       bindDocumentHandler();
     };
@@ -128,12 +138,37 @@
       return $location.path() === path;
     };
 
+    $ctrl.isAuthenticated = function isAuthenticated() {
+      return AuthService.isAuthenticated();
+    };
+
+    $ctrl.signOut = function signOut() {
+      $ctrl.isDashboardMenuOpen = false;
+      $ctrl.isAdminMenuOpen = false;
+      AuthService.signOut();
+      refreshAuthState();
+    };
+
     function applyTheme(theme) {
       $document[0].body.classList.remove('theme-dark', 'theme-light');
       $document[0].body.classList.add('theme-' + theme);
     }
 
     function bindWatchers() {
+      $scope.$watch(
+        function watchAuthSession() {
+          return AuthService.getSession();
+        },
+        function handleAuthSessionChange(session) {
+          $ctrl.auth.session = session;
+
+          if (session) {
+            DashboardService.load();
+          }
+        },
+        true
+      );
+
       $scope.$watch(
         function watchActiveDashboard() {
           return DashboardService.getActiveId();
@@ -158,6 +193,10 @@
       $ctrl.removeDocumentHandler = function removeDocumentHandler() {
         $document.off('click', handleDocumentClick);
       };
+    }
+
+    function refreshAuthState() {
+      $ctrl.auth.session = AuthService.getSession();
     }
   }
 })();

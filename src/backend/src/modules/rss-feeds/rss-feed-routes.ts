@@ -16,8 +16,8 @@ export async function registerRssFeedRoutes(
   const rssFeedService = dependencies.rssFeedService;
   const defaultUserService = dependencies.defaultUserService;
 
-  app.get('/api/v1/rss-feeds', async function handleListRssFeeds() {
-    const user = await defaultUserService.getDefaultUser();
+  app.get('/api/v1/rss-feeds', async function handleListRssFeeds(request) {
+    const user = await defaultUserService.getDefaultUser(request);
     const items = await rssFeedService.listForTenant(user.tenantId);
 
     return {
@@ -29,7 +29,7 @@ export async function registerRssFeedRoutes(
     const body = request.body as { name?: string; description?: string };
 
     try {
-      const user = await defaultUserService.getDefaultUser();
+      const user = await defaultUserService.getDefaultUser(request);
       const category = await rssFeedService.createCategory({
         tenantId: user.tenantId,
         name: typeof body?.name === 'string' ? body.name : '',
@@ -62,7 +62,7 @@ export async function registerRssFeedRoutes(
     }
 
     try {
-      const user = await defaultUserService.getDefaultUser();
+      const user = await defaultUserService.getDefaultUser(request);
       const category = await rssFeedService.updateCategory({
         tenantId: user.tenantId,
         categoryId: params.categoryId,
@@ -101,7 +101,7 @@ export async function registerRssFeedRoutes(
     }
 
     try {
-      const user = await defaultUserService.getDefaultUser();
+      const user = await defaultUserService.getDefaultUser(request);
       await rssFeedService.deleteCategory(user.tenantId, params.categoryId);
 
       reply.code(204);
@@ -130,7 +130,7 @@ export async function registerRssFeedRoutes(
     }
 
     try {
-      const user = await defaultUserService.getDefaultUser();
+      const user = await defaultUserService.getDefaultUser(request);
       const category = await rssFeedService.addFeed({
         tenantId: user.tenantId,
         categoryId: params.categoryId,
@@ -170,7 +170,7 @@ export async function registerRssFeedRoutes(
     }
 
     try {
-      const user = await defaultUserService.getDefaultUser();
+      const user = await defaultUserService.getDefaultUser(request);
       const category = await rssFeedService.removeFeed(user.tenantId, params.categoryId, params.feedId);
 
       return category;

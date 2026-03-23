@@ -50,6 +50,52 @@ test('GET /api/v1/me returns the default user profile', async function () {
   }
 });
 
+test('GET /api/v1/me passes the incoming request to the user service', async function () {
+  const app = Fastify();
+
+  await registerDashboardRoutes(app, {
+    defaultUserService: {
+      async getDefaultUser(request) {
+        assert.equal(request && request.headers.authorization, 'Bearer signed-life2-token');
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
+        };
+      }
+    },
+    dashboardService: {
+      async listForOwner() {
+        throw new Error('not used');
+      },
+      async create() {
+        throw new Error('not used');
+      },
+      async update() {
+        throw new Error('not used');
+      },
+      async archive() {
+        throw new Error('not used');
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/me',
+      headers: {
+        authorization: 'Bearer signed-life2-token'
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+  } finally {
+    await app.close();
+  }
+});
+
 test('GET /api/v1/dashboards returns dashboards for the default user', async function () {
   const app = Fastify();
   const expectedDashboards = [
