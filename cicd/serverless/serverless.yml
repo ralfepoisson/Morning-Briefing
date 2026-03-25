@@ -18,7 +18,7 @@ custom:
   dbPassword: ${param:dbPassword, 'change-me-now'}
   googleOauthClientId: ${param:googleOauthClientId, ''}
   googleOauthClientSecret: ${param:googleOauthClientSecret, ''}
-  googleOauthRedirectUri: ${param:googleOauthRedirectUri, ''}
+  googleOauthRedirectUri: ${param:googleOauthRedirectUri, 'https://${self:custom.frontendDomainName}/api/v1/connections/google-calendar/oauth/callback'}
   googleOauthStateSecret: ${param:googleOauthStateSecret, ''}
   frontendDesiredCount: ${param:frontendDesiredCount, 1}
   backendDesiredCount: ${param:backendDesiredCount, 1}

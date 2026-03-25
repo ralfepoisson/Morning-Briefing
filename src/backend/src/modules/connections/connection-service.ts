@@ -39,6 +39,7 @@ export class ConnectionService {
     const connection = await this.repository.update({
       tenantId: input.tenantId,
       connectionId: input.connectionId,
+      ownerUserId: input.ownerUserId,
       name: nextName,
       credentials: nextCredentials
     });

@@ -1,8 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
+import { logApplicationEvent } from '../admin/application-logger.js';
 import { DefaultUserService } from '../default-user/default-user-service.js';
 import { ConnectionService } from './connection-service.js';
-import { getGoogleCalendarOAuthClientFromEnvironment, type GoogleCalendarOAuthClient } from './google-calendar-oauth-client.js';
+import {
+  getDefaultFrontendBaseUrl,
+  getGoogleCalendarOAuthClientFromEnvironment,
+  type GoogleCalendarOAuthClient
+} from './google-calendar-oauth-client.js';
 import { PrismaConnectionRepository } from './prisma-connection-repository.js';
 
 export type ConnectionRouteDependencies = {
@@ -49,6 +54,7 @@ export async function registerConnectionRoutes(
       const user = await defaultUserService.getDefaultUser(request);
       const connection = await connectionService.create({
         tenantId: user.tenantId,
+        ownerUserId: user.userId,
         type: body.type.trim(),
         credentials: body.credentials || {}
       });
@@ -129,17 +135,21 @@ export async function registerConnectionRoutes(
       returnTo?: string;
       connectionId?: string;
     };
-    const user = await defaultUserService.getDefaultUser(request);
-    const returnTo = googleCalendarOAuthClient.normalizeReturnTo(query.returnTo);
-    const authorizationUrl = googleCalendarOAuthClient.createAuthorizationUrl({
-      tenantId: user.tenantId,
-      userId: user.userId,
-      returnTo,
-      connectionId: typeof query.connectionId === 'string' && query.connectionId.trim() ? query.connectionId.trim() : undefined,
-      issuedAt: Date.now()
-    });
+    const authorizationUrl = await buildGoogleCalendarAuthorizationUrl(request, query, defaultUserService, googleCalendarOAuthClient);
 
     reply.redirect(authorizationUrl);
+  });
+
+  app.post('/api/v1/connections/google-calendar/oauth/start', async function handleStartGoogleCalendarOAuthApi(request) {
+    const body = request.body as {
+      returnTo?: string;
+      connectionId?: string;
+    } | undefined;
+    const authorizationUrl = await buildGoogleCalendarAuthorizationUrl(request, body || {}, defaultUserService, googleCalendarOAuthClient);
+
+    return {
+      authorizationUrl
+    };
   });
 
   app.get('/api/v1/connections/google-calendar/oauth/callback', async function handleGoogleCalendarOAuthCallback(request, reply) {
@@ -150,6 +160,7 @@ export async function registerConnectionRoutes(
     };
 
     let returnTo = googleCalendarOAuthClient.normalizeReturnTo();
+    let resolvedConnectionId: string | null = null;
 
     try {
       if (!query.state || typeof query.state !== 'string') {
@@ -160,6 +171,18 @@ export async function registerConnectionRoutes(
       returnTo = state.returnTo;
 
       if (query.error) {
+        logApplicationEvent({
+          level: 'warn',
+          scope: 'connections',
+          event: 'google_calendar_oauth_denied',
+          message: 'Google Calendar OAuth was cancelled or denied.',
+          context: {
+            tenantId: state.tenantId,
+            userId: state.userId,
+            connectionId: state.connectionId || null,
+            error: query.error
+          }
+        });
         reply.redirect(returnTo);
         return;
       }
@@ -168,17 +191,12 @@ export async function registerConnectionRoutes(
         throw new Error('Google OAuth authorization code is missing.');
       }
 
-      const user = await defaultUserService.getDefaultUser(request);
-
-      if (user.userId !== state.userId || user.tenantId !== state.tenantId) {
-        throw new Error('Google OAuth state is invalid.');
-      }
-
       const tokenSet = await googleCalendarOAuthClient.exchangeAuthorizationCode(query.code.trim());
       const account = await googleCalendarOAuthClient.getPrimaryCalendar(tokenSet.accessToken);
 
       const input = {
-        tenantId: user.tenantId,
+        tenantId: state.tenantId,
+        ownerUserId: state.userId,
         type: 'google-calendar',
         credentials: {
           accessToken: tokenSet.accessToken,
@@ -194,21 +212,65 @@ export async function registerConnectionRoutes(
       } as const;
 
       if (state.connectionId) {
-        await connectionService.update({
-          tenantId: user.tenantId,
+        const updatedConnection = await connectionService.update({
+          tenantId: state.tenantId,
           connectionId: state.connectionId,
+          ownerUserId: state.userId,
           name: account.accountLabel || 'Google Calendar',
           credentials: input.credentials
         });
+        resolvedConnectionId = updatedConnection.id;
       } else {
-        await connectionService.create(input);
+        const createdConnection = await connectionService.create(input);
+        resolvedConnectionId = createdConnection.id;
       }
 
-      reply.redirect(returnTo);
-    } catch {
+      logApplicationEvent({
+        level: 'info',
+        scope: 'connections',
+        event: 'google_calendar_oauth_saved',
+        message: 'Google Calendar OAuth connection saved.',
+        context: {
+          tenantId: state.tenantId,
+          userId: state.userId,
+          connectionId: state.connectionId || null,
+          calendarId: input.credentials.calendarId,
+          accountEmail: input.credentials.accountEmail || null
+        }
+      });
+
+      reply.redirect(appendOAuthResultToReturnTo(returnTo, resolvedConnectionId, input.type));
+    } catch (error) {
+      logApplicationEvent({
+        level: 'error',
+        scope: 'connections',
+        event: 'google_calendar_oauth_callback_failed',
+        message: 'Google Calendar OAuth callback failed.',
+        context: {
+          error: error instanceof Error ? error.message : String(error),
+          codePresent: typeof query.code === 'string' && !!query.code.trim(),
+          errorParam: typeof query.error === 'string' ? query.error : null,
+          returnTo
+        }
+      });
       reply.redirect(returnTo);
     }
   });
+}
+
+function appendOAuthResultToReturnTo(returnTo: string, connectionId: string | null, provider: string): string {
+  if (!connectionId) {
+    return returnTo;
+  }
+
+  try {
+    const targetUrl = new URL(returnTo);
+    targetUrl.searchParams.set('oauthConnectionId', connectionId);
+    targetUrl.searchParams.set('oauthProvider', provider);
+    return targetUrl.toString();
+  } catch {
+    return returnTo;
+  }
 }
 
 function createConnectionRouteDependencies(): ConnectionRouteDependencies {
@@ -229,7 +291,7 @@ function createConnectionRouteDependencies(): ConnectionRouteDependencies {
         throw new Error('Google OAuth is not configured.');
       },
       normalizeReturnTo(value) {
-        return value && value.trim() ? value : 'http://127.0.0.1:8080/';
+        return value && value.trim() ? value : getDefaultFrontendBaseUrl();
       },
       verifyState() {
         throw new Error('Google OAuth is not configured.');
@@ -242,4 +304,25 @@ function createConnectionRouteDependencies(): ConnectionRouteDependencies {
     defaultUserService: new DefaultUserService(prisma),
     googleCalendarOAuthClient
   };
+}
+
+async function buildGoogleCalendarAuthorizationUrl(
+  request: Parameters<ConnectionRouteDependencies['defaultUserService']['getDefaultUser']>[0],
+  input: {
+    returnTo?: string;
+    connectionId?: string;
+  },
+  defaultUserService: ConnectionRouteDependencies['defaultUserService'],
+  googleCalendarOAuthClient: ConnectionRouteDependencies['googleCalendarOAuthClient']
+): Promise<string> {
+  const user = await defaultUserService.getDefaultUser(request);
+  const returnTo = googleCalendarOAuthClient.normalizeReturnTo(input.returnTo);
+
+  return googleCalendarOAuthClient.createAuthorizationUrl({
+    tenantId: user.tenantId,
+    userId: user.userId,
+    returnTo,
+    connectionId: typeof input.connectionId === 'string' && input.connectionId.trim() ? input.connectionId.trim() : undefined,
+    issuedAt: Date.now()
+  });
 }

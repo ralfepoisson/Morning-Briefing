@@ -1,6 +1,7 @@
 export type ConnectionRecord = {
   id: string;
   tenantId: string;
+  ownerUserId: string | null;
   type: string;
   name: string;
   status: 'ACTIVE' | 'DISABLED' | 'ERROR';
@@ -20,6 +21,7 @@ export type ListConnectionsInput = {
 
 export type CreateConnectionInput = {
   tenantId: string;
+  ownerUserId?: string;
   type: string;
   credentials: Record<string, unknown>;
 };
@@ -27,6 +29,7 @@ export type CreateConnectionInput = {
 export type UpdateConnectionInput = {
   tenantId: string;
   connectionId: string;
+  ownerUserId?: string;
   name?: string;
   credentials?: Record<string, unknown>;
 };

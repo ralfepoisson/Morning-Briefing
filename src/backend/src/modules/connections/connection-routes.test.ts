@@ -171,6 +171,62 @@ test('GET /api/v1/connections/google-calendar/oauth/start redirects to Google', 
   }
 });
 
+test('POST /api/v1/connections/google-calendar/oauth/start returns a Google authorization url', async function () {
+  const app = Fastify();
+  let capturedState = '';
+
+  await registerConnectionRoutes(app, {
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
+        };
+      }
+    },
+    connectionService: {
+      async listForTenant() {
+        throw new Error('not used');
+      },
+      async create() {
+        throw new Error('not used');
+      },
+      async update() {
+        throw new Error('not used');
+      }
+    },
+    googleCalendarOAuthClient: {
+      ...createGoogleCalendarOAuthClientStub(),
+      createAuthorizationUrl(state) {
+        capturedState = JSON.stringify(state);
+        return 'https://accounts.google.com/o/oauth2/v2/auth?state=signed';
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/connections/google-calendar/oauth/start',
+      payload: {
+        returnTo: 'https://briefing.ralfepoisson.com/#/admin/connectors',
+        connectionId: 'connection-1'
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json(), {
+      authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=signed'
+    });
+    assert.match(capturedState, /connection-1/);
+    assert.match(capturedState, /tenant-1/);
+  } finally {
+    await app.close();
+  }
+});
+
 test('GET /api/v1/connections/google-calendar/oauth/callback creates a connection and redirects back', async function () {
   const app = Fastify();
   let created = false;
@@ -255,8 +311,220 @@ test('GET /api/v1/connections/google-calendar/oauth/callback creates a connectio
     });
 
     assert.equal(response.statusCode, 302);
-    assert.equal(response.headers.location, 'http://127.0.0.1:8080/#/');
+    assert.equal(response.headers.location, 'http://127.0.0.1:8080/?oauthConnectionId=connection-2&oauthProvider=google-calendar#/');
     assert.equal(created, true);
+  } finally {
+    await app.close();
+  }
+});
+
+test('GET /api/v1/connections/google-calendar/oauth/callback saves the connection without resolving the current request user', async function () {
+  const app = Fastify();
+  let created = false;
+
+  await registerConnectionRoutes(app, {
+    defaultUserService: {
+      async getDefaultUser() {
+        throw new Error('callback should rely on OAuth state');
+      }
+    },
+    connectionService: {
+      async listForTenant() {
+        throw new Error('not used');
+      },
+      async create(input) {
+        created = true;
+        assert.equal(input.tenantId, 'tenant-1');
+        assert.equal(input.type, 'google-calendar');
+        assert.equal(input.credentials.refreshToken, 'refresh-token');
+
+        return {
+          id: 'connection-2',
+          type: 'google-calendar',
+          name: 'Primary Calendar',
+          status: 'ACTIVE',
+          authType: 'OAUTH',
+          config: {
+            calendarId: 'primary@example.com'
+          },
+          createdAt: '2026-03-19T08:00:00.000Z',
+          updatedAt: '2026-03-19T08:00:00.000Z'
+        };
+      },
+      async update() {
+        throw new Error('not used');
+      }
+    },
+    googleCalendarOAuthClient: {
+      ...createGoogleCalendarOAuthClientStub(),
+      verifyState() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          returnTo: 'https://briefing.ralfepoisson.com/#/',
+          issuedAt: Date.now()
+        };
+      },
+      async exchangeAuthorizationCode() {
+        return {
+          accessToken: 'access-token',
+          refreshToken: 'refresh-token',
+          expiresAt: '2026-03-20T10:00:00.000Z',
+          scope: 'https://www.googleapis.com/auth/calendar.readonly',
+          tokenType: 'Bearer'
+        };
+      },
+      async getPrimaryCalendar() {
+        return {
+          calendarId: 'primary@example.com',
+          accountEmail: 'primary@example.com',
+          accountLabel: 'Primary Calendar',
+          timezone: 'Europe/Paris'
+        };
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/connections/google-calendar/oauth/callback?code=auth-code&state=signed-state'
+    });
+
+    assert.equal(response.statusCode, 302);
+    assert.equal(response.headers.location, 'https://briefing.ralfepoisson.com/?oauthConnectionId=connection-2&oauthProvider=google-calendar#/');
+    assert.equal(created, true);
+  } finally {
+    await app.close();
+  }
+});
+
+test('GET /api/v1/connections/google-calendar/oauth/callback updates an existing connection from OAuth state', async function () {
+  const app = Fastify();
+  let updated = false;
+
+  await registerConnectionRoutes(app, {
+    defaultUserService: {
+      async getDefaultUser() {
+        throw new Error('callback should rely on OAuth state');
+      }
+    },
+    connectionService: {
+      async listForTenant() {
+        throw new Error('not used');
+      },
+      async create() {
+        throw new Error('not used');
+      },
+      async update(input) {
+        updated = true;
+        assert.equal(input.tenantId, 'tenant-1');
+        assert.equal(input.connectionId, 'connection-42');
+        assert.equal(input.name, 'Work Calendar');
+        assert.equal(input.credentials.refreshToken, 'refresh-token');
+        assert.equal(input.credentials.calendarId, 'work@example.com');
+
+        return {
+          id: 'connection-42',
+          type: 'google-calendar',
+          name: 'Work Calendar',
+          status: 'ACTIVE',
+          authType: 'OAUTH',
+          config: {
+            calendarId: 'work@example.com'
+          },
+          createdAt: '2026-03-19T08:00:00.000Z',
+          updatedAt: '2026-03-20T08:00:00.000Z'
+        };
+      }
+    },
+    googleCalendarOAuthClient: {
+      ...createGoogleCalendarOAuthClientStub(),
+      verifyState() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          connectionId: 'connection-42',
+          returnTo: 'https://briefing.ralfepoisson.com/#/connectors',
+          issuedAt: Date.now()
+        };
+      },
+      async exchangeAuthorizationCode() {
+        return {
+          accessToken: 'access-token',
+          refreshToken: 'refresh-token',
+          expiresAt: '2026-03-20T10:00:00.000Z',
+          scope: 'https://www.googleapis.com/auth/calendar.readonly',
+          tokenType: 'Bearer'
+        };
+      },
+      async getPrimaryCalendar() {
+        return {
+          calendarId: 'work@example.com',
+          accountEmail: 'work@example.com',
+          accountLabel: 'Work Calendar',
+          timezone: 'Europe/Paris'
+        };
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/connections/google-calendar/oauth/callback?code=auth-code&state=signed-state'
+    });
+
+    assert.equal(response.statusCode, 302);
+    assert.equal(response.headers.location, 'https://briefing.ralfepoisson.com/?oauthConnectionId=connection-42&oauthProvider=google-calendar#/connectors');
+    assert.equal(updated, true);
+  } finally {
+    await app.close();
+  }
+});
+
+test('GET /api/v1/connections/google-calendar/oauth/callback redirects back safely when state verification fails', async function () {
+  const app = Fastify();
+  let createCalls = 0;
+  let updateCalls = 0;
+
+  await registerConnectionRoutes(app, {
+    defaultUserService: {
+      async getDefaultUser() {
+        throw new Error('not used');
+      }
+    },
+    connectionService: {
+      async listForTenant() {
+        throw new Error('not used');
+      },
+      async create() {
+        createCalls += 1;
+        throw new Error('not used');
+      },
+      async update() {
+        updateCalls += 1;
+        throw new Error('not used');
+      }
+    },
+    googleCalendarOAuthClient: {
+      ...createGoogleCalendarOAuthClientStub(),
+      verifyState() {
+        throw new Error('Google OAuth state is invalid.');
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/connections/google-calendar/oauth/callback?code=auth-code&state=bad-state'
+    });
+
+    assert.equal(response.statusCode, 302);
+    assert.equal(response.headers.location, 'http://127.0.0.1:8080/#/');
+    assert.equal(createCalls, 0);
+    assert.equal(updateCalls, 0);
   } finally {
     await app.close();
   }

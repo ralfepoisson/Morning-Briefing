@@ -39,6 +39,7 @@ export class PrismaConnectionRepository implements ConnectionRepository {
     const connector = await this.prisma.connector.create({
       data: {
         tenantId: input.tenantId,
+        ownerUserId: typeof input.ownerUserId === 'string' && input.ownerUserId.trim() ? input.ownerUserId.trim() : undefined,
         connectorType: input.type,
         name: buildConnectionName(input.type),
         status: 'ACTIVE',
@@ -62,6 +63,7 @@ export class PrismaConnectionRepository implements ConnectionRepository {
         id: input.connectionId
       },
       data: {
+        ownerUserId: typeof input.ownerUserId === 'string' && input.ownerUserId.trim() ? input.ownerUserId.trim() : undefined,
         name: typeof input.name === 'string' ? input.name.trim() : undefined,
         authType: input.credentials ? getConnectionAuthType(existingConnector.connectorType, input.credentials) : undefined,
         configJson: input.credentials ? normalizeConfig(input.credentials) : undefined,
@@ -76,6 +78,7 @@ export class PrismaConnectionRepository implements ConnectionRepository {
 function mapConnectionRecord(connector: {
   id: string;
   tenantId: string;
+  ownerUserId: string | null;
   connectorType: string;
   name: string;
   status: 'ACTIVE' | 'DISABLED' | 'ERROR';
@@ -90,6 +93,7 @@ function mapConnectionRecord(connector: {
   return {
     id: connector.id,
     tenantId: connector.tenantId,
+    ownerUserId: connector.ownerUserId,
     type: connector.connectorType,
     name: connector.name,
     status: connector.status,

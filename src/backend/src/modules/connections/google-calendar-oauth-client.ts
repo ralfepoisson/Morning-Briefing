@@ -225,8 +225,8 @@ export class GoogleCalendarOAuthClient {
 export function getGoogleCalendarOAuthClientFromEnvironment(): GoogleCalendarOAuthClient {
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
   const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
-  const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || '';
-  const frontendBaseUrl = process.env.FRONTEND_BASE_URL || 'http://127.0.0.1:8080/';
+  const frontendBaseUrl = process.env.FRONTEND_BASE_URL || getDefaultFrontendBaseUrl();
+  const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || getDefaultGoogleOAuthRedirectUri();
   const stateSecret = process.env.GOOGLE_OAUTH_STATE_SECRET || clientSecret;
 
   if (!clientId || !clientSecret || !redirectUri || !stateSecret) {
@@ -240,4 +240,20 @@ export function getGoogleCalendarOAuthClientFromEnvironment(): GoogleCalendarOAu
     frontendBaseUrl,
     stateSecret
   });
+}
+
+export function getDefaultFrontendBaseUrl(): string {
+  return process.env.NODE_ENV === 'production'
+    ? 'https://briefing.ralfepoisson.com/'
+    : 'http://127.0.0.1:8080/';
+}
+
+export function getDefaultGoogleOAuthRedirectUri(frontendBaseUrl?: string): string {
+  const baseUrl = frontendBaseUrl || (
+    process.env.NODE_ENV === 'production'
+      ? 'https://briefing.ralfepoisson.com/'
+      : 'http://127.0.0.1:3000/'
+  );
+
+  return new URL('/api/v1/connections/google-calendar/oauth/callback', baseUrl).toString();
 }

@@ -124,6 +124,7 @@ model AppUser {
   updatedAt    DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
   tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   dashboards   Dashboard[]
+  ownedConnectors Connector[]      @relation("ConnectorOwner")
   snapshots    BriefingSnapshot[]
 
   @@unique([tenantId, email])
@@ -214,6 +215,7 @@ model ReferenceCity {
 model Connector {
   id          String            @id @default(uuid()) @db.Uuid
   tenantId    String            @map("tenant_id") @db.Uuid
+  ownerUserId String?           @map("owner_user_id") @db.Uuid
   connectorType String          @map("connector_type")
   name        String
   status      ConnectorStatus   @default(ACTIVE)
@@ -225,9 +227,11 @@ model Connector {
   createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
   tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  owner       AppUser?          @relation("ConnectorOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   widgets     WidgetConnector[]
 
   @@index([tenantId])
+  @@index([ownerUserId])
   @@map("connectors")
 }
 

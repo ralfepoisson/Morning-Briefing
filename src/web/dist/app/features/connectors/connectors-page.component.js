@@ -126,7 +126,9 @@
         return;
       }
 
-      ConnectionService.startGoogleCalendarOAuth($window.location.href, $ctrl.selectedConnection.id);
+      ConnectionService.startGoogleCalendarOAuth($window.location.href, $ctrl.selectedConnection.id).catch(function handleReconnectError(error) {
+        NotificationService.error(getErrorMessage(error, 'Unable to start Google Calendar reconnection right now.'), 'Unable to reconnect Google Calendar');
+      });
     };
 
     $ctrl.save = function save() {

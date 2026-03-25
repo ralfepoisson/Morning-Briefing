@@ -15,7 +15,7 @@
       elementName: 'weather-widget',
       cardClass: 'widget-card--weather',
       defaultSize: {
-        width: 320,
+        width: 360,
         height: 360
       },
       resizable: {
@@ -35,7 +35,7 @@
           title: options.title || 'Weather Outlook',
           x: options.x,
           y: options.y,
-          width: options.width || 320,
+          width: options.width || 360,
           height: options.height || 360,
           config: config,
           data: {

@@ -179,10 +179,11 @@
     controller: DashboardPageController
   });
 
-  DashboardPageController.$inject = ['DashboardService', 'DashboardSnapshotService', 'ConnectionService', 'WidgetService', 'WidgetRegistryService', 'ReferenceDataService', 'UiShellService', 'NotificationService', '$scope', '$window'];
+  DashboardPageController.$inject = ['DashboardService', 'DashboardSnapshotService', 'ConnectionService', 'WidgetService', 'WidgetRegistryService', 'ReferenceDataService', 'UiShellService', 'NotificationService', '$scope', '$window', '$q'];
 
-  function DashboardPageController(DashboardService, DashboardSnapshotService, ConnectionService, WidgetService, WidgetRegistryService, ReferenceDataService, UiShellService, NotificationService, $scope, $window) {
+  function DashboardPageController(DashboardService, DashboardSnapshotService, ConnectionService, WidgetService, WidgetRegistryService, ReferenceDataService, UiShellService, NotificationService, $scope, $window, $q) {
     var $ctrl = this;
+    var pendingWidgetOAuthResult = readPendingWidgetOAuthResult();
 
     $ctrl.ready = false;
     $ctrl.isEditing = false;
@@ -198,7 +199,9 @@
       bindUiWatchers();
       DashboardService.load().then(function handleDashboardLoad() {
         $ctrl.ready = true;
-        return syncState();
+        return syncState().then(function handleInitialSync() {
+          return restoreWidgetOAuthFlowIfPresent();
+        });
       }).catch(function handleDashboardLoadError(error) {
         NotificationService.error(getErrorMessage(error, 'Unable to load dashboards right now.'), 'Unable to load dashboard');
       }).finally(function markReady() {
@@ -471,7 +474,18 @@
     };
 
     $ctrl.startGoogleCalendarOAuth = function startGoogleCalendarOAuth() {
-      ConnectionService.startGoogleCalendarOAuth($window.location.href);
+      if ($ctrl.widgetConfig.widget) {
+        ConnectionService.saveWidgetOAuthContext({
+          dashboardId: $ctrl.activeDashboard ? $ctrl.activeDashboard.id : '',
+          widgetId: $ctrl.widgetConfig.widget.id,
+          widgetType: $ctrl.widgetConfig.widget.type
+        });
+      }
+
+      ConnectionService.startGoogleCalendarOAuth($window.location.href).catch(function handleGoogleOAuthStartError(error) {
+        ConnectionService.saveWidgetOAuthContext(null);
+        NotificationService.error(getErrorMessage(error, 'Unable to start Google Calendar connection right now.'), 'Unable to start Google connection');
+      });
     };
 
     $ctrl.addWidget = function addWidget(type) {
@@ -669,6 +683,88 @@
         baseUrl: nextProvider === 'openai' ? 'https://api.openai.com' : '',
         isSaving: false
       };
+    }
+
+    function restoreWidgetOAuthFlowIfPresent() {
+      var context = ConnectionService.consumeWidgetOAuthContext();
+      var resumedWidget;
+
+      if (!pendingWidgetOAuthResult || !pendingWidgetOAuthResult.connectionId || pendingWidgetOAuthResult.provider !== 'google-calendar') {
+        return $q.resolve();
+      }
+
+      clearPendingWidgetOAuthResultFromUrl();
+
+      if (!context || !context.widgetId || !context.dashboardId || context.dashboardId !== ($ctrl.activeDashboard && $ctrl.activeDashboard.id)) {
+        return $q.resolve();
+      }
+
+      resumedWidget = ($ctrl.widgets || []).find(function findWidget(widget) {
+        return widget.id === context.widgetId;
+      });
+
+      if (!resumedWidget || !widgetSupportsConnections(context.widgetType || resumedWidget.type)) {
+        return $q.resolve();
+      }
+
+      $ctrl.isEditing = true;
+
+      return ConnectionService.list(getConnectionProviderForWidgetType(resumedWidget.type)).then(function handleConnections(connections) {
+        var selectedConnection = (connections || []).find(function findConnection(connection) {
+          return connection.id === pendingWidgetOAuthResult.connectionId;
+        });
+
+        if (!selectedConnection) {
+          NotificationService.error('The Google Calendar connection was created, but it could not be loaded into the widget automatically.', 'Connection restore failed');
+          return;
+        }
+
+        resumedWidget.config = resumedWidget.config || {};
+        applyConnectionWidgetPreview(resumedWidget, selectedConnection);
+        $ctrl.widgets = WidgetService.listForDashboard($ctrl.activeDashboard.id);
+        NotificationService.success('Google Calendar connected and staged on the widget. Click Save Dashboard to persist it.', 'Connection added');
+      }).catch(function handleRestoreOAuthWidgetError(error) {
+        NotificationService.error(getErrorMessage(error, 'The Google Calendar connection was created, but it could not be staged on the widget automatically.'), 'Connection restore failed');
+      });
+    }
+
+    function readPendingWidgetOAuthResult() {
+      var currentUrl;
+      var connectionId;
+      var provider;
+
+      try {
+        currentUrl = new URL($window.location.href);
+      } catch (error) {
+        return null;
+      }
+
+      connectionId = currentUrl.searchParams.get('oauthConnectionId');
+      provider = currentUrl.searchParams.get('oauthProvider');
+
+      if (!connectionId || !provider) {
+        return null;
+      }
+
+      return {
+        connectionId: connectionId,
+        provider: provider
+      };
+    }
+
+    function clearPendingWidgetOAuthResultFromUrl() {
+      var currentUrl;
+
+      try {
+        currentUrl = new URL($window.location.href);
+      } catch (error) {
+        return;
+      }
+
+      currentUrl.searchParams.delete('oauthConnectionId');
+      currentUrl.searchParams.delete('oauthProvider');
+      $window.history.replaceState({}, '', currentUrl.toString());
+      pendingWidgetOAuthResult = null;
     }
 
     function applyWeatherWidgetPreview(widget) {

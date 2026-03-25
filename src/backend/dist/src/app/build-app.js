@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import { registerAdminConnectorRoutes } from '../modules/admin/connector-routes.js';
 import { assertAuthenticatedRequest } from '../modules/default-user/default-user-service.js';
 import { registerLogRoutes } from '../modules/admin/log-routes.js';
 import { registerMessageBrokerRoutes } from '../modules/admin/message-broker-routes.js';
@@ -46,6 +47,7 @@ export async function buildApp() {
     await registerConnectionRoutes(app);
     await registerLogRoutes(app);
     await registerMessageBrokerRoutes(app);
+    await registerAdminConnectorRoutes(app);
     await registerAdminWidgetRoutes(app);
     await registerReferenceCityRoutes(app);
     await registerRssFeedRoutes(app);
@@ -59,6 +61,5 @@ function isProtectedApiRoute(url) {
     if (!pathname.startsWith('/api/v1')) {
         return false;
     }
-    return pathname !== '/api/v1/connections/google-calendar/oauth/start' &&
-        pathname !== '/api/v1/connections/google-calendar/oauth/callback';
+    return pathname !== '/api/v1/connections/google-calendar/oauth/callback';
 }

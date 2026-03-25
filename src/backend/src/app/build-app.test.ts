@@ -69,3 +69,25 @@ test('protected api routes allow CORS preflight requests without an authorizatio
     await app.close();
   }
 });
+
+test('connection preflight requests allow authorization and content-type headers', async function () {
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/v1/connections',
+      headers: {
+        origin: 'http://127.0.0.1:8080',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'authorization,content-type'
+      }
+    });
+
+    assert.equal(response.statusCode, 204);
+    assert.equal(response.headers['access-control-allow-origin'], 'http://127.0.0.1:8080');
+    assert.equal(response.headers['access-control-allow-headers'], 'Authorization, Content-Type');
+  } finally {
+    await app.close();
+  }
+});

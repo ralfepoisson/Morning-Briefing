@@ -65,8 +65,8 @@ const widgetDefinitions: WidgetDefinition[] = [
     name: 'Weather',
     title: 'Weather Outlook',
     description: 'Mocked daily forecast',
-    defaultSize: { width: 320, height: 360 },
-    minSize: { width: 320, height: 360 },
+    defaultSize: { width: 360, height: 360 },
+    minSize: { width: 360, height: 360 },
     refreshMode: 'SNAPSHOT',
     createDefaultConfig: function createDefaultConfig() {
       return {};
