@@ -179,10 +179,11 @@
     controller: DashboardPageController
   });
 
-  DashboardPageController.$inject = ['DashboardService', 'DashboardSnapshotService', 'ConnectionService', 'WidgetService', 'WidgetRegistryService', 'ReferenceDataService', 'UiShellService', 'NotificationService', '$scope', '$window', '$q'];
+  DashboardPageController.$inject = ['DashboardService', 'DashboardSnapshotService', 'ConnectionService', 'WidgetService', 'WidgetRegistryService', 'ReferenceDataService', 'UiShellService', 'NotificationService', '$scope', '$window', '$q', '$location'];
 
-  function DashboardPageController(DashboardService, DashboardSnapshotService, ConnectionService, WidgetService, WidgetRegistryService, ReferenceDataService, UiShellService, NotificationService, $scope, $window, $q) {
+  function DashboardPageController(DashboardService, DashboardSnapshotService, ConnectionService, WidgetService, WidgetRegistryService, ReferenceDataService, UiShellService, NotificationService, $scope, $window, $q, $location) {
     var $ctrl = this;
+    var hasCompletedInitialStateLoad = false;
     var pendingWidgetOAuthResult = readPendingWidgetOAuthResult();
 
     $ctrl.ready = false;
@@ -205,6 +206,7 @@
       }).catch(function handleDashboardLoadError(error) {
         NotificationService.error(getErrorMessage(error, 'Unable to load dashboards right now.'), 'Unable to load dashboard');
       }).finally(function markReady() {
+        hasCompletedInitialStateLoad = true;
         $ctrl.ready = true;
       });
     };
@@ -615,6 +617,10 @@
           return DashboardService.getActiveId();
         },
         function handleActiveDashboardIdChange() {
+          if (!hasCompletedInitialStateLoad) {
+            return;
+          }
+
           syncState();
         }
       );
@@ -686,8 +692,7 @@
     }
 
     function restoreWidgetOAuthFlowIfPresent() {
-      var context = ConnectionService.consumeWidgetOAuthContext();
-      var resumedWidget;
+      var context = ConnectionService.getWidgetOAuthContext();
 
       if (!pendingWidgetOAuthResult || !pendingWidgetOAuthResult.connectionId || pendingWidgetOAuthResult.provider !== 'google-calendar') {
         return $q.resolve();
@@ -696,10 +701,11 @@
       clearPendingWidgetOAuthResultFromUrl();
 
       if (!context || !context.widgetId || !context.dashboardId || context.dashboardId !== ($ctrl.activeDashboard && $ctrl.activeDashboard.id)) {
+        ConnectionService.clearWidgetOAuthContext();
         return $q.resolve();
       }
 
-      resumedWidget = ($ctrl.widgets || []).find(function findWidget(widget) {
+      var resumedWidget = ($ctrl.widgets || []).find(function findWidget(widget) {
         return widget.id === context.widgetId;
       });
 
@@ -710,37 +716,43 @@
       $ctrl.isEditing = true;
 
       return ConnectionService.list(getConnectionProviderForWidgetType(resumedWidget.type)).then(function handleConnections(connections) {
+        var currentWidgets = WidgetService.listForDashboard(context.dashboardId);
+        var currentWidget = (currentWidgets || []).find(function findCurrentWidget(widget) {
+          return widget.id === context.widgetId;
+        });
         var selectedConnection = (connections || []).find(function findConnection(connection) {
           return connection.id === pendingWidgetOAuthResult.connectionId;
         });
 
         if (!selectedConnection) {
+          ConnectionService.clearWidgetOAuthContext();
           NotificationService.error('The Google Calendar connection was created, but it could not be loaded into the widget automatically.', 'Connection restore failed');
           return;
         }
 
-        resumedWidget.config = resumedWidget.config || {};
-        applyConnectionWidgetPreview(resumedWidget, selectedConnection);
-        $ctrl.widgets = WidgetService.listForDashboard($ctrl.activeDashboard.id);
+        if (!currentWidget) {
+          ConnectionService.clearWidgetOAuthContext();
+          NotificationService.error('The Google Calendar connection was created, but the calendar widget could not be found to stage it automatically.', 'Connection restore failed');
+          return;
+        }
+
+        currentWidget.config = currentWidget.config || {};
+        applyConnectionWidgetPreview(currentWidget, selectedConnection);
+        $ctrl.widgets = currentWidgets;
+        ConnectionService.clearWidgetOAuthContext();
         NotificationService.success('Google Calendar connected and staged on the widget. Click Save Dashboard to persist it.', 'Connection added');
       }).catch(function handleRestoreOAuthWidgetError(error) {
+        ConnectionService.clearWidgetOAuthContext();
         NotificationService.error(getErrorMessage(error, 'The Google Calendar connection was created, but it could not be staged on the widget automatically.'), 'Connection restore failed');
       });
     }
 
     function readPendingWidgetOAuthResult() {
-      var currentUrl;
       var connectionId;
       var provider;
 
-      try {
-        currentUrl = new URL($window.location.href);
-      } catch (error) {
-        return null;
-      }
-
-      connectionId = currentUrl.searchParams.get('oauthConnectionId');
-      provider = currentUrl.searchParams.get('oauthProvider');
+      connectionId = $location.search().oauthConnectionId;
+      provider = $location.search().oauthProvider;
 
       if (!connectionId || !provider) {
         return null;
@@ -754,15 +766,33 @@
 
     function clearPendingWidgetOAuthResultFromUrl() {
       var currentUrl;
+      var hash;
+      var queryIndex;
+      var hashPath;
+      var hashQuery;
 
       try {
         currentUrl = new URL($window.location.href);
       } catch (error) {
+        pendingWidgetOAuthResult = null;
         return;
       }
 
-      currentUrl.searchParams.delete('oauthConnectionId');
-      currentUrl.searchParams.delete('oauthProvider');
+      hash = ($window.location.hash || '').replace(/^#/, '');
+      queryIndex = hash.indexOf('?');
+
+      if (queryIndex === -1) {
+        pendingWidgetOAuthResult = null;
+        return;
+      }
+
+      hashPath = hash.slice(0, queryIndex);
+      hashQuery = new URLSearchParams(hash.slice(queryIndex + 1));
+      hashQuery.delete('oauthConnectionId');
+      hashQuery.delete('oauthProvider');
+      currentUrl.hash = hashQuery.toString()
+        ? '#' + hashPath + '?' + hashQuery.toString()
+        : '#' + hashPath;
       $window.history.replaceState({}, '', currentUrl.toString());
       pendingWidgetOAuthResult = null;
     }

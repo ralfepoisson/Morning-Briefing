@@ -311,7 +311,7 @@ test('GET /api/v1/connections/google-calendar/oauth/callback creates a connectio
     });
 
     assert.equal(response.statusCode, 302);
-    assert.equal(response.headers.location, 'http://127.0.0.1:8080/?oauthConnectionId=connection-2&oauthProvider=google-calendar#/');
+    assert.equal(response.headers.location, 'http://127.0.0.1:8080/#/?oauthConnectionId=connection-2&oauthProvider=google-calendar');
     assert.equal(created, true);
   } finally {
     await app.close();
@@ -392,7 +392,7 @@ test('GET /api/v1/connections/google-calendar/oauth/callback saves the connectio
     });
 
     assert.equal(response.statusCode, 302);
-    assert.equal(response.headers.location, 'https://briefing.ralfepoisson.com/?oauthConnectionId=connection-2&oauthProvider=google-calendar#/');
+    assert.equal(response.headers.location, 'https://briefing.ralfepoisson.com/#/?oauthConnectionId=connection-2&oauthProvider=google-calendar');
     assert.equal(created, true);
   } finally {
     await app.close();
@@ -476,7 +476,7 @@ test('GET /api/v1/connections/google-calendar/oauth/callback updates an existing
     });
 
     assert.equal(response.statusCode, 302);
-    assert.equal(response.headers.location, 'https://briefing.ralfepoisson.com/?oauthConnectionId=connection-42&oauthProvider=google-calendar#/connectors');
+    assert.equal(response.headers.location, 'https://briefing.ralfepoisson.com/#/connectors?oauthConnectionId=connection-42&oauthProvider=google-calendar');
     assert.equal(updated, true);
   } finally {
     await app.close();

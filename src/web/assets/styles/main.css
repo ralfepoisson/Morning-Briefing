@@ -794,6 +794,17 @@ body.theme-light::before {
   min-height: 520px;
 }
 
+.rss-feeds-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.rss-feeds-category-add {
+  flex-shrink: 0;
+}
+
 .connectors-panel-header {
   margin-bottom: 0.8rem;
 }
@@ -950,6 +961,31 @@ body.theme-light .connectors-panel-copy--error {
 
 .rss-feed-category-item {
   margin-top: 0.55rem;
+}
+
+.rss-feed-category-card {
+  position: relative;
+  margin-top: 0.55rem;
+  padding-top: 1.25rem;
+  cursor: pointer;
+}
+
+.rss-feed-category-card__header {
+  padding-left: 2rem;
+}
+
+.rss-feed-category-settings {
+  position: absolute;
+  top: 0.85rem;
+  left: 0.85rem;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+}
+
+.rss-feed-category-settings:hover,
+.rss-feed-category-settings:focus {
+  background: var(--chip);
 }
 
 .rss-feed-count-badge {

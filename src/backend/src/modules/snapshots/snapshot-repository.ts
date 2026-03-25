@@ -32,6 +32,17 @@ export type UpsertWidgetSnapshotInput = {
   widgetSnapshot: DashboardSnapshotWidgetRecord;
 };
 
+export type PersistedNewsArticleRecord = {
+  articleKey: string;
+  categoryName: string;
+  categoryDescription: string;
+  title: string;
+  url: string;
+  summary: string;
+  sourceName: string;
+  publishedAt: string | null;
+};
+
 export interface SnapshotRepository {
   findDashboardWithWidgets(dashboardId: string, ownerUserId: string): Promise<SnapshotDashboardRecord | null>;
   findLatestDashboardSnapshot(dashboardId: string, userId: string): Promise<DashboardSnapshotRecord | null>;
@@ -43,4 +54,7 @@ export interface SnapshotRepository {
   skipSnapshotJob(idempotencyKey: string, reason: string): Promise<void>;
   failSnapshotJob(idempotencyKey: string, reason: string): Promise<void>;
   upsertWidgetSnapshot(input: UpsertWidgetSnapshotInput): Promise<void>;
+  listNewsArticleSelections(widgetId: string, snapshotDate: string): Promise<PersistedNewsArticleRecord[]>;
+  listPriorNewsArticleKeys(widgetId: string, snapshotDate: string): Promise<string[]>;
+  replaceNewsArticleSelections(widget: DashboardWidgetRecord, snapshotDate: string, items: PersistedNewsArticleRecord[]): Promise<void>;
 }

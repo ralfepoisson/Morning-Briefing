@@ -1,0 +1,45 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - navigation [ref=e3]:
+    - generic [ref=e4]:
+      - link "Morning Briefing logo" [ref=e5] [cursor=pointer]:
+        - /url: "#/"
+        - img "Morning Briefing logo" [ref=e6]
+      - generic [ref=e7]:
+        - button "Dashboards Ralfe's Morning Briefing" [ref=e9] [cursor=pointer]:
+          - generic [ref=e10]: Dashboards
+          - generic [ref=e11]: Ralfe's Morning Briefing
+        - link "Connectors" [ref=e13] [cursor=pointer]:
+          - /url: "#/connectors"
+        - link "RSS Feeds" [ref=e14] [cursor=pointer]:
+          - /url: "#/rss-feeds"
+        - button "Admin" [ref=e16] [cursor=pointer]:
+          - generic [ref=e17]: Admin
+        - group "Theme switcher" [ref=e19]:
+          - button "Light" [ref=e20] [cursor=pointer]
+          - button "Dark" [ref=e21] [cursor=pointer]
+        - generic [ref=e22]:
+          - generic [ref=e23]: ralfepoisson@gmail.com
+          - button "Sign out" [ref=e24] [cursor=pointer]
+  - main [ref=e25]:
+    - generic [ref=e29]:
+      - generic [ref=e31]:
+        - generic [ref=e32]:
+          - generic [ref=e33]: Dashboard
+          - heading "Ralfe's Morning Briefing" [level=1] [ref=e34]
+          - paragraph [ref=e35]: Primary dashboard
+        - button "Edit Dashboard" [ref=e37] [cursor=pointer]
+      - article [ref=e39]:
+        - button "Refresh widget snapshot"
+        - generic [ref=e41]:
+          - generic [ref=e42]: Calendar widget
+          - heading "Today on Calendar" [level=3] [ref=e43]
+        - generic [ref=e46]:
+          - generic [ref=e47]:
+            - text: "Connection:"
+            - strong [ref=e48]: Not connected
+          - generic [ref=e49]: Today
+          - paragraph [ref=e50]: Choose a Google Calendar connection in edit mode to configure this widget.
+```

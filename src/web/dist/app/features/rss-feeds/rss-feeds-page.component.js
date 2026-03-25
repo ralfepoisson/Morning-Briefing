@@ -19,32 +19,28 @@
       '    <aside class="connectors-list-panel rss-feeds-categories-panel">' +
       '      <div class="connectors-panel-header">' +
       '        <div class="eyebrow">Categories</div>' +
-      '        <h2 class="connectors-panel-title">Feed groups</h2>' +
-      '      </div>' +
-      '      <p class="connectors-panel-copy">Create categories that match how you want the News widget grouped.</p>' +
-      '      <form class="rss-feeds-form" ng-submit="$ctrl.saveCategory()" novalidate>' +
-      '        <label class="form-label" for="rssCategoryName">Category name</label>' +
-      '        <input id="rssCategoryName" class="form-control" type="text" ng-model="$ctrl.categoryForm.name" placeholder="Technology" required />' +
-      '        <label class="form-label mt-3" for="rssCategoryDescription">Description</label>' +
-      '        <textarea id="rssCategoryDescription" class="form-control rss-feeds-textarea" ng-model="$ctrl.categoryForm.description" placeholder="What kind of stories belong here?"></textarea>' +
-      '        <p class="connectors-panel-copy" ng-if="$ctrl.isLoading">Loading categories...</p>' +
-      '        <div class="modal-actions modal-actions--page rss-feeds-actions">' +
-      '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.startNewCategory()">New category</button>' +
-      '          <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.isSavingCategory || !$ctrl.categoryForm.name">{{$ctrl.categoryForm.id ? "Save category" : "Add category"}}</button>' +
+      '        <div class="rss-feeds-category-header">' +
+      '          <h2 class="connectors-panel-title">Feed groups</h2>' +
+      '          <button type="button" class="btn btn-primary rss-feeds-category-add" ng-click="$ctrl.openCreateCategoryModal()">+ Category</button>' +
       '        </div>' +
-      '      </form>' +
+      '      </div>' +
+      '        <p class="connectors-panel-copy" ng-if="$ctrl.isLoading">Loading categories...</p>' +
+      '      <p class="connectors-panel-copy">Create categories that match how you want the News widget grouped, then pick one to manage its feeds.</p>' +
       '      <div class="connectors-empty-state" ng-if="!$ctrl.isLoading && !$ctrl.categories.length">' +
       '        <strong>No categories yet</strong>' +
       '        <span>Create your first category to start collecting RSS feeds for the News widget.</span>' +
       '      </div>' +
       '      <div class="rss-feed-category-list">' +
-      '        <button type="button" class="connector-list-item rss-feed-category-item" ng-repeat="category in $ctrl.categories track by category.id" ng-class="{\'connector-list-item--active\': $ctrl.isSelectedCategory(category)}" ng-click="$ctrl.selectCategory(category)">' +
-      '          <div class="connector-list-item__header">' +
+      '        <article class="connector-list-item rss-feed-category-card" ng-repeat="category in $ctrl.categories track by category.id" ng-class="{\'connector-list-item--active\': $ctrl.isSelectedCategory(category)}" ng-click="$ctrl.selectCategory(category)">' +
+      '          <button type="button" class="btn btn-outline-light icon-button rss-feed-category-settings" ng-click="$ctrl.openEditCategoryModal(category, $event)" aria-label="Edit category">' +
+      '            <i class="fa-solid fa-gear" aria-hidden="true"></i>' +
+      '          </button>' +
+      '          <div class="connector-list-item__header rss-feed-category-card__header">' +
       '            <strong>{{category.name}}</strong>' +
       '            <span class="rss-feed-count-badge">{{category.feeds.length}}</span>' +
       '          </div>' +
       '          <span class="connector-list-item__meta">{{category.description || "No description yet"}}</span>' +
-      '        </button>' +
+      '        </article>' +
       '      </div>' +
       '    </aside>' +
       '    <section class="connectors-detail-panel rss-feeds-detail-panel">' +
@@ -54,7 +50,7 @@
       '      </div>' +
       '      <div class="connectors-empty-state connectors-empty-state--detail" ng-if="!$ctrl.selectedCategory">' +
       '        <strong>Choose a category first</strong>' +
-      '        <span>Add one on the left or select an existing category to start collecting feeds.</span>' +
+      '        <span>Create a category or select an existing one to start collecting feeds.</span>' +
       '      </div>' +
       '      <div ng-if="$ctrl.selectedCategory">' +
       '        <p class="connectors-panel-copy">{{$ctrl.selectedCategory.description || "This category does not have a description yet."}}</p>' +
@@ -72,7 +68,6 @@
       '          <div class="modal-actions modal-actions--page rss-feeds-actions">' +
       '            <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.clearFeedForm()">Clear</button>' +
       '            <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.isSavingFeed || !$ctrl.feedForm.name || !$ctrl.feedForm.url">Add feed</button>' +
-      '            <button type="button" class="btn btn-outline-danger" ng-click="$ctrl.deleteSelectedCategory()" ng-disabled="$ctrl.isDeletingCategory || !$ctrl.selectedCategory">Delete category</button>' +
       '          </div>' +
       '        </form>' +
       '        <div class="rss-feed-list" ng-if="$ctrl.selectedCategory.feeds.length">' +
@@ -91,6 +86,24 @@
       '      </div>' +
       '    </section>' +
       '  </div>' +
+      '  <div class="modal-shell" ng-if="$ctrl.categoryModal.isOpen" ng-click="$ctrl.closeCategoryModal()">' +
+      '    <div class="modal-card" role="dialog" aria-modal="true" ng-click="$event.stopPropagation()">' +
+      '      <div class="eyebrow">RSS Category</div>' +
+      '      <h2 class="modal-title">{{$ctrl.categoryModal.mode === "edit" ? "Edit category" : "New category"}}</h2>' +
+      '      <p class="modal-copy">{{$ctrl.categoryModal.mode === "edit" ? "Update the category details or remove it if you no longer need it." : "Create a new category for organizing your RSS feeds."}}</p>' +
+      '      <form ng-submit="$ctrl.saveCategory()" novalidate>' +
+      '        <label class="form-label" for="rssCategoryName">Category name</label>' +
+      '        <input id="rssCategoryName" class="form-control" type="text" ng-model="$ctrl.categoryForm.name" placeholder="Technology" required />' +
+      '        <label class="form-label mt-3" for="rssCategoryDescription">Description</label>' +
+      '        <textarea id="rssCategoryDescription" class="form-control rss-feeds-textarea" ng-model="$ctrl.categoryForm.description" placeholder="What kind of stories belong here?"></textarea>' +
+      '        <div class="modal-actions">' +
+      '          <button type="button" class="btn btn-outline-danger me-auto" ng-if="$ctrl.categoryModal.mode === \'edit\'" ng-click="$ctrl.deleteCategory()" ng-disabled="$ctrl.isDeletingCategory">Delete category</button>' +
+      '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeCategoryModal()">Cancel</button>' +
+      '          <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.isSavingCategory || !$ctrl.categoryForm.name">{{$ctrl.categoryModal.mode === "edit" ? "Save category" : "Create category"}}</button>' +
+      '        </div>' +
+      '      </form>' +
+      '    </div>' +
+      '  </div>' +
       '</section>',
     controller: RssFeedsPageController
   });
@@ -103,6 +116,7 @@
     $ctrl.categories = [];
     $ctrl.selectedCategory = null;
     $ctrl.categoryForm = buildEmptyCategoryForm();
+    $ctrl.categoryModal = buildEmptyCategoryModal();
     $ctrl.feedForm = buildEmptyFeedForm();
     $ctrl.isLoading = false;
     $ctrl.isSavingCategory = false;
@@ -128,19 +142,43 @@
 
     $ctrl.selectCategory = function selectCategory(category) {
       $ctrl.selectedCategory = category;
-      $ctrl.categoryForm = {
-        id: category.id,
-        name: category.name,
-        description: category.description || ''
-      };
     };
 
     $ctrl.isSelectedCategory = function isSelectedCategory(category) {
       return !!($ctrl.selectedCategory && category && $ctrl.selectedCategory.id === category.id);
     };
 
-    $ctrl.startNewCategory = function startNewCategory() {
-      $ctrl.selectedCategory = null;
+    $ctrl.openCreateCategoryModal = function openCreateCategoryModal() {
+      $ctrl.categoryForm = buildEmptyCategoryForm();
+      $ctrl.categoryModal = {
+        isOpen: true,
+        mode: 'create'
+      };
+    };
+
+    $ctrl.openEditCategoryModal = function openEditCategoryModal(category, $event) {
+      if ($event) {
+        $event.preventDefault();
+        $event.stopPropagation();
+      }
+
+      if (!category) {
+        return;
+      }
+
+      $ctrl.categoryForm = {
+        id: category.id,
+        name: category.name,
+        description: category.description || ''
+      };
+      $ctrl.categoryModal = {
+        isOpen: true,
+        mode: 'edit'
+      };
+    };
+
+    $ctrl.closeCategoryModal = function closeCategoryModal() {
+      $ctrl.categoryModal = buildEmptyCategoryModal();
       $ctrl.categoryForm = buildEmptyCategoryForm();
     };
 
@@ -159,7 +197,7 @@
 
       request.then(function handleSaved(category) {
         NotificationService.success($ctrl.categoryForm.id ? 'Category updated.' : 'Category created.', 'RSS category saved');
-        $ctrl.categoryForm = buildEmptyCategoryForm();
+        $ctrl.closeCategoryModal();
         return $ctrl.loadCategories(category.id);
       }).catch(function handleError(error) {
         NotificationService.error(getErrorMessage(error, 'Unable to save category.'), 'Unable to save category');
@@ -203,19 +241,19 @@
       });
     };
 
-    $ctrl.deleteSelectedCategory = function deleteSelectedCategory() {
+    $ctrl.deleteCategory = function deleteCategory() {
       var currentCategoryId;
 
-      if (!$ctrl.selectedCategory) {
+      if (!$ctrl.categoryForm.id) {
         return;
       }
 
-      currentCategoryId = $ctrl.selectedCategory.id;
+      currentCategoryId = $ctrl.categoryForm.id;
       $ctrl.isDeletingCategory = true;
 
       RssFeedService.deleteCategory(currentCategoryId).then(function handleDeleted() {
         NotificationService.success('Category deleted.', 'RSS category removed');
-        $ctrl.categoryForm = buildEmptyCategoryForm();
+        $ctrl.closeCategoryModal();
         $ctrl.feedForm = buildEmptyFeedForm();
         return $ctrl.loadCategories();
       }).catch(function handleError(error) {
@@ -241,14 +279,6 @@
       }
 
       $ctrl.selectedCategory = nextSelectedCategory || ($ctrl.categories.length ? $ctrl.categories[0] : null);
-
-      if ($ctrl.selectedCategory) {
-        $ctrl.categoryForm = {
-          id: $ctrl.selectedCategory.id,
-          name: $ctrl.selectedCategory.name,
-          description: $ctrl.selectedCategory.description || ''
-        };
-      }
     }
 
   }
@@ -258,6 +288,13 @@
       id: '',
       name: '',
       description: ''
+    };
+  }
+
+  function buildEmptyCategoryModal() {
+    return {
+      isOpen: false,
+      mode: 'create'
     };
   }
 

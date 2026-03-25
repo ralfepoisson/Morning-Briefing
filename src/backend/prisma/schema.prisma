@@ -75,6 +75,7 @@ model Tenant {
   widgets     DashboardWidget[]
   connectors  Connector[]
   rssFeedCategories RssFeedCategory[]
+  newsArticleSelections NewsArticleSelection[]
   referenceCities ReferenceCity[]
   snapshots   BriefingSnapshot[]
 
@@ -183,6 +184,7 @@ model DashboardWidget {
   connectors    WidgetConnector[]
   snapshots     WidgetSnapshot[]
   snapshotJobs  SnapshotGenerationJob[]
+  newsArticleSelections NewsArticleSelection[]
 
   @@index([tenantId])
   @@index([dashboardId])
@@ -247,6 +249,30 @@ model WidgetConnector {
   @@unique([dashboardWidgetId, connectorId, usageRole])
   @@index([connectorId])
   @@map("widget_connectors")
+}
+
+model NewsArticleSelection {
+  id                String          @id @default(uuid()) @db.Uuid
+  tenantId          String          @map("tenant_id") @db.Uuid
+  dashboardWidgetId String          @map("dashboard_widget_id") @db.Uuid
+  snapshotDate      DateTime        @map("snapshot_date") @db.Date
+  articleKey        String          @map("article_key")
+  categoryName      String          @map("category_name")
+  categoryDescription String        @default("") @map("category_description")
+  title             String
+  articleUrl        String          @map("article_url")
+  summary           String          @default("")
+  sourceName        String          @default("") @map("source_name")
+  publishedAt       DateTime?       @map("published_at") @db.Timestamptz(6)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dashboardWidget   DashboardWidget @relation(fields: [dashboardWidgetId], references: [id], onDelete: Cascade)
+
+  @@unique([dashboardWidgetId, snapshotDate, articleKey])
+  @@index([dashboardWidgetId, snapshotDate])
+  @@index([dashboardWidgetId, articleKey])
+  @@map("news_article_selections")
 }
 
 model BriefingSnapshot {

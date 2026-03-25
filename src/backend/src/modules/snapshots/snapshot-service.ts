@@ -9,7 +9,7 @@ import type { WeatherClient } from './open-meteo-weather-client.js';
 import type { ParsedRssArticle, RssFeedClient } from './rss-feed-client.js';
 import type { GenerateWidgetSnapshotRequested } from './snapshot-job-types.js';
 import type { TodoistTask, TodoistTaskClient } from './todoist-task-client.js';
-import type { SnapshotRepository } from './snapshot-repository.js';
+import type { PersistedNewsArticleRecord, SnapshotRepository } from './snapshot-repository.js';
 import { XkcdClientImpl, type XkcdClient } from './xkcd-client.js';
 import type {
   DashboardSnapshotRecord,
@@ -326,6 +326,7 @@ export class SnapshotService {
   }
 
   private async buildNewsWidgetSnapshot(widget: DashboardWidgetRecord, generatedAt: Date): Promise<DashboardSnapshotWidgetRecord> {
+    const snapshotDate = formatDateKey(generatedAt);
     const categories = await this.rssFeedRepository.listCategories(widget.tenantId);
     const configuredCategories = categories.filter(function hasFeeds(category) {
       return category.feeds.length > 0;
@@ -420,65 +421,113 @@ export class SnapshotService {
     }
 
     const sourceErrors: string[] = [];
-    const preparedCategories: Array<{
+    let preparedCategories: Array<{
       name: string;
       description: string;
       articles: ParsedRssArticle[];
     }> = [];
+    const existingSelections = await this.repository.listNewsArticleSelections(widget.id, snapshotDate);
 
-    for (const category of configuredCategories) {
-      const categoryArticles: ParsedRssArticle[] = [];
+    if (existingSelections.length) {
+      preparedCategories = restorePreparedNewsCategories(existingSelections);
+      this.logSnapshotProgress('news_article_pool_reused', 'Reused persisted news article pool for snapshot date.', {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        widgetTitle: widget.title,
+        dashboardId: widget.dashboardId,
+        tenantId: widget.tenantId,
+        snapshotDate,
+        categoryCount: preparedCategories.length,
+        articleCount: existingSelections.length
+      });
+    } else {
+      const priorArticleKeys = new Set(await this.repository.listPriorNewsArticleKeys(widget.id, snapshotDate));
+      this.logSnapshotProgress('news_prior_article_keys_loaded', 'Loaded prior considered news article keys.', {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        widgetTitle: widget.title,
+        dashboardId: widget.dashboardId,
+        tenantId: widget.tenantId,
+        snapshotDate,
+        priorArticleKeyCount: priorArticleKeys.size
+      });
 
-      for (const feed of category.feeds) {
-        try {
-          const result = await this.rssFeedClient.fetchFeed(feed.url);
-          this.logSnapshotProgress('news_rss_feed_loaded', 'Loaded RSS feed items for news snapshot.', {
-            widgetId: widget.id,
-            widgetType: widget.type,
-            widgetTitle: widget.title,
-            dashboardId: widget.dashboardId,
-            tenantId: widget.tenantId,
-            categoryName: category.name,
-            feedName: feed.name,
-            feedUrl: feed.url,
-            itemCount: result.items.length
-          });
+      for (const category of configuredCategories) {
+        const categoryArticles: ParsedRssArticle[] = [];
 
-          result.items.slice(0, 4).forEach(function pushItem(item) {
-            categoryArticles.push({
-              title: item.title,
-              url: item.url,
-              summary: item.summary,
-              publishedAt: item.publishedAt,
-              sourceName: item.sourceName || feed.name
+        for (const feed of category.feeds) {
+          try {
+            const result = await this.rssFeedClient.fetchFeed(feed.url);
+            this.logSnapshotProgress('news_rss_feed_loaded', 'Loaded RSS feed items for news snapshot.', {
+              widgetId: widget.id,
+              widgetType: widget.type,
+              widgetTitle: widget.title,
+              dashboardId: widget.dashboardId,
+              tenantId: widget.tenantId,
+              categoryName: category.name,
+              feedName: feed.name,
+              feedUrl: feed.url,
+              itemCount: result.items.length
             });
-          });
-        } catch (error) {
-          const errorMessage = feed.name + ': ' + (error instanceof Error ? error.message : 'Feed request failed.');
-          sourceErrors.push(errorMessage);
-          this.logSnapshotProgress('news_rss_feed_failed', 'RSS feed could not be loaded for news snapshot.', {
-            widgetId: widget.id,
-            widgetType: widget.type,
-            widgetTitle: widget.title,
-            dashboardId: widget.dashboardId,
-            tenantId: widget.tenantId,
-            categoryName: category.name,
-            feedName: feed.name,
-            feedUrl: feed.url,
-            errorMessage
+
+            result.items.slice(0, 4).forEach(function pushItem(item) {
+              const article = {
+                title: item.title,
+                url: item.url,
+                summary: item.summary,
+                publishedAt: item.publishedAt,
+                sourceName: item.sourceName || feed.name
+              };
+
+              if (priorArticleKeys.has(buildNewsArticleKey(article))) {
+                return;
+              }
+
+              categoryArticles.push(article);
+            });
+          } catch (error) {
+            const errorMessage = feed.name + ': ' + (error instanceof Error ? error.message : 'Feed request failed.');
+            sourceErrors.push(errorMessage);
+            this.logSnapshotProgress('news_rss_feed_failed', 'RSS feed could not be loaded for news snapshot.', {
+              widgetId: widget.id,
+              widgetType: widget.type,
+              widgetTitle: widget.title,
+              dashboardId: widget.dashboardId,
+              tenantId: widget.tenantId,
+              categoryName: category.name,
+              feedName: feed.name,
+              feedUrl: feed.url,
+              errorMessage
+            });
+          }
+        }
+
+        const deduplicatedArticles = dedupeArticlesByKey(categoryArticles)
+          .sort(compareArticlesByDateDesc)
+          .slice(0, 10);
+
+        if (deduplicatedArticles.length) {
+          preparedCategories.push({
+            name: category.name,
+            description: category.description,
+            articles: deduplicatedArticles
           });
         }
       }
 
-      const deduplicatedArticles = dedupeArticlesByUrl(categoryArticles)
-        .sort(compareArticlesByDateDesc)
-        .slice(0, 10);
+      if (preparedCategories.length) {
+        const selections = flattenPreparedNewsCategories(preparedCategories);
 
-      if (deduplicatedArticles.length) {
-        preparedCategories.push({
-          name: category.name,
-          description: category.description,
-          articles: deduplicatedArticles
+        await this.repository.replaceNewsArticleSelections(widget, snapshotDate, selections);
+        this.logSnapshotProgress('news_article_pool_persisted', 'Persisted day-scoped news article pool.', {
+          widgetId: widget.id,
+          widgetType: widget.type,
+          widgetTitle: widget.title,
+          dashboardId: widget.dashboardId,
+          tenantId: widget.tenantId,
+          snapshotDate,
+          categoryCount: preparedCategories.length,
+          articleCount: selections.length
         });
       }
     }
@@ -523,7 +572,7 @@ export class SnapshotService {
         apiKey,
         model,
         baseUrl,
-        snapshotDate: formatDateKey(generatedAt),
+        snapshotDate,
         categories: preparedCategories
       });
       this.logSnapshotProgress('news_summary_completed', 'News summary generated successfully.', {
@@ -1132,11 +1181,75 @@ function addDays(date: Date, days: number): Date {
   return next;
 }
 
-function dedupeArticlesByUrl(items: ParsedRssArticle[]): ParsedRssArticle[] {
+function flattenPreparedNewsCategories(categories: Array<{
+  name: string;
+  description: string;
+  articles: ParsedRssArticle[];
+}>): PersistedNewsArticleRecord[] {
+  return categories.flatMap(function mapCategory(category) {
+    return category.articles.map(function mapArticle(article) {
+      return {
+        articleKey: buildNewsArticleKey(article),
+        categoryName: category.name,
+        categoryDescription: category.description,
+        title: article.title,
+        url: article.url,
+        summary: article.summary,
+        sourceName: article.sourceName,
+        publishedAt: article.publishedAt
+      };
+    });
+  });
+}
+
+function restorePreparedNewsCategories(items: PersistedNewsArticleRecord[]): Array<{
+  name: string;
+  description: string;
+  articles: ParsedRssArticle[];
+}> {
+  const categories = new Map<string, {
+    name: string;
+    description: string;
+    articles: ParsedRssArticle[];
+  }>();
+
+  items.forEach(function groupItem(item) {
+    const existingCategory = categories.get(item.categoryName);
+
+    if (existingCategory) {
+      existingCategory.articles.push({
+        title: item.title,
+        url: item.url,
+        summary: item.summary,
+        sourceName: item.sourceName,
+        publishedAt: item.publishedAt
+      });
+      return;
+    }
+
+    categories.set(item.categoryName, {
+      name: item.categoryName,
+      description: item.categoryDescription,
+      articles: [
+        {
+          title: item.title,
+          url: item.url,
+          summary: item.summary,
+          sourceName: item.sourceName,
+          publishedAt: item.publishedAt
+        }
+      ]
+    });
+  });
+
+  return Array.from(categories.values());
+}
+
+function dedupeArticlesByKey(items: ParsedRssArticle[]): ParsedRssArticle[] {
   const seen = new Set<string>();
 
   return items.filter(function filterItem(item) {
-    const key = item.url.trim().toLowerCase();
+    const key = buildNewsArticleKey(item);
 
     if (!key || seen.has(key)) {
       return false;
@@ -1145,6 +1258,23 @@ function dedupeArticlesByUrl(items: ParsedRssArticle[]): ParsedRssArticle[] {
     seen.add(key);
     return true;
   });
+}
+
+function buildNewsArticleKey(item: {
+  title: string;
+  url: string;
+  sourceName: string;
+  publishedAt: string | null;
+}): string {
+  if (item.url && item.url.trim()) {
+    return item.url.trim().toLowerCase();
+  }
+
+  return [
+    item.title.trim().toLowerCase(),
+    item.sourceName.trim().toLowerCase(),
+    item.publishedAt || ''
+  ].join('|');
 }
 
 function compareArticlesByDateDesc(left: ParsedRssArticle, right: ParsedRssArticle): number {

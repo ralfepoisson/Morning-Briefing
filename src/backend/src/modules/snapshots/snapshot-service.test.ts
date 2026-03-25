@@ -6,6 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SnapshotService } from './snapshot-service.js';
 import type {
+  PersistedNewsArticleRecord,
   SnapshotRepository,
   SnapshotDashboardRecord,
   UpsertDashboardSnapshotInput,
@@ -493,6 +494,163 @@ test('SnapshotService generates a news snapshot from RSS feeds and an OpenAI con
   assert.equal(snapshot && snapshot.widgets[0].status, 'READY');
   assert.equal(snapshot && snapshot.widgets[0].content.headline, 'Local AI tooling leads the morning briefing.');
   assert.equal(snapshot && snapshot.widgets[0].content.categories[0].bullets.length, 1);
+});
+
+test('SnapshotService excludes previously considered news articles from a new day', async function () {
+  const today = formatDateKey(new Date());
+  const yesterday = formatDateKey(addDays(new Date(), -1));
+  const repository = new InMemorySnapshotRepository(createNewsDashboardRecord());
+  repository.newsArticleSelectionsByDate[yesterday] = [
+    {
+      articleKey: 'https://example.com/article-1',
+      categoryName: 'Technology',
+      categoryDescription: 'AI and software',
+      title: 'Yesterday story',
+      url: 'https://example.com/article-1',
+      summary: 'Already considered yesterday.',
+      sourceName: 'Ars Technica',
+      publishedAt: '2026-03-19T07:00:00.000Z'
+    }
+  ];
+  const service = new SnapshotService(
+    repository,
+    newsCategoryRepository(),
+    unusedWeatherClient(),
+    unusedTodoistClient(),
+    unusedGoogleCalendarClient(),
+    unusedGoogleCalendarOAuthClient(),
+    {
+      async fetchFeed() {
+        return {
+          sourceName: 'Ars Technica',
+          items: [
+            {
+              title: 'Yesterday story',
+              url: 'https://example.com/article-1',
+              summary: 'Already considered yesterday.',
+              publishedAt: '2026-03-19T07:00:00.000Z',
+              sourceName: 'Ars Technica'
+            },
+            {
+              title: 'Fresh story',
+              url: 'https://example.com/article-2',
+              summary: 'New for today.',
+              publishedAt: '2026-03-20T07:00:00.000Z',
+              sourceName: 'Ars Technica'
+            }
+          ]
+        };
+      }
+    },
+    {
+      async summarize(input) {
+        assert.equal(input.categories.length, 1);
+        assert.deepEqual(input.categories[0].articles.map(function mapArticle(article) {
+          return article.url;
+        }), ['https://example.com/article-2']);
+
+        return {
+          headline: 'Fresh story only.',
+          markdown: '# Fresh story only.',
+          categories: [
+            {
+              name: 'Technology',
+              bullets: [
+                {
+                  headline: 'Fresh story',
+                  summary: 'New for today.',
+                  url: 'https://example.com/article-2',
+                  sourceName: 'Ars Technica'
+                }
+              ]
+            }
+          ]
+        };
+      }
+    }
+  );
+
+  const snapshot = await service.getLatestForDashboard('dash-1', {
+    tenantId: 'tenant-1',
+    userId: 'user-1',
+    displayName: 'Ralfe',
+    timezone: 'Europe/Paris'
+  });
+
+  assert.ok(snapshot);
+  assert.equal(snapshot && snapshot.widgets[0].status, 'READY');
+  assert.deepEqual(repository.newsArticleSelectionsByDate[today].map(function mapItem(item) {
+    return item.url;
+  }), ['https://example.com/article-2']);
+});
+
+test('SnapshotService reuses the same considered news article pool within a day', async function () {
+  const today = formatDateKey(new Date());
+  const repository = new InMemorySnapshotRepository(createNewsDashboardRecord());
+  repository.newsArticleSelectionsByDate[today] = [
+    {
+      articleKey: 'https://example.com/article-2',
+      categoryName: 'Technology',
+      categoryDescription: 'AI and software',
+      title: 'Locked story',
+      url: 'https://example.com/article-2',
+      summary: 'Reuse this article for every refresh today.',
+      sourceName: 'Ars Technica',
+      publishedAt: '2026-03-20T08:00:00.000Z'
+    }
+  ];
+  const service = new SnapshotService(
+    repository,
+    newsCategoryRepository(),
+    unusedWeatherClient(),
+    unusedTodoistClient(),
+    unusedGoogleCalendarClient(),
+    unusedGoogleCalendarOAuthClient(),
+    {
+      async fetchFeed() {
+        throw new Error('RSS feeds should not be fetched when today\'s article pool is already locked.');
+      }
+    },
+    {
+      async summarize(input) {
+        assert.equal(input.categories.length, 1);
+        assert.deepEqual(input.categories[0].articles.map(function mapArticle(article) {
+          return article.url;
+        }), ['https://example.com/article-2']);
+
+        return {
+          headline: 'Locked story only.',
+          markdown: '# Locked story only.',
+          categories: [
+            {
+              name: 'Technology',
+              bullets: [
+                {
+                  headline: 'Locked story',
+                  summary: 'Reuse this article for every refresh today.',
+                  url: 'https://example.com/article-2',
+                  sourceName: 'Ars Technica'
+                }
+              ]
+            }
+          ]
+        };
+      }
+    }
+  );
+
+  const snapshot = await service.getLatestForDashboard('dash-1', {
+    tenantId: 'tenant-1',
+    userId: 'user-1',
+    displayName: 'Ralfe',
+    timezone: 'Europe/Paris'
+  });
+
+  assert.ok(snapshot);
+  assert.equal(snapshot && snapshot.widgets[0].status, 'READY');
+  assert.deepEqual(repository.newsArticleSelectionsByDate[today].map(function mapItem(item) {
+    return item.url;
+  }), ['https://example.com/article-2']);
 });
 
 test('SnapshotService generates an xkcd snapshot for the dashboard', async function () {
@@ -1025,6 +1183,7 @@ class InMemorySnapshotRepository implements SnapshotRepository {
   public lastUpsertInput: UpsertDashboardSnapshotInput | null = null;
   public lastWidgetUpsertInput: UpsertWidgetSnapshotInput | null = null;
   public persistedSnapshot: DashboardSnapshotRecord | null = null;
+  public newsArticleSelectionsByDate: Record<string, PersistedNewsArticleRecord[]> = {};
 
   constructor(private readonly dashboard: SnapshotDashboardRecord | null) {}
 
@@ -1082,6 +1241,28 @@ class InMemorySnapshotRepository implements SnapshotRepository {
   async upsertWidgetSnapshot(input: UpsertWidgetSnapshotInput): Promise<void> {
     this.lastWidgetUpsertInput = input;
   }
+
+  async listNewsArticleSelections(_widgetId: string, snapshotDate: string): Promise<PersistedNewsArticleRecord[]> {
+    return this.newsArticleSelectionsByDate[snapshotDate] || [];
+  }
+
+  async listPriorNewsArticleKeys(_widgetId: string, snapshotDate: string): Promise<string[]> {
+    return Object.keys(this.newsArticleSelectionsByDate).filter(function filterDate(dateKey) {
+      return dateKey < snapshotDate;
+    }).flatMap(function mapDate(dateKey) {
+      return (this.newsArticleSelectionsByDate[dateKey] || []).map(function mapItem(item) {
+        return item.articleKey;
+      });
+    }, this);
+  }
+
+  async replaceNewsArticleSelections(
+    _widget: SnapshotDashboardRecord['widgets'][number],
+    snapshotDate: string,
+    items: PersistedNewsArticleRecord[]
+  ): Promise<void> {
+    this.newsArticleSelectionsByDate[snapshotDate] = items.slice();
+  }
 }
 
 function unusedWeatherClient(): WeatherClient {
@@ -1121,6 +1302,95 @@ function unusedRssFeedRepository(): Pick<RssFeedRepository, 'listCategories'> {
     async listCategories() {
       return [];
     }
+  };
+}
+
+function newsCategoryRepository(): Pick<RssFeedRepository, 'listCategories'> {
+  return {
+    async listCategories() {
+      return [
+        {
+          id: 'category-1',
+          tenantId: 'tenant-1',
+          name: 'Technology',
+          description: 'AI and software',
+          sortOrder: 1,
+          feeds: [
+            {
+              id: 'feed-1',
+              categoryId: 'category-1',
+              name: 'Ars Technica',
+              url: 'https://example.com/rss.xml',
+              createdAt: new Date('2026-03-19T07:00:00.000Z'),
+              updatedAt: new Date('2026-03-19T07:00:00.000Z')
+            }
+          ],
+          createdAt: new Date('2026-03-19T07:00:00.000Z'),
+          updatedAt: new Date('2026-03-19T07:00:00.000Z')
+        }
+      ];
+    }
+  };
+}
+
+function createNewsDashboardRecord(): SnapshotDashboardRecord {
+  return {
+    id: 'dash-1',
+    tenantId: 'tenant-1',
+    ownerUserId: 'user-1',
+    name: 'Morning Focus',
+    description: 'Seed dashboard',
+    widgets: [
+      {
+        id: 'widget-news',
+        tenantId: 'tenant-1',
+        dashboardId: 'dash-1',
+        ownerUserId: 'user-1',
+        type: 'news',
+        title: 'News Briefing',
+        x: 0,
+        y: 0,
+        width: 420,
+        height: 420,
+        minWidth: 360,
+        minHeight: 320,
+        isVisible: true,
+        sortOrder: 1,
+        refreshMode: 'SNAPSHOT',
+        version: 1,
+        config: {
+          connectionId: 'connection-openai',
+          connectionName: 'OpenAI',
+          provider: 'openai'
+        },
+        configHash: 'hash-news',
+        data: {},
+        connections: [
+          {
+            id: 'connection-openai',
+            usageRole: 'llm',
+            connector: {
+              id: 'connection-openai',
+              type: 'openai',
+              name: 'OpenAI',
+              status: 'ACTIVE',
+              authType: 'API_KEY',
+              baseUrl: 'https://api.openai.com',
+              config: {
+                apiKey: 'openai-secret',
+                model: 'gpt-5-mini',
+                baseUrl: 'https://api.openai.com'
+              },
+              lastSyncAt: null,
+              createdAt: new Date('2026-03-19T07:00:00.000Z'),
+              updatedAt: new Date('2026-03-19T07:00:00.000Z')
+            }
+          }
+        ],
+        createdAt: new Date('2026-03-19T07:00:00.000Z'),
+        updatedAt: new Date('2026-03-19T07:00:00.000Z')
+      }
+    ]
   };
 }
 
