@@ -314,6 +314,149 @@ body.theme-light::before {
   backdrop-filter: none;
 }
 
+.audio-briefing-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0 1.2rem;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(121, 224, 192, 0.16), transparent 28%),
+    linear-gradient(135deg, rgba(10, 23, 41, 0.94), rgba(8, 17, 30, 0.9));
+  box-shadow: var(--shadow);
+}
+
+.audio-briefing-panel--disabled {
+  opacity: 0.8;
+}
+
+.audio-briefing-panel__main {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.audio-briefing-panel__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.audio-briefing-panel__title {
+  margin: 0.2rem 0 0.35rem;
+  font-size: 1.4rem;
+}
+
+.audio-briefing-panel__copy {
+  margin: 0;
+  color: var(--muted);
+  max-width: 48rem;
+}
+
+.audio-briefing-panel__copy--compact {
+  max-width: none;
+  font-size: 0.76rem;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.audio-briefing-panel__status {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.audio-briefing-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.audio-briefing-panel--compact {
+  flex: 0 0 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0.55rem 0.7rem 0.55rem 0.85rem;
+  border-radius: 18px;
+  gap: 0.7rem;
+  box-shadow: none;
+  border-color: rgba(121, 224, 192, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(121, 224, 192, 0.22), transparent 32%),
+    linear-gradient(135deg, rgba(11, 26, 46, 0.98), rgba(24, 47, 64, 0.96));
+}
+
+.audio-briefing-panel--compact .audio-briefing-panel__main {
+  flex: 0 1 auto;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.6rem;
+}
+
+.audio-briefing-panel--compact .audio-briefing-panel__actions {
+  gap: 0.45rem;
+}
+
+.audio-briefing-panel--compact .audio-briefing-chip {
+  padding: 0.28rem 0.55rem;
+  font-size: 0.72rem;
+  color: rgba(244, 250, 255, 0.92);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.audio-briefing-panel--compact .widget-label {
+  color: rgba(101, 235, 206, 0.95);
+}
+
+.audio-briefing-panel--compact .audio-briefing-panel__copy--compact {
+  color: rgba(244, 250, 255, 0.88);
+}
+
+.audio-briefing-panel--compact .btn-light {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(255, 255, 255, 0.96);
+  color: #102335 !important;
+}
+
+.audio-briefing-panel--compact .btn-light:hover,
+.audio-briefing-panel--compact .btn-light:focus {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #08131d !important;
+}
+
+.audio-briefing-panel--compact .btn-outline-light {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: rgba(245, 249, 255, 0.96);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.audio-briefing-panel--compact .btn-outline-light:hover,
+.audio-briefing-panel--compact .btn-outline-light:focus {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.audio-briefing-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
 .connectors-page,
 .rss-feeds-page {
   display: flex;
@@ -726,6 +869,79 @@ body.theme-light::before {
   color: #ffb0b0;
 }
 
+.dashboards-admin-table__toggle {
+  min-width: 2.25rem;
+  padding-inline: 0.45rem;
+}
+
+.dashboards-admin-page .message-broker-summary {
+  grid-template-columns: repeat(3, minmax(180px, 260px));
+  justify-content: flex-start;
+}
+
+.dashboards-admin-page .message-broker-card {
+  min-height: 0;
+  padding: 0.9rem 1rem;
+}
+
+.dashboards-admin-page .message-broker-panel {
+  padding-top: 0.95rem;
+}
+
+.dashboards-admin-table th:first-child,
+.dashboards-admin-table td:first-child {
+  width: 56px;
+}
+
+.dashboards-admin-table th:nth-child(4),
+.dashboards-admin-table td:nth-child(4) {
+  width: 130px;
+}
+
+.dashboards-admin-table th:nth-child(5),
+.dashboards-admin-table td:nth-child(5) {
+  width: 220px;
+}
+
+.dashboards-admin-table th:last-child,
+.dashboards-admin-table td:last-child {
+  width: 170px;
+}
+
+.dashboards-admin-table td {
+  padding-top: 0.8rem;
+  padding-bottom: 0.8rem;
+}
+
+.dashboards-admin-table__details-cell {
+  padding: 0 !important;
+  border-top: 0 !important;
+}
+
+.dashboards-admin-table__details {
+  padding: 1rem 1.1rem 1.1rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dashboards-admin-table__widget-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.8rem;
+  margin-top: 0.7rem;
+}
+
+.dashboards-admin-table__widget-card {
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--chip);
+}
+
+.dashboards-admin-table__error {
+  max-width: 320px;
+  color: #ffb0b0;
+}
+
 .user-admin-table__action {
   display: inline-flex;
   align-items: center;
@@ -1089,7 +1305,7 @@ body.theme-light .connectors-panel-copy--error {
 
 .header-controls {
   max-width: 100%;
-  gap: 0.45rem !important;
+  gap: 1.45rem !important;
 }
 
 .theme-toggle {
@@ -2066,6 +2282,26 @@ body.theme-light .widget-card {
     justify-content: flex-end;
   }
 
+  .audio-briefing-panel,
+  .audio-briefing-panel__main {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .audio-briefing-panel__status {
+    justify-content: flex-start;
+  }
+
+  .audio-briefing-panel--compact,
+  .audio-briefing-panel--compact .audio-briefing-panel__main {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .audio-briefing-panel--compact .audio-briefing-panel__copy--compact {
+    white-space: normal;
+  }
+
   .dashboard-menu__trigger {
     min-width: 200px;
   }
@@ -2102,7 +2338,8 @@ body.theme-light .widget-card {
 
   .logs-page .message-broker-summary,
   .widgets-admin-page .message-broker-summary,
-  .user-admin-page .message-broker-summary {
+  .user-admin-page .message-broker-summary,
+  .dashboards-admin-page .message-broker-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

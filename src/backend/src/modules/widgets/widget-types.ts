@@ -17,6 +17,9 @@ export type DashboardWidgetRecord = {
   version: number;
   config: Record<string, unknown>;
   configHash: string;
+  includeInBriefingDefault: boolean;
+  includeInBriefingOverride: boolean | null;
+  includeInBriefing: boolean;
   data: Record<string, unknown>;
   connections: DashboardWidgetConnectionRecord[];
   createdAt: Date;
@@ -62,6 +65,7 @@ export type UpdateDashboardWidgetInput = {
   width: number;
   height: number;
   config?: Record<string, unknown>;
+  includeInBriefingOverride?: boolean | null;
 };
 
 export type ArchiveDashboardWidgetInput = {
@@ -84,6 +88,9 @@ export type DashboardWidgetResponse = {
   isVisible: boolean;
   sortOrder: number;
   config: Record<string, unknown>;
+  includeInBriefingDefault: boolean;
+  includeInBriefingOverride: boolean | null;
+  includeInBriefing: boolean;
   data: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;

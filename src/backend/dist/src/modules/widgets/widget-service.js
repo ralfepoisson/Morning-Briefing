@@ -65,6 +65,9 @@ function toResponse(widget) {
         isVisible: widget.isVisible,
         sortOrder: widget.sortOrder,
         config: widget.config,
+        includeInBriefingDefault: widget.includeInBriefingDefault,
+        includeInBriefingOverride: widget.includeInBriefingOverride,
+        includeInBriefing: widget.includeInBriefing,
         data: widget.data,
         createdAt: widget.createdAt.toISOString(),
         updatedAt: widget.updatedAt.toISOString()

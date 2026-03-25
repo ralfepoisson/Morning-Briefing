@@ -3,6 +3,7 @@ export type WidgetDefinition = {
   name: string;
   title: string;
   description: string;
+  briefingDefaultIncluded: boolean;
   defaultSize: {
     width: number;
     height: number;
@@ -22,6 +23,7 @@ const widgetDefinitions: WidgetDefinition[] = [
     name: 'xkcd',
     title: 'Latest xkcd',
     description: 'The newest comic from xkcd.com',
+    briefingDefaultIncluded: false,
     defaultSize: { width: 420, height: 420 },
     minSize: { width: 360, height: 320 },
     refreshMode: 'SNAPSHOT',
@@ -45,6 +47,7 @@ const widgetDefinitions: WidgetDefinition[] = [
     name: 'News',
     title: 'News Briefing',
     description: 'Summaries from configured RSS feeds',
+    briefingDefaultIncluded: true,
     defaultSize: { width: 420, height: 420 },
     minSize: { width: 360, height: 320 },
     refreshMode: 'SNAPSHOT',
@@ -65,6 +68,7 @@ const widgetDefinitions: WidgetDefinition[] = [
     name: 'Weather',
     title: 'Weather Outlook',
     description: 'Mocked daily forecast',
+    briefingDefaultIncluded: true,
     defaultSize: { width: 360, height: 360 },
     minSize: { width: 360, height: 360 },
     refreshMode: 'SNAPSHOT',
@@ -97,6 +101,7 @@ const widgetDefinitions: WidgetDefinition[] = [
     name: 'Calendar',
     title: 'Today on Calendar',
     description: 'Today\'s appointments',
+    briefingDefaultIncluded: true,
     defaultSize: { width: 360, height: 360 },
     minSize: { width: 360, height: 260 },
     refreshMode: 'SNAPSHOT',
@@ -129,6 +134,7 @@ const widgetDefinitions: WidgetDefinition[] = [
     name: 'Task list',
     title: 'Task List',
     description: 'Today, tomorrow, and undated tasks',
+    briefingDefaultIncluded: true,
     defaultSize: { width: 360, height: 360 },
     minSize: { width: 360, height: 260 },
     refreshMode: 'SNAPSHOT',

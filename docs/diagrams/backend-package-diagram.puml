@@ -18,6 +18,7 @@ package "Backend API\nNode.js + Fastify" as Api {
     [Widget Use Cases]
     [Connector Use Cases]
     [Briefing Use Cases]
+    [Audio Briefing Use Cases]
   }
 
   package "Domain Layer" as DomainLayer {
@@ -33,6 +34,9 @@ package "Backend API\nNode.js + Fastify" as Api {
     [Secret Store]
     [Snapshot Queue Publisher]
     [Snapshot Job Processor]
+    [LLM Provider]
+    [TTS Provider]
+    [Audio Storage]
     [Observability]
   }
 }
@@ -43,6 +47,7 @@ cloud "AWS Lambda\nSnapshot Worker" as Lambda
 cloud "EventBridge Scheduler\nNightly Refresh" as Scheduler
 cloud "Secret Backend\n(Local env / AWS Secrets Manager)" as Secrets
 cloud "External Providers\nWeather / Calendar / Tasks / News" as Providers
+cloud "External AI Providers\nLLM / TTS" as AiProviders
 
 WebUi --> ApiLayer : REST /api/v1
 ApiLayer --> AppLayer
@@ -52,12 +57,17 @@ InfraLayer --> Postgres
 InfraLayer --> Sqs
 InfraLayer --> Secrets
 InfraLayer --> Providers
+InfraLayer --> AiProviders
 Scheduler --> AppLayer : invokes nightly enqueue
 Sqs --> Lambda : event source mapping
 Lambda --> [Snapshot Job Processor]
 [Snapshot Queue Publisher] ..> Sqs : enqueue commands
 [Snapshot Job Processor] ..> [Briefing Use Cases] : generate widget snapshots
 [Snapshot Job Processor] ..> Postgres : job state + snapshots
+[Audio Briefing Use Cases] ..> [LLM Provider] : script generation
+[Audio Briefing Use Cases] ..> [TTS Provider] : audio generation
+[Audio Briefing Use Cases] ..> [Audio Storage] : persist files
+[Audio Briefing Use Cases] ..> Postgres : metadata + preferences
 
 [Connector Clients] ..> [Connector Domain]
 [Postgres Repositories] ..> [Dashboard Domain]

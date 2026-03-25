@@ -105,6 +105,54 @@ Current structured logs cover:
 - Provider errors currently produce failed snapshots instead of retry-specific classification.
 - Lambda/EventBridge infrastructure wiring is represented in code and docs, but deployment IaC is not part of this repo yet.
 
+## Audio Briefing
+
+Audio Briefing is a dashboard-level derived artifact. It is not stored as a widget snapshot and it does not scrape widget HTML.
+
+### How it works
+
+1. Widget snapshots are generated and stored as usual.
+2. The dashboard briefing aggregation service loads the latest eligible widget snapshots for the dashboard.
+3. Structured widget-specific transforms normalize those snapshots into one dashboard briefing input payload.
+4. An LLM provider generates structured JSON for the spoken script.
+5. A TTS provider converts the script into audio and stores the generated file under the backend data directory by default.
+6. The dashboard UI loads the latest saved briefing and plays the stored audio file through a backend playback endpoint.
+
+### Widget inclusion rules
+
+- Widget type defaults are code-owned in `src/modules/widgets/widget-definitions.ts`.
+- `weather`, `calendar`, `tasks`, and `news` default to included.
+- `xkcd` defaults to excluded.
+- Each widget instance can override that default with `include_in_briefing_override`.
+- The dashboard edit modal also stores dashboard-level Audio Briefing preferences such as enabled state, duration, tone, and voice.
+
+### LLM and TTS configuration
+
+Environment variables:
+
+- `AUDIO_BRIEFING_LLM_PROVIDER=stub|openai`
+- `AUDIO_BRIEFING_LLM_API_KEY`
+- `AUDIO_BRIEFING_LLM_MODEL`
+- `AUDIO_BRIEFING_LLM_BASE_URL`
+- `AUDIO_BRIEFING_TTS_PROVIDER=stub|openai`
+- `AUDIO_BRIEFING_TTS_API_KEY`
+- `AUDIO_BRIEFING_TTS_MODEL`
+- `AUDIO_BRIEFING_TTS_BASE_URL`
+- `AUDIO_BRIEFING_STORAGE_DIR`
+
+Default behavior uses stub providers so the feature works locally without external credentials:
+
+- the stub LLM produces a deterministic structured script
+- the stub TTS produces a valid WAV file for playback
+
+When both provider type and required credentials are set to `openai`, the backend uses the OpenAI Responses API for script generation and the OpenAI speech endpoint for TTS.
+
+### Caching and regeneration
+
+- A dashboard briefing source hash is computed from dashboard id, briefing preferences, widget inclusion overrides, and the latest included widget snapshot ids, statuses, hashes, and timestamps.
+- `POST /api/v1/dashboards/:dashboardId/audio-briefing/generate` reuses the latest ready briefing when the source hash is unchanged.
+- Passing `{ "force": true }` bypasses that reuse and regenerates a fresh dashboard briefing from the same source snapshots.
+
 ## Current API
 
 - `GET /health`
@@ -112,6 +160,13 @@ Current structured logs cover:
 - `GET /api/v1/dashboards`
 - `POST /api/v1/dashboards`
 - `PATCH /api/v1/dashboards/:dashboardId`
+- `GET /api/v1/dashboards/:dashboardId/audio-briefing/preferences`
+- `PATCH /api/v1/dashboards/:dashboardId/audio-briefing/preferences`
+- `GET /api/v1/dashboards/:dashboardId/audio-briefing/input-preview`
+- `GET /api/v1/dashboards/:dashboardId/audio-briefing`
+- `POST /api/v1/dashboards/:dashboardId/audio-briefing/generate`
+- `GET /api/v1/dashboard-briefing-audio/:audioId`
+- `GET /api/v1/dashboard-briefing-audio/:audioId/content`
 - `GET /api/v1/dashboards/:dashboardId/widgets`
 - `POST /api/v1/dashboards/:dashboardId/widgets`
 - `PATCH /api/v1/dashboards/:dashboardId/widgets/:widgetId`

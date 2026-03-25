@@ -14,6 +14,26 @@
       '          <p class="stage-copy stage-copy--compact mb-0" ng-if="!$ctrl.activeDashboard.description">Blank dashboard ready for widgets.</p>' +
       '        </div>' +
       '        <div class="header-controls d-flex flex-wrap align-items-center justify-content-xl-end gap-2">' +
+      '          <section class="audio-briefing-panel audio-briefing-panel--compact" ng-class="{\'audio-briefing-panel--disabled\': !$ctrl.audioBriefingPreferences.enabled}">' +
+      '            <div class="audio-briefing-panel__main">' +
+      '              <div class="audio-briefing-panel__header">' +
+      '                <div class="widget-label">Audio Briefing</div>' +
+      '                <div class="audio-briefing-panel__copy audio-briefing-panel__copy--compact">{{ $ctrl.getAudioBriefingStatusLabel() }}</div>' +
+      '              </div>' +
+      '              <div class="audio-briefing-panel__status">' +
+      '                <span class="audio-briefing-chip" ng-if="$ctrl.audioBriefing && $ctrl.audioBriefing.estimatedDurationSeconds">{{ $ctrl.formatDuration($ctrl.audioBriefing.estimatedDurationSeconds) }}</span>' +
+      '                <span class="audio-briefing-chip" ng-if="$ctrl.audioBriefing && $ctrl.audioBriefing.generatedAt">{{ $ctrl.formatTimestamp($ctrl.audioBriefing.generatedAt) }}</span>' +
+      '              </div>' +
+      '            </div>' +
+      '            <div class="audio-briefing-panel__actions">' +
+      '              <button type="button" class="btn btn-light text-dark btn-sm" ng-click="$ctrl.toggleAudioPlayback()" ng-disabled="!$ctrl.canPlayAudioBriefing()">' +
+      '                <i class="fa-solid" ng-class="$ctrl.isAudioPlaying ? \'fa-pause\' : \'fa-play\'" aria-hidden="true"></i>' +
+      '              </button>' +
+      '              <button type="button" class="btn btn-outline-light btn-sm" ng-click="$ctrl.generateAudioBriefing(true)" ng-disabled="$ctrl.isGeneratingAudioBriefing || !$ctrl.audioBriefingPreferences.enabled">' +
+      '                <i class="fa-solid" ng-class="$ctrl.isGeneratingAudioBriefing ? \'fa-spinner fa-spin\' : \'fa-wave-square\'" aria-hidden="true"></i>' +
+      '              </button>' +
+      '            </div>' +
+      '          </section>' +
       '          <button type="button" class="btn btn-outline-light icon-button" ng-if="$ctrl.isEditing" ng-click="$ctrl.openEditDashboardModal()" aria-label="Configure dashboard"><i class="fa-solid fa-gear" aria-hidden="true"></i></button>' +
       '          <button type="button" class="btn btn-light text-dark" ng-click="$ctrl.toggleEditing()">{{ $ctrl.isEditing ? "Save Dashboard" : "Edit Dashboard" }}</button>' +
       '          <button type="button" class="btn btn-outline-light" ng-if="$ctrl.isEditing" ng-click="$ctrl.openWidgetPanel()">+ Widget</button>' +
@@ -56,12 +76,27 @@
       '    <div class="modal-card" role="dialog" aria-modal="true" ng-click="$event.stopPropagation()">' +
       '      <div class="eyebrow">{{ $ctrl.ui.dashboardModalMode === "create" ? "Create Dashboard" : "Configure Dashboard" }}</div>' +
       '      <h2 class="modal-title">{{ $ctrl.ui.dashboardModalMode === "create" ? "New dashboard" : "Edit dashboard" }}</h2>' +
-      '      <p class="modal-copy">{{ $ctrl.ui.dashboardModalMode === "create" ? "Create a fresh, empty dashboard and start placing widgets." : "Update the current dashboard name and description." }}</p>' +
+      '      <p class="modal-copy">{{ $ctrl.ui.dashboardModalMode === "create" ? "Create a fresh, empty dashboard and start placing widgets." : "Update the current dashboard name and description, then tune the dashboard-level Audio Briefing." }}</p>' +
       '      <form ng-submit="$ctrl.submitDashboardModal()">' +
       '        <label class="form-label" for="modalDashboardName">Dashboard name</label>' +
       '        <input id="modalDashboardName" class="form-control form-control-lg" type="text" ng-model="$ctrl.modalForm.name" placeholder="Weekend Reset" required />' +
       '        <label class="form-label mt-3" for="modalDashboardDescription">Description</label>' +
       '        <textarea id="modalDashboardDescription" class="form-control" rows="4" ng-model="$ctrl.modalForm.description" placeholder="A slower view with weather, errands, and family plans."></textarea>' +
+      '        <div class="audio-settings" ng-if="$ctrl.ui.dashboardModalMode === \'edit\'">' +
+      '          <div class="eyebrow mt-4">Audio Briefing</div>' +
+      '          <label class="form-check mt-2">' +
+      '            <input class="form-check-input" type="checkbox" ng-model="$ctrl.modalForm.audioBriefing.enabled" />' +
+      '            <span class="form-check-label">Enable Audio Briefing for this dashboard</span>' +
+      '          </label>' +
+      '          <label class="form-label mt-3" for="audioBriefingDuration">Target duration (seconds)</label>' +
+      '          <input id="audioBriefingDuration" class="form-control" type="number" min="30" max="180" step="5" ng-model="$ctrl.modalForm.audioBriefing.targetDurationSeconds" />' +
+      '          <label class="form-label mt-3" for="audioBriefingTone">Tone</label>' +
+      '          <input id="audioBriefingTone" class="form-control" type="text" ng-model="$ctrl.modalForm.audioBriefing.tone" placeholder="calm, concise, professional" />' +
+      '          <label class="form-label mt-3" for="audioBriefingVoice">Voice</label>' +
+      '          <select id="audioBriefingVoice" class="form-select" ng-model="$ctrl.modalForm.audioBriefing.voiceName">' +
+      '            <option value="default">Default voice</option>' +
+      '          </select>' +
+      '        </div>' +
       '        <div class="modal-actions">' +
       '          <button type="button" class="btn btn-outline-danger me-auto" ng-if="$ctrl.ui.dashboardModalMode === \'edit\'" ng-click="$ctrl.archiveDashboard()">Delete dashboard</button>' +
       '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeModal()">Cancel</button>' +
@@ -98,6 +133,11 @@
       '      </div>' +
       '      <p class="widget-config-selected" ng-if="$ctrl.widgetConfig.selectedCity">Selected city: <strong>{{ $ctrl.getSelectedCityDisplayName($ctrl.widgetConfig.selectedCity) }}</strong></p>' +
       '      <p class="widget-config-selected" ng-if="$ctrl.widgetSupportsConnections() && $ctrl.getSelectedConnection()">Selected connection: <strong>{{ $ctrl.getSelectedConnection().name }}</strong></p>' +
+      '      <label class="form-check mt-3">' +
+      '        <input class="form-check-input" type="checkbox" ng-model="$ctrl.widgetConfig.includeInBriefing" />' +
+      '        <span class="form-check-label">Include in Audio Briefing</span>' +
+      '      </label>' +
+      '      <p class="widget-config-helper">This dashboard-level summary uses structured widget snapshots, not rendered widget text.</p>' +
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.isSearching">Searching cities...</p>' +
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.hasSearched && !$ctrl.widgetConfig.isSearching && !$ctrl.widgetConfig.searchResults.length">No matching cities were found.</p>' +
       '      <div class="widget-config-results" ng-if="$ctrl.widgetConfig.searchResults.length">' +
@@ -111,7 +151,7 @@
       '        <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeWidgetConfigModal()">Cancel</button>' +
       '        <button type="button" class="btn btn-primary" ng-if="$ctrl.widgetConfig.widget.type === \'weather\'" ng-disabled="!$ctrl.widgetConfig.selectedCity" ng-click="$ctrl.saveWidgetConfig()">Save</button>' +
       '        <button type="button" class="btn btn-primary" ng-if="$ctrl.widgetSupportsConnections()" ng-disabled="!$ctrl.widgetConfig.selectedConnectionId" ng-click="$ctrl.saveWidgetConfig()">Save</button>' +
-      '        <button type="button" class="btn btn-primary" ng-if="$ctrl.widgetConfig.widget.type !== \'weather\' && !$ctrl.widgetSupportsConnections()" ng-click="$ctrl.closeWidgetConfigModal()">Close</button>' +
+      '        <button type="button" class="btn btn-primary" ng-if="$ctrl.widgetConfig.widget.type !== \'weather\' && !$ctrl.widgetSupportsConnections()" ng-click="$ctrl.saveWidgetConfig()">Save</button>' +
       '      </div>' +
       '    </div>' +
       '  </div>' +
@@ -179,12 +219,14 @@
     controller: DashboardPageController
   });
 
-  DashboardPageController.$inject = ['DashboardService', 'DashboardSnapshotService', 'ConnectionService', 'WidgetService', 'WidgetRegistryService', 'ReferenceDataService', 'UiShellService', 'NotificationService', '$scope', '$window', '$q', '$location'];
+  DashboardPageController.$inject = ['DashboardService', 'DashboardSnapshotService', 'AudioBriefingService', 'ConnectionService', 'WidgetService', 'WidgetRegistryService', 'ReferenceDataService', 'UiShellService', 'NotificationService', '$scope', '$window', '$q', '$location'];
 
-  function DashboardPageController(DashboardService, DashboardSnapshotService, ConnectionService, WidgetService, WidgetRegistryService, ReferenceDataService, UiShellService, NotificationService, $scope, $window, $q, $location) {
+  function DashboardPageController(DashboardService, DashboardSnapshotService, AudioBriefingService, ConnectionService, WidgetService, WidgetRegistryService, ReferenceDataService, UiShellService, NotificationService, $scope, $window, $q, $location) {
     var $ctrl = this;
     var hasCompletedInitialStateLoad = false;
     var pendingWidgetOAuthResult = readPendingWidgetOAuthResult();
+    var audioElement = null;
+    var audioPlaybackUrl = '';
 
     $ctrl.ready = false;
     $ctrl.isEditing = false;
@@ -195,6 +237,11 @@
     $ctrl.widgetConfig = buildEmptyWidgetConfigState();
     $ctrl.connectionModal = buildEmptyConnectionModalState();
     $ctrl.refreshingWidgetId = '';
+    $ctrl.audioBriefing = null;
+    $ctrl.audioBriefingPreferences = buildDefaultAudioBriefingPreferences();
+    $ctrl.isGeneratingAudioBriefing = false;
+    $ctrl.isAudioPlaying = false;
+    $ctrl.isAudioLoading = false;
 
     $ctrl.$onInit = function onInit() {
       bindUiWatchers();
@@ -209,6 +256,15 @@
         hasCompletedInitialStateLoad = true;
         $ctrl.ready = true;
       });
+    };
+
+    $ctrl.$onDestroy = function onDestroy() {
+      if (audioElement) {
+        audioElement.pause();
+        audioElement = null;
+      }
+
+      releaseAudioPlaybackUrl();
     };
 
     $ctrl.openEditDashboardModal = function openEditDashboardModal() {
@@ -253,9 +309,15 @@
 
       request.then(function handleDashboardSave() {
         persistDashboard().then(function handlePersistedDashboard() {
-          $ctrl.closeModal();
-          syncState().then(function handleStateSync() {
-            $ctrl.isEditing = isCreateMode;
+          var preferencesRequest = isCreateMode || !$ctrl.activeDashboard
+            ? $q.resolve()
+            : AudioBriefingService.updatePreferences($ctrl.activeDashboard.id, $ctrl.modalForm.audioBriefing || {});
+
+          preferencesRequest.then(function handleSavedPreferences() {
+            $ctrl.closeModal();
+            syncState().then(function handleStateSync() {
+              $ctrl.isEditing = isCreateMode;
+            });
           });
         });
       }).catch(function handleDashboardSaveError(error) {
@@ -335,6 +397,7 @@
         cityQuery: getSelectedCityDisplayName(widget.config && widget.config.location),
         searchResults: [],
         selectedCity: widget.config && widget.config.location ? angular.copy(widget.config.location) : null,
+        includeInBriefing: widget.includeInBriefing,
         availableConnections: [],
         selectedConnectionId: widget.config && widget.config.connectionId ? widget.config.connectionId : '',
         isLoadingConnections: false,
@@ -394,6 +457,10 @@
       }
 
       widget.config = widget.config || {};
+      widget.includeInBriefingOverride = $ctrl.widgetConfig.includeInBriefing === widget.includeInBriefingDefault
+        ? null
+        : !!$ctrl.widgetConfig.includeInBriefing;
+      widget.includeInBriefing = $ctrl.widgetConfig.includeInBriefing;
 
       if (widget.type === 'weather') {
         if (!$ctrl.widgetConfig.selectedCity) {
@@ -413,7 +480,10 @@
 
         applyConnectionWidgetPreview(widget, getSelectedConnection());
         $ctrl.closeWidgetConfigModal();
+        return;
       }
+
+      $ctrl.closeWidgetConfigModal();
     };
 
     $ctrl.removeWidget = function removeWidget() {
@@ -540,6 +610,108 @@
       return !!(widget && $ctrl.refreshingWidgetId === widget.id);
     };
 
+    $ctrl.generateAudioBriefing = function generateAudioBriefing(force) {
+      if (!$ctrl.activeDashboard || $ctrl.isGeneratingAudioBriefing) {
+        return;
+      }
+
+      $ctrl.isGeneratingAudioBriefing = true;
+
+      AudioBriefingService.generate($ctrl.activeDashboard.id, {
+        force: !!force
+      }).then(function handleGeneratedAudioBriefing(result) {
+        $ctrl.audioBriefing = result ? result.briefing : null;
+        NotificationService.success(result && result.reused ? 'The latest matching audio briefing was reused.' : 'A new audio briefing is ready to play.', 'Audio Briefing updated');
+      }).catch(function handleGenerateAudioBriefingError(error) {
+        NotificationService.error(getErrorMessage(error, 'Unable to generate the audio briefing right now.'), 'Audio Briefing failed');
+      }).finally(function clearGeneratingState() {
+        $ctrl.isGeneratingAudioBriefing = false;
+      });
+    };
+
+    $ctrl.canPlayAudioBriefing = function canPlayAudioBriefing() {
+      return !!($ctrl.audioBriefing && $ctrl.audioBriefing.audio && $ctrl.audioBriefing.status === 'READY' && !$ctrl.isAudioLoading);
+    };
+
+    $ctrl.toggleAudioPlayback = function toggleAudioPlayback() {
+      if (!$ctrl.canPlayAudioBriefing()) {
+        return;
+      }
+
+      if (audioElement && !audioElement.paused) {
+        audioElement.pause();
+        return;
+      }
+
+      $ctrl.isAudioLoading = true;
+
+      ensureAudioElement().then(function handleAudioElementReady() {
+        return audioElement.play();
+      }).catch(function handleAudioPlayError(error) {
+        $scope.$applyAsync(function applyAudioPlayError() {
+          $ctrl.isAudioLoading = false;
+          $ctrl.isAudioPlaying = false;
+          NotificationService.error(getErrorMessage(error, 'The audio briefing could not be played.'), 'Playback failed');
+        });
+      });
+    };
+
+    $ctrl.getAudioBriefingSummary = function getAudioBriefingSummary() {
+      if (!$ctrl.audioBriefing) {
+        return 'Generate the latest dashboard-level spoken summary from your selected widgets.';
+      }
+
+      if ($ctrl.audioBriefing.sourceWidgetTypes && $ctrl.audioBriefing.sourceWidgetTypes.length) {
+        return 'Includes ' + $ctrl.audioBriefing.sourceWidgetTypes.join(', ') + '.';
+      }
+
+      return 'The latest dashboard-level spoken summary is ready.';
+    };
+
+    $ctrl.getAudioBriefingStatusLabel = function getAudioBriefingStatusLabel() {
+      if ($ctrl.isGeneratingAudioBriefing) {
+        return 'Generating';
+      }
+
+      if (!$ctrl.audioBriefingPreferences.enabled) {
+        return 'Disabled';
+      }
+
+      if (!$ctrl.audioBriefing) {
+        return 'Not generated';
+      }
+
+      if ($ctrl.audioBriefing.status === 'READY') {
+        return 'Ready';
+      }
+
+      if ($ctrl.audioBriefing.status === 'FAILED') {
+        return 'Failed';
+      }
+
+      if ($ctrl.audioBriefing.status === 'GENERATING') {
+        return 'Generating';
+      }
+
+      return 'Pending';
+    };
+
+    $ctrl.formatDuration = function formatDuration(seconds) {
+      if (!seconds) {
+        return '';
+      }
+
+      return Math.max(1, Math.round(seconds / 60)) + ' min';
+    };
+
+    $ctrl.formatTimestamp = function formatTimestamp(value) {
+      if (!value) {
+        return '';
+      }
+
+      return new Date(value).toLocaleString();
+    };
+
     $ctrl.getWidgetCardClass = function getWidgetCardClass(widget) {
       var definition = WidgetRegistryService.get(widget.type);
 
@@ -567,18 +739,30 @@
       if (!$ctrl.activeDashboard) {
         $ctrl.closeWidgetConfigModal();
         $ctrl.widgets = [];
+        $ctrl.audioBriefing = null;
+        $ctrl.audioBriefingPreferences = buildDefaultAudioBriefingPreferences();
         return Promise.resolve([]);
       }
 
       activeDashboardId = $ctrl.activeDashboard.id;
       $ctrl.widgets = WidgetService.listForDashboard(activeDashboardId);
 
-      return WidgetService.loadForDashboard(activeDashboardId).then(function handleWidgetLoad(widgets) {
+      return $q.all([
+        WidgetService.loadForDashboard(activeDashboardId),
+        AudioBriefingService.getPreferences(activeDashboardId),
+        AudioBriefingService.getLatest(activeDashboardId)
+      ]).then(function handleWidgetLoad(results) {
+        var widgets = results[0];
+        var audioBriefingPreferences = results[1];
+        var audioBriefing = results[2];
+
         if (!$ctrl.activeDashboard || $ctrl.activeDashboard.id !== activeDashboardId) {
           return widgets;
         }
 
         $ctrl.widgets = widgets;
+        $ctrl.audioBriefingPreferences = audioBriefingPreferences || buildDefaultAudioBriefingPreferences();
+        $ctrl.audioBriefing = audioBriefing;
         return DashboardSnapshotService.loadLatestForDashboard(activeDashboardId).then(function handleSnapshot(snapshot) {
           if (!$ctrl.activeDashboard || $ctrl.activeDashboard.id !== activeDashboardId) {
             return widgets;
@@ -633,14 +817,16 @@
           if (mode === 'create') {
             $ctrl.modalForm = {
               name: '',
-              description: ''
+              description: '',
+              audioBriefing: buildDefaultAudioBriefingPreferences()
             };
           }
 
           if (mode === 'edit' && $ctrl.activeDashboard) {
             $ctrl.modalForm = {
               name: $ctrl.activeDashboard.name,
-              description: $ctrl.activeDashboard.description
+              description: $ctrl.activeDashboard.description,
+              audioBriefing: angular.copy($ctrl.audioBriefingPreferences || buildDefaultAudioBriefingPreferences())
             };
           }
         }
@@ -670,11 +856,24 @@
         cityQuery: '',
         searchResults: [],
         selectedCity: null,
+        includeInBriefing: false,
         availableConnections: [],
         selectedConnectionId: '',
         isLoadingConnections: false,
         isSearching: false,
         hasSearched: false
+      };
+    }
+
+    function buildDefaultAudioBriefingPreferences() {
+      return {
+        enabled: true,
+        autoGenerate: false,
+        targetDurationSeconds: 75,
+        tone: 'calm, concise, professional',
+        language: 'en-GB',
+        voiceName: 'default',
+        includeWidgetTypes: []
       };
     }
 
@@ -1043,6 +1242,58 @@
       }
 
       return credentials;
+    }
+
+    function attachAudioElement() {
+      if (audioElement) {
+        audioElement.pause();
+      }
+
+      audioElement = new Audio(audioPlaybackUrl);
+      audioElement.addEventListener('playing', function handlePlaying() {
+        $scope.$applyAsync(function applyPlaying() {
+          $ctrl.isAudioPlaying = true;
+          $ctrl.isAudioLoading = false;
+        });
+      });
+      audioElement.addEventListener('pause', function handlePause() {
+        $scope.$applyAsync(function applyPause() {
+          $ctrl.isAudioPlaying = false;
+          $ctrl.isAudioLoading = false;
+        });
+      });
+      audioElement.addEventListener('ended', function handleEnded() {
+        $scope.$applyAsync(function applyEnded() {
+          $ctrl.isAudioPlaying = false;
+          $ctrl.isAudioLoading = false;
+        });
+      });
+      audioElement.addEventListener('error', function handleError() {
+        $scope.$applyAsync(function applyError() {
+          $ctrl.isAudioPlaying = false;
+          $ctrl.isAudioLoading = false;
+        });
+      });
+    }
+
+    function ensureAudioElement() {
+      if (audioElement && audioPlaybackUrl) {
+        return $q.resolve(audioElement);
+      }
+
+      return AudioBriefingService.fetchAudioPlaybackUrl($ctrl.audioBriefing.audio).then(function handlePlaybackUrl(nextPlaybackUrl) {
+        releaseAudioPlaybackUrl();
+        audioPlaybackUrl = nextPlaybackUrl;
+        attachAudioElement();
+        return audioElement;
+      });
+    }
+
+    function releaseAudioPlaybackUrl() {
+      if (audioPlaybackUrl) {
+        URL.revokeObjectURL(audioPlaybackUrl);
+        audioPlaybackUrl = '';
+      }
     }
 
     function getErrorMessage(error, fallbackMessage) {

@@ -65,13 +65,17 @@
           y: widget.y,
           width: widget.width,
           height: widget.height,
-          config: widget.config || {}
+          config: widget.config || {},
+          includeInBriefingOverride: widget.includeInBriefingOverride
         }).then(function handleResponse(response) {
           widget.x = response.data.x;
           widget.y = response.data.y;
           widget.width = response.data.width;
           widget.height = response.data.height;
           widget.config = response.data.config || widget.config || {};
+          widget.includeInBriefingDefault = response.data.includeInBriefingDefault;
+          widget.includeInBriefingOverride = response.data.includeInBriefingOverride;
+          widget.includeInBriefing = response.data.includeInBriefing;
           widget.data = response.data.data || widget.data;
           return widget;
         });
@@ -162,6 +166,9 @@
         minWidth: widgetPayload.minWidth,
         minHeight: widgetPayload.minHeight,
         config: widgetPayload.config || {},
+        includeInBriefingDefault: widgetPayload.includeInBriefingDefault,
+        includeInBriefingOverride: widgetPayload.includeInBriefingOverride,
+        includeInBriefing: widgetPayload.includeInBriefing,
         data: widgetPayload.data,
         location: widgetPayload.data && widgetPayload.data.location,
         temperature: widgetPayload.data && widgetPayload.data.temperature,

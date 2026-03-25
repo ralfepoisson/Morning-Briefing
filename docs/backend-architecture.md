@@ -213,6 +213,28 @@ The logical idempotency key is:
 
 That key intentionally coalesces overlapping scheduled and ad hoc refresh requests for the same widget/day/config state while still allowing a new config change to produce a fresh job.
 
+## Audio Briefing Pipeline
+
+Audio Briefing extends the existing snapshot architecture at the dashboard level rather than introducing a new widget type.
+
+### Pipeline shape
+
+1. Widgets produce structured `widget_snapshots`.
+2. A dashboard briefing aggregation step selects the latest eligible snapshots for the dashboard.
+3. Widget-type-specific transformers normalize those snapshots into one dashboard briefing input payload.
+4. An LLM generates a structured JSON script contract.
+5. A TTS provider converts the full script into audio and stores the generated file.
+6. The dashboard UI fetches the latest saved briefing metadata and plays the stored audio artifact.
+
+### Design rules
+
+- Audio Briefing must use backend snapshot data, not rendered DOM text.
+- Widget eligibility is controlled at two levels:
+  - code-owned widget type defaults
+  - per-widget instance overrides persisted on `dashboard_widgets`
+- Briefing preferences are dashboard-scoped and stored separately from widget configuration.
+- Cache reuse is based on a source hash built from the included widget snapshot identities and the current dashboard briefing preferences.
+
 ## Connectors And Secrets
 
 Connectors should be tenant-scoped integrations such as weather, calendar, tasks, RSS, or news. The connector row should store stable metadata only:

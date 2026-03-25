@@ -64,6 +64,7 @@ class DashboardWidget {
   version : int
   config_json : json
   config_hash : varchar
+  include_in_briefing_override : boolean?
   created_at : timestamp
   updated_at : timestamp
 }
@@ -142,6 +143,52 @@ class SnapshotGenerationJob {
   updated_at : timestamp
 }
 
+class DashboardBriefingPreference {
+  +dashboard_briefing_preference_id : UUID
+  --
+  dashboard_id : UUID
+  enabled : boolean
+  auto_generate : boolean
+  target_duration_seconds : int
+  tone : varchar
+  language : varchar
+  voice_name : varchar
+  include_widget_types_json : json
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+class DashboardBriefing {
+  +dashboard_briefing_id : UUID
+  --
+  dashboard_id : UUID
+  status : varchar
+  source_snapshot_hash : varchar
+  generated_at : timestamp
+  model_name : varchar
+  prompt_version : varchar
+  script_text : text
+  script_json : json
+  estimated_duration_seconds : int
+  error_message : varchar
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+class DashboardBriefingAudio {
+  +dashboard_briefing_audio_id : UUID
+  --
+  dashboard_briefing_id : UUID
+  provider : varchar
+  voice_name : varchar
+  storage_key : varchar
+  mime_type : varchar
+  duration_seconds : int
+  generated_at : timestamp
+  created_at : timestamp
+  updated_at : timestamp
+}
+
 Tenant "1" -- "0..*" AppUser : has >
 Tenant "1" -- "0..*" Dashboard : owns >
 Tenant "1" -- "0..*" Connector : provides >
@@ -162,6 +209,9 @@ DashboardWidget "1" -- "0..*" WidgetSnapshot : materialised as >
 DashboardWidget "1" -- "0..*" SnapshotGenerationJob : requested as >
 AppUser "1" -- "0..*" SnapshotGenerationJob : requested for >
 Dashboard "1" -- "0..*" SnapshotGenerationJob : scoped to >
+Dashboard "1" -- "0..1" DashboardBriefingPreference : configures >
+Dashboard "1" -- "0..*" DashboardBriefing : produces >
+DashboardBriefing "1" -- "0..*" DashboardBriefingAudio : renders >
 
 note right of DashboardWidget
 Represents the configured widget instance
@@ -194,6 +244,20 @@ end note
 note bottom of BriefingSnapshot
 Recommended unique key:
 (user_id, dashboard_id, snapshot_date)
+end note
+
+note right of DashboardBriefing
+Dashboard-level derived artifact built
+from the latest eligible widget snapshots.
+Stores the structured script contract and
+the source hash used for cache reuse.
+end note
+
+note right of DashboardBriefingPreference
+Controls whether dashboard audio briefing
+is enabled and how it should sound.
+Widget instance overrides still control
+which widgets contribute content.
 end note
 
 @enduml

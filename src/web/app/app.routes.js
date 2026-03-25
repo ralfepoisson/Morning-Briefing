@@ -30,6 +30,9 @@
       .when('/admin/users', {
         template: '<user-admin-page></user-admin-page>'
       })
+      .when('/admin/dashboards', {
+        template: '<dashboards-admin-page></dashboards-admin-page>'
+      })
       .when('/admin/connectors', {
         template: '<connectors-admin-page></connectors-admin-page>'
       })

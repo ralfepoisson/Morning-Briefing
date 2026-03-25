@@ -340,6 +340,68 @@ export class PrismaSnapshotRepository {
             }
         });
     }
+    async listNewsArticleSelections(widgetId, snapshotDate) {
+        const items = await this.prisma.newsArticleSelection.findMany({
+            where: {
+                dashboardWidgetId: widgetId,
+                snapshotDate: parseSnapshotDate(snapshotDate)
+            },
+            orderBy: [
+                { categoryName: 'asc' },
+                { publishedAt: 'desc' },
+                { createdAt: 'asc' }
+            ]
+        });
+        return items.map(mapNewsArticleSelectionRecord);
+    }
+    async listPriorNewsArticleKeys(widgetId, snapshotDate) {
+        const items = await this.prisma.newsArticleSelection.findMany({
+            where: {
+                dashboardWidgetId: widgetId,
+                snapshotDate: {
+                    lt: parseSnapshotDate(snapshotDate)
+                }
+            },
+            select: {
+                articleKey: true
+            },
+            distinct: ['articleKey']
+        });
+        return items.map(function mapItem(item) {
+            return item.articleKey;
+        });
+    }
+    async replaceNewsArticleSelections(widget, snapshotDate, items) {
+        const parsedSnapshotDate = parseSnapshotDate(snapshotDate);
+        await this.prisma.$transaction(async (tx) => {
+            await tx.newsArticleSelection.deleteMany({
+                where: {
+                    dashboardWidgetId: widget.id,
+                    snapshotDate: parsedSnapshotDate
+                }
+            });
+            if (!items.length) {
+                return;
+            }
+            await tx.newsArticleSelection.createMany({
+                data: items.map(function mapItem(item) {
+                    return {
+                        tenantId: widget.tenantId,
+                        dashboardWidgetId: widget.id,
+                        snapshotDate: parsedSnapshotDate,
+                        articleKey: item.articleKey,
+                        categoryName: item.categoryName,
+                        categoryDescription: item.categoryDescription,
+                        title: item.title,
+                        articleUrl: item.url,
+                        summary: item.summary,
+                        sourceName: item.sourceName,
+                        publishedAt: item.publishedAt ? new Date(item.publishedAt) : null
+                    };
+                })
+            });
+        });
+    }
     async upsertWidgetSnapshot(input) {
         const snapshotDate = parseSnapshotDate(input.snapshotDate);
         await this.prisma.$transaction(async (tx) => {
@@ -432,6 +494,18 @@ export class PrismaSnapshotRepository {
             });
         });
     }
+}
+function mapNewsArticleSelectionRecord(item) {
+    return {
+        articleKey: item.articleKey,
+        categoryName: item.categoryName,
+        categoryDescription: item.categoryDescription,
+        title: item.title,
+        url: item.articleUrl,
+        summary: item.summary,
+        sourceName: item.sourceName,
+        publishedAt: item.publishedAt ? item.publishedAt.toISOString() : null
+    };
 }
 function computeDashboardSnapshotStatus(eligibleWidgets, widgetSnapshots) {
     if (!eligibleWidgets.length) {

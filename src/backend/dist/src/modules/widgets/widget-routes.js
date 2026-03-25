@@ -98,7 +98,12 @@ export async function registerWidgetRoutes(app, dependencies = createWidgetRoute
                 y: body.y,
                 width: body.width,
                 height: body.height,
-                config: body.config
+                config: body.config,
+                includeInBriefingOverride: typeof body.includeInBriefingOverride === 'boolean'
+                    ? body.includeInBriefingOverride
+                    : body.includeInBriefingOverride === null
+                        ? null
+                        : undefined
             });
             if (!widget) {
                 reply.code(404);

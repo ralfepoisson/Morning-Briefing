@@ -20,7 +20,17 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
                     archivedAt: null
                 }
             },
-            include: {
+            select: {
+                id: true,
+                dashboardId: true,
+                widgetType: true,
+                title: true,
+                isVisible: true,
+                refreshMode: true,
+                version: true,
+                configHash: true,
+                createdAt: true,
+                updatedAt: true,
                 dashboard: {
                     select: {
                         id: true,
@@ -97,7 +107,15 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
                     archivedAt: null
                 }
             },
-            include: {
+            select: {
+                id: true,
+                tenantId: true,
+                dashboardId: true,
+                widgetType: true,
+                title: true,
+                refreshMode: true,
+                version: true,
+                configHash: true,
                 dashboard: {
                     select: {
                         id: true,

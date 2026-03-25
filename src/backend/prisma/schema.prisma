@@ -57,6 +57,13 @@ enum SnapshotJobStatus {
   SKIPPED
 }
 
+enum DashboardBriefingStatus {
+  PENDING
+  GENERATING
+  READY
+  FAILED
+}
+
 enum ApplicationLogLevel {
   INFO
   WARN
@@ -152,6 +159,8 @@ model Dashboard {
   owner              AppUser         @relation(fields: [ownerUserId], references: [id], onDelete: Restrict)
   widgets            DashboardWidget[]
   snapshots          BriefingSnapshot[]
+  briefingPreferences DashboardBriefingPreference?
+  dashboardBriefings DashboardBriefing[]
 
   @@index([tenantId])
   @@index([ownerUserId])
@@ -177,6 +186,7 @@ model DashboardWidget {
   version       Int               @default(1)
   configJson    Json?             @map("config_json")
   configHash    String?           @map("config_hash")
+  includeInBriefingOverride Boolean? @map("include_in_briefing_override")
   createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
   tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
@@ -359,4 +369,60 @@ model SnapshotGenerationJob {
   @@index([dashboardId, snapshotDate])
   @@index([userId, snapshotDate])
   @@map("snapshot_generation_jobs")
+}
+
+model DashboardBriefingPreference {
+  id                    String    @id @default(uuid()) @db.Uuid
+  dashboardId           String    @unique @map("dashboard_id") @db.Uuid
+  enabled               Boolean   @default(true)
+  autoGenerate          Boolean   @default(false) @map("auto_generate")
+  targetDurationSeconds Int       @default(75) @map("target_duration_seconds")
+  tone                  String    @default("calm, concise, professional")
+  language              String    @default("en-GB")
+  voiceName             String    @default("default") @map("voice_name")
+  includeWidgetTypesJson Json?    @map("include_widget_types_json")
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  dashboard             Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+
+  @@map("dashboard_briefing_preferences")
+}
+
+model DashboardBriefing {
+  id                       String                  @id @default(uuid()) @db.Uuid
+  dashboardId              String                  @map("dashboard_id") @db.Uuid
+  status                   DashboardBriefingStatus @default(PENDING)
+  sourceSnapshotHash       String                  @map("source_snapshot_hash")
+  generatedAt              DateTime?               @map("generated_at") @db.Timestamptz(6)
+  modelName                String                  @default("") @map("model_name")
+  promptVersion            String                  @default("dashboard-briefing-v1") @map("prompt_version")
+  scriptText               String                  @default("") @map("script_text")
+  scriptJson               Json?                   @map("script_json")
+  estimatedDurationSeconds Int?                    @map("estimated_duration_seconds")
+  errorMessage             String?                 @map("error_message")
+  createdAt                DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+  dashboard                Dashboard               @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  audio                    DashboardBriefingAudio[]
+
+  @@index([dashboardId, createdAt])
+  @@index([dashboardId, sourceSnapshotHash])
+  @@map("dashboard_briefings")
+}
+
+model DashboardBriefingAudio {
+  id                  String             @id @default(uuid()) @db.Uuid
+  dashboardBriefingId String             @map("dashboard_briefing_id") @db.Uuid
+  provider            String
+  voiceName           String             @map("voice_name")
+  storageKey          String             @map("storage_key")
+  mimeType            String             @map("mime_type")
+  durationSeconds     Int?               @map("duration_seconds")
+  generatedAt         DateTime?          @map("generated_at") @db.Timestamptz(6)
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  briefing            DashboardBriefing  @relation(fields: [dashboardBriefingId], references: [id], onDelete: Cascade)
+
+  @@index([dashboardBriefingId, createdAt])
+  @@map("dashboard_briefing_audio")
 }

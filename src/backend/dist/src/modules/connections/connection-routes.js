@@ -198,8 +198,19 @@ function appendOAuthResultToReturnTo(returnTo, connectionId, provider) {
     }
     try {
         const targetUrl = new URL(returnTo);
-        targetUrl.searchParams.set('oauthConnectionId', connectionId);
-        targetUrl.searchParams.set('oauthProvider', provider);
+        if (targetUrl.hash && targetUrl.hash.startsWith('#')) {
+            const hashValue = targetUrl.hash.slice(1);
+            const queryIndex = hashValue.indexOf('?');
+            const hashPath = queryIndex === -1 ? hashValue : hashValue.slice(0, queryIndex);
+            const hashQuery = new URLSearchParams(queryIndex === -1 ? '' : hashValue.slice(queryIndex + 1));
+            hashQuery.set('oauthConnectionId', connectionId);
+            hashQuery.set('oauthProvider', provider);
+            targetUrl.hash = '#' + hashPath + '?' + hashQuery.toString();
+        }
+        else {
+            targetUrl.searchParams.set('oauthConnectionId', connectionId);
+            targetUrl.searchParams.set('oauthProvider', provider);
+        }
         return targetUrl.toString();
     }
     catch {

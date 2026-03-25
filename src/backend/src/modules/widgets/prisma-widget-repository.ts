@@ -13,29 +13,37 @@ export class PrismaWidgetRepository implements WidgetRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async listForDashboard(dashboardId: string, ownerUserId: string): Promise<DashboardWidgetRecord[]> {
-    const widgets = await this.prisma.dashboardWidget.findMany({
-      where: {
-        dashboardId,
-        archivedAt: null,
-        dashboard: {
-          ownerUserId,
-          archivedAt: null
-        }
-      },
-      include: {
-        connectors: {
-          include: {
-            connector: true
+    try {
+      const widgets = await this.prisma.dashboardWidget.findMany({
+        where: {
+          dashboardId,
+          archivedAt: null,
+          dashboard: {
+            ownerUserId,
+            archivedAt: null
           }
-        }
-      },
-      orderBy: [
-        { sortOrder: 'asc' },
-        { createdAt: 'asc' }
-      ]
-    });
+        },
+        include: {
+          connectors: {
+            include: {
+              connector: true
+            }
+          }
+        },
+        orderBy: [
+          { sortOrder: 'asc' },
+          { createdAt: 'asc' }
+        ]
+      });
 
-    return widgets.map(mapDashboardWidgetRecord);
+      return widgets.map(mapDashboardWidgetRecord);
+    } catch (error) {
+      if (!isMissingBriefingSchemaError(error)) {
+        throw error;
+      }
+
+      return this.listForDashboardLegacy(dashboardId, ownerUserId);
+    }
   }
 
   async create(input: CreateDashboardWidgetInput): Promise<DashboardWidgetRecord> {
@@ -69,26 +77,57 @@ export class PrismaWidgetRepository implements WidgetRepository {
     const nextOffset = nextSortOrder - 1;
     const defaultConfig = definition.createDefaultConfig();
 
-    const widget = await this.prisma.dashboardWidget.create({
-      data: {
-        tenantId: dashboard.tenantId,
-        dashboardId: dashboard.id,
-        widgetType: definition.type,
-        title: definition.title,
-        positionX: 36 + nextOffset * 28,
-        positionY: 36 + nextOffset * 28,
-        width: definition.defaultSize.width,
-        height: definition.defaultSize.height,
-        minWidth: definition.minSize.width,
-        minHeight: definition.minSize.height,
-        refreshMode: definition.refreshMode,
-        sortOrder: nextSortOrder,
-        configJson: defaultConfig,
-        configHash: hashWidgetConfig(defaultConfig)
-      }
-    });
+    try {
+      const widget = await this.prisma.dashboardWidget.create({
+        data: {
+          tenantId: dashboard.tenantId,
+          dashboardId: dashboard.id,
+          widgetType: definition.type,
+          title: definition.title,
+          positionX: 36 + nextOffset * 28,
+          positionY: 36 + nextOffset * 28,
+          width: definition.defaultSize.width,
+          height: definition.defaultSize.height,
+          minWidth: definition.minSize.width,
+          minHeight: definition.minSize.height,
+          refreshMode: definition.refreshMode,
+          sortOrder: nextSortOrder,
+          configJson: defaultConfig,
+          configHash: hashWidgetConfig(defaultConfig),
+          includeInBriefingOverride: null
+        }
+      });
 
-    return mapDashboardWidgetRecord(widget);
+      return mapDashboardWidgetRecord(widget);
+    } catch (error) {
+      if (!isMissingBriefingSchemaError(error)) {
+        throw error;
+      }
+
+      const widget = await this.prisma.dashboardWidget.create({
+        data: {
+          tenantId: dashboard.tenantId,
+          dashboardId: dashboard.id,
+          widgetType: definition.type,
+          title: definition.title,
+          positionX: 36 + nextOffset * 28,
+          positionY: 36 + nextOffset * 28,
+          width: definition.defaultSize.width,
+          height: definition.defaultSize.height,
+          minWidth: definition.minSize.width,
+          minHeight: definition.minSize.height,
+          refreshMode: definition.refreshMode,
+          sortOrder: nextSortOrder,
+          configJson: defaultConfig,
+          configHash: hashWidgetConfig(defaultConfig)
+        }
+      });
+
+      return mapDashboardWidgetRecord({
+        ...widget,
+        includeInBriefingOverride: null
+      });
+    }
   }
 
   async update(input: UpdateDashboardWidgetInput): Promise<DashboardWidgetRecord | null> {
@@ -111,80 +150,169 @@ export class PrismaWidgetRepository implements WidgetRepository {
     const normalizedConfig = normalizeWidgetConfig(input.config || asObject(widget.configJson));
     const nextConfigHash = hashWidgetConfig(normalizedConfig);
     const currentConfigHash = widget.configHash || hashWidgetConfig(asObject(widget.configJson));
+    const nextIncludeInBriefingOverride = typeof input.includeInBriefingOverride === 'boolean'
+      ? input.includeInBriefingOverride
+      : input.includeInBriefingOverride === null
+        ? null
+        : widget.includeInBriefingOverride;
 
-    const updatedWidget = await this.prisma.$transaction(async (tx) => {
-      const savedWidget = await tx.dashboardWidget.update({
-        where: {
-          id: widget.id
-        },
-        data: {
-          positionX: Math.max(0, Math.round(input.x)),
-          positionY: Math.max(0, Math.round(input.y)),
-          width: Math.max(1, Math.round(input.width)),
-          height: Math.max(widget.minHeight, Math.round(input.height)),
-          configJson: normalizedConfig,
-          configHash: nextConfigHash,
-          version: {
-            increment: 1
-          }
-        }
-      });
-
-      const connectorBinding = getWidgetConnectorBinding(widget.widgetType);
-
-      if (connectorBinding) {
-        await tx.widgetConnector.deleteMany({
+    try {
+      const updatedWidget = await this.prisma.$transaction(async (tx) => {
+        const savedWidget = await tx.dashboardWidget.update({
           where: {
-            dashboardWidgetId: widget.id,
-            usageRole: connectorBinding.usageRole
+            id: widget.id
+          },
+          data: {
+            positionX: Math.max(0, Math.round(input.x)),
+            positionY: Math.max(0, Math.round(input.y)),
+            width: Math.max(1, Math.round(input.width)),
+            height: Math.max(widget.minHeight, Math.round(input.height)),
+            configJson: normalizedConfig,
+            configHash: nextConfigHash,
+            includeInBriefingOverride: nextIncludeInBriefingOverride,
+            version: {
+              increment: 1
+            }
           }
         });
 
-        if (typeof normalizedConfig.connectionId === 'string' && normalizedConfig.connectionId.trim()) {
-          const connector = await tx.connector.findFirst({
+        const connectorBinding = getWidgetConnectorBinding(widget.widgetType);
+
+        if (connectorBinding) {
+          await tx.widgetConnector.deleteMany({
             where: {
-              id: normalizedConfig.connectionId,
-              tenantId: widget.tenantId,
-              connectorType: {
-                in: connectorBinding.connectorTypes
-              }
-            }
-          });
-
-          if (!connector) {
-            throw new Error('Selected connection was not found.');
-          }
-
-          await tx.widgetConnector.create({
-            data: {
               dashboardWidgetId: widget.id,
-              connectorId: connector.id,
               usageRole: connectorBinding.usageRole
             }
           });
-        }
-      }
 
-      return tx.dashboardWidget.findFirstOrThrow({
-        where: {
-          id: savedWidget.id,
-          archivedAt: null
-        },
-        include: {
-          dashboard: true,
-          connectors: {
-            include: {
-              connector: true
+          if (typeof normalizedConfig.connectionId === 'string' && normalizedConfig.connectionId.trim()) {
+            const connector = await tx.connector.findFirst({
+              where: {
+                id: normalizedConfig.connectionId,
+                tenantId: widget.tenantId,
+                connectorType: {
+                  in: connectorBinding.connectorTypes
+                }
+              }
+            });
+
+            if (!connector) {
+              throw new Error('Selected connection was not found.');
             }
+
+            await tx.widgetConnector.create({
+              data: {
+                dashboardWidgetId: widget.id,
+                connectorId: connector.id,
+                usageRole: connectorBinding.usageRole
+              }
+            });
           }
         }
-      });
-    });
 
-    return {
-      ...mapDashboardWidgetRecord(updatedWidget),
-      shouldRefreshSnapshot: currentConfigHash !== nextConfigHash
-    };
+        return tx.dashboardWidget.findFirstOrThrow({
+          where: {
+            id: savedWidget.id,
+            archivedAt: null
+          },
+          include: {
+            dashboard: true,
+            connectors: {
+              include: {
+                connector: true
+              }
+            }
+          }
+        });
+      });
+
+      return {
+        ...mapDashboardWidgetRecord(updatedWidget),
+        shouldRefreshSnapshot: currentConfigHash !== nextConfigHash
+      };
+    } catch (error) {
+      if (!isMissingBriefingSchemaError(error)) {
+        throw error;
+      }
+
+      const updatedWidget = await this.prisma.$transaction(async (tx) => {
+        const savedWidget = await tx.dashboardWidget.update({
+          where: {
+            id: widget.id
+          },
+          data: {
+            positionX: Math.max(0, Math.round(input.x)),
+            positionY: Math.max(0, Math.round(input.y)),
+            width: Math.max(1, Math.round(input.width)),
+            height: Math.max(widget.minHeight, Math.round(input.height)),
+            configJson: normalizedConfig,
+            configHash: nextConfigHash,
+            version: {
+              increment: 1
+            }
+          }
+        });
+
+        const connectorBinding = getWidgetConnectorBinding(widget.widgetType);
+
+        if (connectorBinding) {
+          await tx.widgetConnector.deleteMany({
+            where: {
+              dashboardWidgetId: widget.id,
+              usageRole: connectorBinding.usageRole
+            }
+          });
+
+          if (typeof normalizedConfig.connectionId === 'string' && normalizedConfig.connectionId.trim()) {
+            const connector = await tx.connector.findFirst({
+              where: {
+                id: normalizedConfig.connectionId,
+                tenantId: widget.tenantId,
+                connectorType: {
+                  in: connectorBinding.connectorTypes
+                }
+              }
+            });
+
+            if (!connector) {
+              throw new Error('Selected connection was not found.');
+            }
+
+            await tx.widgetConnector.create({
+              data: {
+                dashboardWidgetId: widget.id,
+                connectorId: connector.id,
+                usageRole: connectorBinding.usageRole
+              }
+            });
+          }
+        }
+
+        return tx.dashboardWidget.findFirstOrThrow({
+          where: {
+            id: savedWidget.id,
+            archivedAt: null
+          },
+          include: {
+            dashboard: true,
+            connectors: {
+              include: {
+                connector: true
+              }
+            }
+          }
+        });
+      });
+
+      return {
+        ...mapDashboardWidgetRecord({
+          ...updatedWidget,
+          includeInBriefingOverride: null
+        }),
+        shouldRefreshSnapshot: currentConfigHash !== nextConfigHash
+      };
+    }
   }
 
   async archive(input: ArchiveDashboardWidgetInput): Promise<boolean> {
@@ -216,6 +344,108 @@ export class PrismaWidgetRepository implements WidgetRepository {
 
     return true;
   }
+
+  private async listForDashboardLegacy(dashboardId: string, ownerUserId: string): Promise<DashboardWidgetRecord[]> {
+    const widgets = await this.prisma.$queryRawUnsafe<Array<{
+      id: string;
+      tenant_id: string;
+      dashboard_id: string;
+      owner_user_id: string;
+      widget_type: string;
+      title: string;
+      position_x: number;
+      position_y: number;
+      width: number;
+      height: number;
+      min_width: number;
+      min_height: number;
+      is_visible: boolean;
+      refresh_mode: 'SNAPSHOT' | 'LIVE' | 'HYBRID';
+      sort_order: number;
+      version: number;
+      config_json: unknown;
+      config_hash: string | null;
+      created_at: Date;
+      updated_at: Date;
+    }>>(
+      `
+        SELECT
+          w.id,
+          w.tenant_id,
+          w.dashboard_id,
+          d.owner_user_id,
+          w.widget_type,
+          w.title,
+          w.position_x,
+          w.position_y,
+          w.width,
+          w.height,
+          w.min_width,
+          w.min_height,
+          w.is_visible,
+          w.refresh_mode,
+          w.sort_order,
+          w.version,
+          w.config_json,
+          w.config_hash,
+          w.created_at,
+          w.updated_at
+        FROM dashboard_widgets w
+        INNER JOIN dashboards d ON d.id = w.dashboard_id
+        WHERE w.dashboard_id = CAST($1 AS uuid)
+          AND w.archived_at IS NULL
+          AND d.owner_user_id = CAST($2 AS uuid)
+          AND d.archived_at IS NULL
+        ORDER BY w.sort_order ASC, w.created_at ASC
+      `,
+      dashboardId,
+      ownerUserId
+    );
+    const widgetIds = widgets.map(function mapWidget(widget) {
+      return widget.id;
+    });
+    const connectors = widgetIds.length
+      ? await this.prisma.widgetConnector.findMany({
+        where: {
+          dashboardWidgetId: {
+            in: widgetIds
+          }
+        },
+        include: {
+          connector: true
+        }
+      })
+      : [];
+
+    return widgets.map((widget) => mapDashboardWidgetRecord({
+      id: widget.id,
+      tenantId: widget.tenant_id,
+      dashboardId: widget.dashboard_id,
+      dashboard: {
+        ownerUserId: widget.owner_user_id
+      },
+      widgetType: widget.widget_type,
+      title: widget.title,
+      positionX: widget.position_x,
+      positionY: widget.position_y,
+      width: widget.width,
+      height: widget.height,
+      minWidth: widget.min_width,
+      minHeight: widget.min_height,
+      isVisible: widget.is_visible,
+      refreshMode: widget.refresh_mode,
+      sortOrder: widget.sort_order,
+      version: widget.version,
+      configJson: widget.config_json,
+      configHash: widget.config_hash,
+      includeInBriefingOverride: null,
+      connectors: connectors.filter(function filterConnector(item) {
+        return item.dashboardWidgetId === widget.id;
+      }),
+      createdAt: widget.created_at,
+      updatedAt: widget.updated_at
+    }));
+  }
 }
 
 function mapDashboardWidgetRecord(widget: {
@@ -238,6 +468,7 @@ function mapDashboardWidgetRecord(widget: {
   version: number;
   configJson: unknown;
   configHash?: string | null;
+  includeInBriefingOverride?: boolean | null;
   connectors?: Array<{
     usageRole: string;
     connector: {
@@ -258,6 +489,10 @@ function mapDashboardWidgetRecord(widget: {
 }): DashboardWidgetRecord {
   const definition = getWidgetDefinition(widget.widgetType);
   const config = withConnectionConfig(asObject(widget.configJson), widget.connectors);
+  const includeInBriefingDefault = definition ? definition.briefingDefaultIncluded : false;
+  const includeInBriefingOverride = typeof widget.includeInBriefingOverride === 'boolean'
+    ? widget.includeInBriefingOverride
+    : null;
 
   return {
     id: widget.id,
@@ -278,6 +513,9 @@ function mapDashboardWidgetRecord(widget: {
     version: widget.version,
     config: config,
     configHash: widget.configHash || hashWidgetConfig(config),
+    includeInBriefingDefault,
+    includeInBriefingOverride,
+    includeInBriefing: includeInBriefingOverride === null ? includeInBriefingDefault : includeInBriefingOverride,
     data: definition ? definition.createMockData(config) : {},
     connections: (widget.connectors || []).map(mapWidgetConnection),
     createdAt: widget.createdAt,
@@ -407,4 +645,20 @@ function mapWidgetConnection(connection: {
       updatedAt: connection.connector.updatedAt
     }
   };
+}
+
+function isMissingBriefingSchemaError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const candidate = error as {
+    code?: unknown;
+    message?: unknown;
+  };
+  const message = typeof candidate.message === 'string' ? candidate.message : '';
+
+  return candidate.code === 'P2021'
+    || candidate.code === 'P2022'
+    || message.includes('include_in_briefing_override');
 }

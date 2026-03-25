@@ -26,7 +26,7 @@ test('buildApp registers dashboard archive route', async function () {
   try {
     const routes = app.printRoutes();
 
-    assert.match(routes, /dashboards[\s\S]*:dashboardId \(PATCH, DELETE\)/);
+    assert.match(routes, /dashboard[\s\S]*s[\s\S]*:dashboardId \(PATCH, DELETE\)/);
   } finally {
     await app.close();
   }

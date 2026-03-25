@@ -96,6 +96,7 @@ export async function registerWidgetRoutes(
       width?: number;
       height?: number;
       config?: Record<string, unknown>;
+      includeInBriefingOverride?: boolean | null;
     };
 
     if (!params.dashboardId) {
@@ -132,7 +133,12 @@ export async function registerWidgetRoutes(
         y: body.y,
         width: body.width,
         height: body.height,
-        config: body.config
+        config: body.config,
+        includeInBriefingOverride: typeof body.includeInBriefingOverride === 'boolean'
+          ? body.includeInBriefingOverride
+          : body.includeInBriefingOverride === null
+            ? null
+            : undefined
       });
 
       if (!widget) {
