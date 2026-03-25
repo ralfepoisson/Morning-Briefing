@@ -6,6 +6,17 @@
   AudioBriefingService.$inject = ['$http', '$q', 'ApiConfig'];
 
   function AudioBriefingService($http, $q, ApiConfig) {
+    function buildAbsolutePlaybackUrl(playbackUrl) {
+      var apiOrigin;
+
+      if (/^https?:\/\//i.test(playbackUrl || '')) {
+        return playbackUrl;
+      }
+
+      apiOrigin = (ApiConfig.baseUrl || '').replace(/\/api\/v1\/?$/, '');
+      return apiOrigin + playbackUrl;
+    }
+
     this.getPreferences = function getPreferences(dashboardId) {
       if (!dashboardId) {
         return $q.resolve(null);
@@ -51,7 +62,7 @@
         return $q.reject(new Error('Audio playback is not available.'));
       }
 
-      return $http.get(ApiConfig.baseUrl + audio.playbackUrl, {
+      return $http.get(buildAbsolutePlaybackUrl(audio.playbackUrl), {
         responseType: 'arraybuffer'
       }).then(function handleResponse(response) {
         var mimeType = audio.mimeType || response.headers('content-type') || 'audio/wav';

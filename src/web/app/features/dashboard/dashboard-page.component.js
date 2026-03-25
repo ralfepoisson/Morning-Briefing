@@ -26,10 +26,10 @@
       '              </div>' +
       '            </div>' +
       '            <div class="audio-briefing-panel__actions">' +
-      '              <button type="button" class="btn btn-light text-dark btn-sm" ng-click="$ctrl.toggleAudioPlayback()" ng-disabled="!$ctrl.canPlayAudioBriefing()">' +
+      '              <button type="button" class="btn btn-light text-dark btn-sm" ng-click="$ctrl.toggleAudioPlayback()" ng-disabled="!$ctrl.canPlayAudioBriefing()" title="{{ $ctrl.isAudioPlaying ? \'Pause audio briefing\' : \'Play audio briefing\' }}" aria-label="{{ $ctrl.isAudioPlaying ? \'Pause audio briefing\' : \'Play audio briefing\' }}">' +
       '                <i class="fa-solid" ng-class="$ctrl.isAudioPlaying ? \'fa-pause\' : \'fa-play\'" aria-hidden="true"></i>' +
       '              </button>' +
-      '              <button type="button" class="btn btn-outline-light btn-sm" ng-click="$ctrl.generateAudioBriefing(true)" ng-disabled="$ctrl.isGeneratingAudioBriefing || !$ctrl.audioBriefingPreferences.enabled">' +
+      '              <button type="button" class="btn btn-outline-light btn-sm" ng-click="$ctrl.generateAudioBriefing(true)" ng-disabled="$ctrl.isGeneratingAudioBriefing || !$ctrl.audioBriefingPreferences.enabled" title="Regenerate audio briefing" aria-label="Regenerate audio briefing">' +
       '                <i class="fa-solid" ng-class="$ctrl.isGeneratingAudioBriefing ? \'fa-spinner fa-spin\' : \'fa-wave-square\'" aria-hidden="true"></i>' +
       '              </button>' +
       '            </div>' +
