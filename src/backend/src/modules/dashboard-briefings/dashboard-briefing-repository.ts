@@ -15,6 +15,7 @@ export type DashboardBriefingWidgetSnapshotSource = {
 
 export type DashboardBriefingAggregationDashboard = {
   id: string;
+  tenantId: string;
   ownerUserId: string;
   name: string;
   widgets: Array<{

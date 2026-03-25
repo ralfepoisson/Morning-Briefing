@@ -2,6 +2,7 @@ import type { GoogleCalendarOAuthClient } from '../connections/google-calendar-o
 import { logApplicationEvent } from '../admin/application-logger.js';
 import type { DefaultUserContext } from '../default-user/default-user-service.js';
 import type { RssFeedRepository } from '../rss-feeds/rss-feed-repository.js';
+import type { TenantAiConfigurationService } from '../tenant-ai-configuration/tenant-ai-configuration-service.js';
 import type { DashboardWidgetRecord } from '../widgets/widget-types.js';
 import type { GoogleCalendarClient, GoogleCalendarEvent } from './google-calendar-client.js';
 import type { OpenAiNewsSummarizer } from './openai-news-summarizer.js';
@@ -27,7 +28,12 @@ export class SnapshotService {
     private readonly googleCalendarOAuthClient: Pick<GoogleCalendarOAuthClient, 'refreshAccessToken'>,
     private readonly rssFeedClient: Pick<RssFeedClient, 'fetchFeed'>,
     private readonly openAiNewsSummarizer: Pick<OpenAiNewsSummarizer, 'summarize'>,
-    private readonly xkcdClient: Pick<XkcdClient, 'getLatestComic'> = new XkcdClientImpl()
+    private readonly xkcdClient: Pick<XkcdClient, 'getLatestComic'> = new XkcdClientImpl(),
+    private readonly tenantAiConfigurationService: Pick<TenantAiConfigurationService, 'getRequiredOpenAiConfiguration'> = {
+      async getRequiredOpenAiConfiguration() {
+        throw new Error('OpenAI configuration is missing. Add the API key in Admin > Configuration.');
+      }
+    }
   ) {}
 
   async generateForWidget(message: GenerateWidgetSnapshotRequested): Promise<{
@@ -358,64 +364,24 @@ export class SnapshotService {
       };
     }
 
-    const connector = widget.connections.find(function findConnector(item) {
-      return item.usageRole === 'llm';
-    });
+    let openAiConfiguration;
 
-    if (!connector) {
+    try {
+      openAiConfiguration = await this.tenantAiConfigurationService.getRequiredOpenAiConfiguration(widget.tenantId);
+    } catch (error) {
       return {
         widgetId: widget.id,
         widgetType: widget.type,
         title: widget.title,
         status: 'FAILED',
         content: {
-          headline: 'LLM configuration required.',
-          markdown: '# LLM configuration required.\n\nChoose an OpenAI connection in the News widget settings to generate a news snapshot.',
+          headline: 'OpenAI configuration required.',
+          markdown: '# OpenAI configuration required.\n\nAdd the tenant OpenAI API key in Admin > Configuration to generate a news snapshot.',
           categories: [],
-          emptyMessage: 'Choose an OpenAI connection in edit mode to configure this widget.',
+          emptyMessage: 'Add the tenant OpenAI configuration in Admin > Configuration.',
           sourceErrors: []
         },
-        errorMessage: 'News widget is missing a configured LLM connection.',
-        generatedAt
-      };
-    }
-
-    if (connector.connector.type !== 'openai') {
-      return {
-        widgetId: widget.id,
-        widgetType: widget.type,
-        title: widget.title,
-        status: 'FAILED',
-        content: {
-          headline: 'Unsupported news summarization provider.',
-          markdown: '# Unsupported news summarization provider.\n\nThe selected News widget connection is not supported yet.',
-          categories: [],
-          emptyMessage: 'The selected LLM provider is not supported yet.',
-          sourceErrors: []
-        },
-        errorMessage: 'News widget is configured with an unsupported LLM provider.',
-        generatedAt
-      };
-    }
-
-    const apiKey = getConnectorApiKey(connector.connector.config);
-    const model = getOpenAiModel(connector.connector.config);
-    const baseUrl = getOpenAiBaseUrl(connector.connector.config);
-
-    if (!apiKey) {
-      return {
-        widgetId: widget.id,
-        widgetType: widget.type,
-        title: widget.title,
-        status: 'FAILED',
-        content: {
-          headline: 'OpenAI API key required.',
-          markdown: '# OpenAI API key required.\n\nThe selected OpenAI connection is missing its API key.',
-          categories: [],
-          emptyMessage: 'The selected OpenAI connection is missing its API key.',
-          sourceErrors: []
-        },
-        errorMessage: 'OpenAI connection is missing an API key.',
+        errorMessage: error instanceof Error ? error.message : 'OpenAI configuration is missing.',
         generatedAt
       };
     }
@@ -557,11 +523,11 @@ export class SnapshotService {
         widgetTitle: widget.title,
         dashboardId: widget.dashboardId,
         tenantId: widget.tenantId,
-        provider: connector.connector.type,
-        connectionId: connector.connector.id,
-        connectionName: connector.connector.name,
-        model,
-        baseUrl,
+        provider: 'openai',
+        connectionId: null,
+        connectionName: 'Tenant AI Configuration',
+        model: openAiConfiguration.model,
+        baseUrl: 'https://api.openai.com',
         categoryCount: preparedCategories.length,
         articleCount: preparedCategories.reduce(function countArticles(total, category) {
           return total + category.articles.length;
@@ -569,9 +535,9 @@ export class SnapshotService {
         sourceErrorCount: sourceErrors.length
       });
       const summary = await this.openAiNewsSummarizer.summarize({
-        apiKey,
-        model,
-        baseUrl,
+        apiKey: openAiConfiguration.apiKey,
+        model: openAiConfiguration.model,
+        baseUrl: 'https://api.openai.com',
         snapshotDate,
         categories: preparedCategories
       });
@@ -581,11 +547,11 @@ export class SnapshotService {
         widgetTitle: widget.title,
         dashboardId: widget.dashboardId,
         tenantId: widget.tenantId,
-        provider: connector.connector.type,
-        connectionId: connector.connector.id,
-        connectionName: connector.connector.name,
-        model,
-        baseUrl,
+        provider: 'openai',
+        connectionId: null,
+        connectionName: 'Tenant AI Configuration',
+        model: openAiConfiguration.model,
+        baseUrl: 'https://api.openai.com',
         summaryCategoryCount: summary.categories.length,
         summaryBulletCount: summary.categories.reduce(function countBullets(total, category) {
           return total + category.bullets.length;
@@ -615,11 +581,11 @@ export class SnapshotService {
         widgetTitle: widget.title,
         dashboardId: widget.dashboardId,
         tenantId: widget.tenantId,
-        provider: connector.connector.type,
-        connectionId: connector.connector.id,
-        connectionName: connector.connector.name,
-        model,
-        baseUrl,
+        provider: 'openai',
+        connectionId: null,
+        connectionName: 'Tenant AI Configuration',
+        model: openAiConfiguration.model,
+        baseUrl: 'https://api.openai.com',
         errorMessage
       });
       return {
@@ -999,22 +965,6 @@ function getConnectorApiKey(config: Record<string, unknown>): string {
   }
 
   return '';
-}
-
-function getOpenAiModel(config: Record<string, unknown>): string {
-  if (typeof config.model === 'string' && config.model.trim()) {
-    return config.model.trim();
-  }
-
-  return 'gpt-5-mini';
-}
-
-function getOpenAiBaseUrl(config: Record<string, unknown>): string {
-  if (typeof config.baseUrl === 'string' && config.baseUrl.trim()) {
-    return config.baseUrl.trim().replace(/\/$/, '');
-  }
-
-  return 'https://api.openai.com';
 }
 
 function getGoogleCalendarId(config: Record<string, unknown>): string {

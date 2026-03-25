@@ -96,6 +96,7 @@ export type DashboardBriefingSectionInput = {
 };
 
 export type DashboardBriefingInput = {
+  tenantId: string;
   dashboardId: string;
   dashboardName: string;
   generatedAt: string;

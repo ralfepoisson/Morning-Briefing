@@ -1,5 +1,7 @@
 import { getGoogleCalendarOAuthClientFromEnvironment } from '../connections/google-calendar-oauth-client.js';
 import { PrismaRssFeedRepository } from '../rss-feeds/prisma-rss-feed-repository.js';
+import { PrismaTenantAiConfigurationRepository } from '../tenant-ai-configuration/prisma-tenant-ai-configuration-repository.js';
+import { TenantAiConfigurationService } from '../tenant-ai-configuration/tenant-ai-configuration-service.js';
 import { GoogleCalendarClientImpl } from './google-calendar-client.js';
 import { OpenAiNewsSummarizer } from './openai-news-summarizer.js';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
@@ -39,7 +41,8 @@ export function createSnapshotService(): SnapshotService {
     googleCalendarOAuthClient,
     new HttpRssFeedClient(),
     new OpenAiNewsSummarizer(),
-    new XkcdClientImpl()
+    new XkcdClientImpl(),
+    new TenantAiConfigurationService(new PrismaTenantAiConfigurationRepository(prisma))
   );
 }
 

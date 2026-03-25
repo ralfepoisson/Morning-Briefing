@@ -34,6 +34,10 @@
       '          <i class="fa-solid" ng-class="$ctrl.isAdminMenuOpen ? \'fa-chevron-up\' : \'fa-chevron-down\'" aria-hidden="true"></i>' +
       '        </button>' +
       '        <div class="dashboard-menu__panel dashboard-menu__panel--compact" ng-if="$ctrl.isAdminMenuOpen">' +
+      '          <a class="dashboard-menu__item dashboard-menu__item--link" ng-class="{\'dashboard-menu__item--active\': $ctrl.isActiveRoute(\'/admin/configuration\')}" href="#/admin/configuration" ng-click="$ctrl.closeAdminMenu()">' +
+      '            <span class="dashboard-menu__item-title">Configuration</span>' +
+      '            <span class="dashboard-menu__item-copy">Shared OpenAI model and API key</span>' +
+      '          </a>' +
       '          <a class="dashboard-menu__item dashboard-menu__item--link" ng-class="{\'dashboard-menu__item--active\': $ctrl.isActiveRoute(\'/admin/dashboards\')}" href="#/admin/dashboards" ng-click="$ctrl.closeAdminMenu()">' +
       '            <span class="dashboard-menu__item-title">Dashboards</span>' +
       '            <span class="dashboard-menu__item-copy">Owners, widgets, and audio briefing regeneration</span>' +

@@ -1,4 +1,5 @@
 import { describeFetchFailure } from '../../shared/fetch-error.js';
+import { logApplicationEvent } from '../admin/application-logger.js';
 export class DashboardBriefingLlmService {
     provider;
     promptService;
@@ -11,14 +12,63 @@ export class DashboardBriefingLlmService {
     }
     async generateScript(input) {
         const prompt = this.promptService.buildPrompt(input);
+        logApplicationEvent({
+            level: 'info',
+            scope: 'dashboard-briefing',
+            event: 'dashboard_briefing_llm_started',
+            message: 'Starting dashboard briefing script generation.',
+            context: {
+                dashboardId: input.dashboardId,
+                provider: this.provider.providerName,
+                modelName: this.provider.modelName,
+                sectionCount: input.sections.length,
+                targetDurationSeconds: input.targetDurationSeconds
+            }
+        });
         try {
             const content = await this.provider.generateScript(input, prompt);
-            return this.promptService.parseModelOutput(content, input);
+            const parsed = this.promptService.parseModelOutput(content, input);
+            logApplicationEvent({
+                level: 'info',
+                scope: 'dashboard-briefing',
+                event: 'dashboard_briefing_llm_completed',
+                message: 'Dashboard briefing script generation completed.',
+                context: {
+                    dashboardId: input.dashboardId,
+                    provider: this.provider.providerName,
+                    modelName: this.provider.modelName,
+                    estimatedDurationSeconds: parsed.estimatedDurationSeconds,
+                    sectionCount: parsed.sections.length
+                }
+            });
+            return parsed;
         }
         catch (error) {
+            logApplicationEvent({
+                level: this.provider.providerName === 'stub' ? 'error' : 'warn',
+                scope: 'dashboard-briefing',
+                event: 'dashboard_briefing_llm_failed',
+                message: error instanceof Error ? error.message : 'Dashboard briefing script generation failed.',
+                context: {
+                    dashboardId: input.dashboardId,
+                    provider: this.provider.providerName,
+                    modelName: this.provider.modelName
+                }
+            });
             if (this.provider.providerName === 'stub') {
                 throw error;
             }
+            logApplicationEvent({
+                level: 'warn',
+                scope: 'dashboard-briefing',
+                event: 'dashboard_briefing_llm_fallback_used',
+                message: 'Falling back to template dashboard briefing script.',
+                context: {
+                    dashboardId: input.dashboardId,
+                    provider: this.provider.providerName,
+                    modelName: this.provider.modelName
+                }
+            });
             return this.promptService.buildFallbackScript(input);
         }
     }
@@ -97,6 +147,22 @@ export class OpenAiDashboardBriefingLlmProvider {
             throw new Error(`OpenAI dashboard briefing request failed with status ${response.status}.`);
         }
         return extractResponseText(await response.json());
+    }
+}
+export class TenantConfiguredOpenAiDashboardBriefingLlmProvider {
+    tenantAiConfigurationService;
+    providerName = 'openai';
+    modelName = 'tenant-admin-configuration';
+    constructor(tenantAiConfigurationService) {
+        this.tenantAiConfigurationService = tenantAiConfigurationService;
+    }
+    async generateScript(input, prompt) {
+        const configuration = await this.tenantAiConfigurationService.getRequiredOpenAiConfiguration(input.tenantId);
+        const provider = new OpenAiDashboardBriefingLlmProvider({
+            apiKey: configuration.apiKey,
+            model: configuration.model
+        });
+        return provider.generateScript(input, prompt);
     }
 }
 function extractResponseText(payload) {

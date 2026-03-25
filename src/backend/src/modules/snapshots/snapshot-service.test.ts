@@ -346,7 +346,7 @@ test('SnapshotService generates a Todoist task snapshot for the dashboard', asyn
   });
 });
 
-test('SnapshotService generates a news snapshot from RSS feeds and an OpenAI connection', async function () {
+test('SnapshotService generates a news snapshot from RSS feeds and the tenant OpenAI configuration', async function () {
   const repository = new InMemorySnapshotRepository({
     id: 'dash-1',
     tenantId: 'tenant-1',
@@ -456,7 +456,7 @@ test('SnapshotService generates a news snapshot from RSS feeds and an OpenAI con
     },
     {
       async summarize(input) {
-        assert.equal(input.apiKey, 'openai-secret');
+        assert.equal(input.apiKey, 'tenant-openai-secret');
         assert.equal(input.model, 'gpt-5-mini');
         assert.equal(input.baseUrl, 'https://api.openai.com');
         assert.equal(input.categories.length, 1);
@@ -480,7 +480,9 @@ test('SnapshotService generates a news snapshot from RSS feeds and an OpenAI con
           ]
         };
       }
-    }
+    },
+    undefined,
+    configuredTenantAiConfigurationService()
   );
 
   const snapshot = await service.getLatestForDashboard('dash-1', {
@@ -567,7 +569,9 @@ test('SnapshotService excludes previously considered news articles from a new da
           ]
         };
       }
-    }
+    },
+    undefined,
+    configuredTenantAiConfigurationService()
   );
 
   const snapshot = await service.getLatestForDashboard('dash-1', {
@@ -636,7 +640,9 @@ test('SnapshotService reuses the same considered news article pool within a day'
           ]
         };
       }
-    }
+    },
+    undefined,
+    configuredTenantAiConfigurationService()
   );
 
   const snapshot = await service.getLatestForDashboard('dash-1', {
@@ -1410,6 +1416,17 @@ function unusedOpenAiNewsSummarizer(): Pick<OpenAiNewsSummarizer, 'summarize'> {
   };
 }
 
+function configuredTenantAiConfigurationService() {
+  return {
+    async getRequiredOpenAiConfiguration() {
+      return {
+        apiKey: 'tenant-openai-secret',
+        model: 'gpt-5-mini'
+      };
+    }
+  };
+}
+
 function unusedXkcdClient(): Pick<XkcdClient, 'getLatestComic'> {
   return {
     async getLatestComic() {
@@ -1454,7 +1471,11 @@ function createWeatherWidget(overrides: Record<string, unknown> = {}) {
 }
 
 function formatDateKey(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
 }
 
 function addDays(date: Date, days: number): Date {

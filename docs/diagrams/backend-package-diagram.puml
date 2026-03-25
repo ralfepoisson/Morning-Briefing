@@ -17,6 +17,7 @@ package "Backend API\nNode.js + Fastify" as Api {
     [Dashboard Use Cases]
     [Widget Use Cases]
     [Connector Use Cases]
+    [Admin Configuration Use Cases]
     [Briefing Use Cases]
     [Audio Briefing Use Cases]
   }
@@ -34,6 +35,7 @@ package "Backend API\nNode.js + Fastify" as Api {
     [Secret Store]
     [Snapshot Queue Publisher]
     [Snapshot Job Processor]
+    [Tenant AI Configuration]
     [LLM Provider]
     [TTS Provider]
     [Audio Storage]
@@ -47,7 +49,8 @@ cloud "AWS Lambda\nSnapshot Worker" as Lambda
 cloud "EventBridge Scheduler\nNightly Refresh" as Scheduler
 cloud "Secret Backend\n(Local env / AWS Secrets Manager)" as Secrets
 cloud "External Providers\nWeather / Calendar / Tasks / News" as Providers
-cloud "External AI Providers\nLLM / TTS" as AiProviders
+cloud "OpenAI Responses API" as OpenAiResponses
+cloud "AWS Polly" as AwsPolly
 
 WebUi --> ApiLayer : REST /api/v1
 ApiLayer --> AppLayer
@@ -57,17 +60,22 @@ InfraLayer --> Postgres
 InfraLayer --> Sqs
 InfraLayer --> Secrets
 InfraLayer --> Providers
-InfraLayer --> AiProviders
+InfraLayer --> OpenAiResponses
+InfraLayer --> AwsPolly
 Scheduler --> AppLayer : invokes nightly enqueue
 Sqs --> Lambda : event source mapping
 Lambda --> [Snapshot Job Processor]
 [Snapshot Queue Publisher] ..> Sqs : enqueue commands
 [Snapshot Job Processor] ..> [Briefing Use Cases] : generate widget snapshots
 [Snapshot Job Processor] ..> Postgres : job state + snapshots
+[Admin Configuration Use Cases] ..> [Tenant AI Configuration] : load/update shared model + key
 [Audio Briefing Use Cases] ..> [LLM Provider] : script generation
 [Audio Briefing Use Cases] ..> [TTS Provider] : audio generation
 [Audio Briefing Use Cases] ..> [Audio Storage] : persist files
 [Audio Briefing Use Cases] ..> Postgres : metadata + preferences
+[LLM Provider] ..> [Tenant AI Configuration]
+[LLM Provider] ..> OpenAiResponses
+[TTS Provider] ..> AwsPolly
 
 [Connector Clients] ..> [Connector Domain]
 [Postgres Repositories] ..> [Dashboard Domain]

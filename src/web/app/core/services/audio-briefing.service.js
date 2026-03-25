@@ -50,9 +50,18 @@
     };
 
     this.generate = function generate(dashboardId, options) {
+      console.info('[AudioBriefingService] generate request', {
+        dashboardId: dashboardId,
+        force: !!(options && options.force)
+      });
       return $http.post(ApiConfig.baseUrl + '/dashboards/' + dashboardId + '/audio-briefing/generate', {
         force: !!(options && options.force)
       }).then(function handleResponse(response) {
+        console.info('[AudioBriefingService] generate response', {
+          dashboardId: dashboardId,
+          reused: !!(response.data && response.data.reused),
+          briefingId: response.data && response.data.briefing ? response.data.briefing.id : null
+        });
         return response.data || null;
       });
     };
@@ -62,12 +71,22 @@
         return $q.reject(new Error('Audio playback is not available.'));
       }
 
+      console.info('[AudioBriefingService] fetch playback audio', {
+        audioId: audio.id,
+        playbackUrl: buildAbsolutePlaybackUrl(audio.playbackUrl)
+      });
+
       return $http.get(buildAbsolutePlaybackUrl(audio.playbackUrl), {
         responseType: 'arraybuffer'
       }).then(function handleResponse(response) {
         var mimeType = audio.mimeType || response.headers('content-type') || 'audio/wav';
         var blob = new Blob([response.data], {
           type: mimeType
+        });
+        console.info('[AudioBriefingService] playback audio fetched', {
+          audioId: audio.id,
+          mimeType: mimeType,
+          byteLength: response.data ? response.data.byteLength : 0
         });
 
         return URL.createObjectURL(blob);

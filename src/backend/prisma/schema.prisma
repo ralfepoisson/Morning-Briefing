@@ -85,8 +85,21 @@ model Tenant {
   newsArticleSelections NewsArticleSelection[]
   referenceCities ReferenceCity[]
   snapshots   BriefingSnapshot[]
+  aiConfiguration TenantAiConfiguration?
 
   @@map("tenants")
+}
+
+model TenantAiConfiguration {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @unique @map("tenant_id") @db.Uuid
+  openAiApiKey  String?  @map("openai_api_key")
+  openAiModel   String   @default("gpt-5-mini") @map("openai_model")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_ai_configurations")
 }
 
 model RssFeedCategory {

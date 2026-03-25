@@ -1,7 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { describeFetchFailure } from '../../shared/fetch-error.js';
+import { PollyClient, SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
+import { logApplicationEvent } from '../admin/application-logger.js';
 export class DashboardBriefingTtsService {
     provider;
     storageDirectory;
@@ -13,6 +14,18 @@ export class DashboardBriefingTtsService {
         return this.provider.providerName;
     }
     async generateAndStore(input) {
+        logApplicationEvent({
+            level: 'info',
+            scope: 'dashboard-briefing',
+            event: 'dashboard_briefing_tts_started',
+            message: 'Starting dashboard briefing audio synthesis.',
+            context: {
+                briefingId: input.briefingId,
+                provider: this.provider.providerName,
+                voiceName: input.voiceName,
+                targetDurationSeconds: input.targetDurationSeconds
+            }
+        });
         const synthesized = await this.provider.synthesize({
             script: input.script,
             voiceName: input.voiceName,
@@ -26,6 +39,20 @@ export class DashboardBriefingTtsService {
         const storageKey = path.join(relativeDir, fileName);
         await mkdir(absoluteDir, { recursive: true });
         await writeFile(path.join(this.storageDirectory, storageKey), synthesized.audio);
+        logApplicationEvent({
+            level: 'info',
+            scope: 'dashboard-briefing',
+            event: 'dashboard_briefing_tts_completed',
+            message: 'Dashboard briefing audio stored successfully.',
+            context: {
+                briefingId: input.briefingId,
+                provider: this.provider.providerName,
+                voiceName: input.voiceName,
+                storageKey,
+                mimeType: synthesized.mimeType,
+                durationSeconds: synthesized.durationSeconds
+            }
+        });
         return {
             provider: this.provider.providerName,
             voiceName: input.voiceName,
@@ -44,47 +71,37 @@ export class StubDashboardBriefingTtsProvider {
     async synthesize(input) {
         const durationSeconds = input.targetDurationSeconds || estimateDurationFromScript(input.script);
         return {
-            audio: buildSilentWav(Math.max(3, durationSeconds)),
+            audio: buildAudibleStubWav(Math.max(3, durationSeconds)),
             mimeType: 'audio/wav',
             durationSeconds: Math.max(3, durationSeconds)
         };
     }
 }
-export class OpenAiDashboardBriefingTtsProvider {
+export class AwsPollyDashboardBriefingTtsProvider {
     config;
-    providerName = 'openai';
+    providerName = 'aws-polly';
     constructor(config) {
         this.config = config;
     }
     async synthesize(input) {
-        const baseUrl = (this.config.baseUrl || 'https://api.openai.com').replace(/\/$/, '');
-        const url = baseUrl + '/v1/audio/speech';
-        let response;
-        try {
-            response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'content-type': 'application/json',
-                    authorization: 'Bearer ' + this.config.apiKey
-                },
-                body: JSON.stringify({
-                    model: this.config.model,
-                    voice: input.voiceName,
-                    input: input.script,
-                    format: 'wav'
-                })
-            });
+        const client = new PollyClient({
+            region: this.config.region,
+            endpoint: this.config.endpoint
+        });
+        const response = await client.send(new SynthesizeSpeechCommand({
+            Engine: 'neural',
+            OutputFormat: 'mp3',
+            Text: input.script,
+            TextType: 'text',
+            VoiceId: normalizePollyVoiceId(input.voiceName, this.config.defaultVoiceId)
+        }));
+        if (!response.AudioStream) {
+            throw new Error('AWS Polly did not return audio content.');
         }
-        catch (error) {
-            throw new Error(describeFetchFailure('OpenAI TTS request', url, error));
-        }
-        if (!response.ok) {
-            throw new Error(`OpenAI TTS request failed with status ${response.status}.`);
-        }
-        const audio = Buffer.from(await response.arrayBuffer());
+        const audio = Buffer.from(await response.AudioStream.transformToByteArray());
         return {
             audio,
-            mimeType: 'audio/wav',
+            mimeType: 'audio/mpeg',
             durationSeconds: null
         };
     }
@@ -92,7 +109,7 @@ export class OpenAiDashboardBriefingTtsProvider {
 function estimateDurationFromScript(script) {
     return Math.round(Math.max(30, script.split(/\s+/).filter(Boolean).length / 2.4));
 }
-function buildSilentWav(durationSeconds) {
+function buildAudibleStubWav(durationSeconds) {
     const sampleRate = 16000;
     const channelCount = 1;
     const bitsPerSample = 16;
@@ -113,6 +130,17 @@ function buildSilentWav(durationSeconds) {
     buffer.writeUInt16LE(bitsPerSample, 34);
     buffer.write('data', 36);
     buffer.writeUInt32LE(dataSize, 40);
+    for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+        const seconds = frameIndex / sampleRate;
+        const gate = seconds % 1.5 < 0.28 ? 1 : 0;
+        const baseSample = gate === 1
+            ? (Math.sin(2 * Math.PI * 440 * seconds) * 0.35 +
+                Math.sin(2 * Math.PI * 660 * seconds) * 0.2)
+            : 0;
+        const fadedSample = Math.max(-1, Math.min(1, baseSample));
+        const sampleValue = Math.round(fadedSample * 32767);
+        buffer.writeInt16LE(sampleValue, 44 + frameIndex * bytesPerSample);
+    }
     return buffer;
 }
 function getExtensionForMimeType(mimeType) {
@@ -123,4 +151,13 @@ function getExtensionForMimeType(mimeType) {
         return '.wav';
     }
     return '.bin';
+}
+function normalizePollyVoiceId(voiceName, fallbackVoiceId) {
+    if (voiceName && voiceName !== 'default') {
+        return voiceName;
+    }
+    if (fallbackVoiceId && fallbackVoiceId.trim()) {
+        return fallbackVoiceId.trim();
+    }
+    return 'Joanna';
 }

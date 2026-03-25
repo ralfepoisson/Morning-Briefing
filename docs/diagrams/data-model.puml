@@ -158,6 +158,16 @@ class DashboardBriefingPreference {
   updated_at : timestamp
 }
 
+class TenantAiConfiguration {
+  +tenant_ai_configuration_id : UUID
+  --
+  tenant_id : UUID
+  openai_api_key : varchar
+  openai_model : varchar
+  created_at : timestamp
+  updated_at : timestamp
+}
+
 class DashboardBriefing {
   +dashboard_briefing_id : UUID
   --
@@ -194,6 +204,7 @@ Tenant "1" -- "0..*" Dashboard : owns >
 Tenant "1" -- "0..*" Connector : provides >
 Tenant "1" -- "0..*" DashboardWidget : scopes >
 Tenant "1" -- "0..*" BriefingSnapshot : contains >
+Tenant "1" -- "0..1" TenantAiConfiguration : configures >
 
 AppUser "1" -- "0..*" Dashboard : owns >
 Dashboard "1" -- "0..*" DashboardWidget : contains >
@@ -258,6 +269,12 @@ Controls whether dashboard audio briefing
 is enabled and how it should sound.
 Widget instance overrides still control
 which widgets contribute content.
+end note
+
+note right of TenantAiConfiguration
+Stores the tenant-scoped OpenAI API key
+and selected model used by shared
+AI summarization and briefing generation.
 end note
 
 @enduml

@@ -15,6 +15,7 @@ test('DashboardBriefingService reuses latest ready briefing when source hash is 
       async buildInput() {
         return {
           input: {
+            tenantId: 'tenant-1',
             dashboardId: 'dash-1',
             dashboardName: 'Morning Briefing',
             generatedAt: '2026-03-25T06:00:00.000Z',
@@ -81,6 +82,7 @@ function createRepository(): DashboardBriefingRepository {
     async findDashboardAggregationContext() {
       return {
         id: 'dash-1',
+        tenantId: 'tenant-1',
         ownerUserId: 'user-1',
         name: 'Morning Briefing',
         widgets: []

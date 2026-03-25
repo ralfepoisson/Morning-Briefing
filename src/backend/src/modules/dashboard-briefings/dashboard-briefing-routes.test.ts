@@ -71,7 +71,7 @@ test('GET /api/v1/dashboards/:dashboardId/audio-briefing/preferences returns pre
   }
 });
 
-test('POST /api/v1/dashboards/:dashboardId/audio-briefing/generate returns 409 on generation conflict', async function () {
+test('POST /api/v1/dashboards/:dashboardId/audio-briefing/generate is disabled for dashboard users', async function () {
   const app = Fastify();
 
   await registerDashboardBriefingRoutes(app, {
@@ -102,7 +102,7 @@ test('POST /api/v1/dashboards/:dashboardId/audio-briefing/generate returns 409 o
         throw new Error('not used');
       },
       async generateBriefing() {
-        throw new Error('Audio Briefing is disabled for this dashboard.');
+        throw new Error('not used');
       },
       async getAudioMetadata() {
         throw new Error('not used');
@@ -122,9 +122,9 @@ test('POST /api/v1/dashboards/:dashboardId/audio-briefing/generate returns 409 o
       }
     });
 
-    assert.equal(response.statusCode, 409);
+    assert.equal(response.statusCode, 403);
     assert.deepEqual(response.json(), {
-      message: 'Audio Briefing is disabled for this dashboard.'
+      message: 'Manual audio briefing generation is only available from Admin > Dashboards.'
     });
   } finally {
     await app.close();

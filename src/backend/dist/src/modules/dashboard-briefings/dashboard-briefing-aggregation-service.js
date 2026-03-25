@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { logApplicationEvent } from '../admin/application-logger.js';
 import { getWidgetDefinition } from '../widgets/widget-definitions.js';
 import { stableStringify } from '../snapshots/snapshot-job-utils.js';
 export class DashboardBriefingAggregationService {
@@ -39,6 +40,7 @@ export class DashboardBriefingAggregationService {
             return items;
         }, []);
         const input = {
+            tenantId: dashboard.tenantId,
             dashboardId: dashboard.id,
             dashboardName: dashboard.name,
             generatedAt: new Date().toISOString(),
@@ -47,6 +49,22 @@ export class DashboardBriefingAggregationService {
             targetDurationSeconds: preferences.targetDurationSeconds,
             sections
         };
+        logApplicationEvent({
+            level: 'info',
+            scope: 'dashboard-briefing',
+            event: 'dashboard_briefing_aggregated',
+            message: 'Dashboard briefing input aggregated.',
+            context: {
+                dashboardId: dashboard.id,
+                ownerUserId: user.userId,
+                includedSectionCount: sections.length,
+                skippedWidgetCount: skippedWidgets.length,
+                includedWidgetTypes: Array.from(new Set(sections.map(function mapSection(section) {
+                    return section.widgetType;
+                }))),
+                skippedWidgets
+            }
+        });
         return {
             input,
             sourceSnapshotHash: createAggregationHash(dashboard.id, preferences, dashboard.widgets),

@@ -1,40 +1,35 @@
 import path from 'node:path';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
+import { PrismaTenantAiConfigurationRepository } from '../tenant-ai-configuration/prisma-tenant-ai-configuration-repository.js';
+import { TenantAiConfigurationService } from '../tenant-ai-configuration/tenant-ai-configuration-service.js';
 import { DashboardBriefingAggregationService } from './dashboard-briefing-aggregation-service.js';
-import { DashboardBriefingLlmService, OpenAiDashboardBriefingLlmProvider, StubDashboardBriefingLlmProvider } from './dashboard-briefing-llm-service.js';
+import { DashboardBriefingLlmService, StubDashboardBriefingLlmProvider, TenantConfiguredOpenAiDashboardBriefingLlmProvider } from './dashboard-briefing-llm-service.js';
 import { DashboardBriefingPromptService } from './dashboard-briefing-prompt-service.js';
 import { PrismaDashboardBriefingRepository } from './prisma-dashboard-briefing-repository.js';
 import { DashboardBriefingService } from './dashboard-briefing-service.js';
-import { DashboardBriefingTtsService, OpenAiDashboardBriefingTtsProvider, StubDashboardBriefingTtsProvider } from './dashboard-briefing-tts-service.js';
+import { AwsPollyDashboardBriefingTtsProvider, DashboardBriefingTtsService, StubDashboardBriefingTtsProvider } from './dashboard-briefing-tts-service.js';
 export function createDashboardBriefingService() {
     const prisma = getPrismaClient();
     const repository = new PrismaDashboardBriefingRepository(prisma);
     const promptService = new DashboardBriefingPromptService();
-    return new DashboardBriefingService(repository, new DashboardBriefingAggregationService(repository), new DashboardBriefingLlmService(createLlmProviderFromEnvironment(), promptService), new DashboardBriefingTtsService(createTtsProviderFromEnvironment(), getAudioStorageDirectory()));
+    const tenantAiConfigurationService = new TenantAiConfigurationService(new PrismaTenantAiConfigurationRepository(prisma));
+    return new DashboardBriefingService(repository, new DashboardBriefingAggregationService(repository), new DashboardBriefingLlmService(createLlmProvider(tenantAiConfigurationService), promptService), new DashboardBriefingTtsService(createTtsProvider(), getAudioStorageDirectory()));
 }
-function createLlmProviderFromEnvironment() {
-    if (process.env.AUDIO_BRIEFING_LLM_PROVIDER === 'openai' &&
-        process.env.AUDIO_BRIEFING_LLM_API_KEY &&
-        process.env.AUDIO_BRIEFING_LLM_MODEL) {
-        return new OpenAiDashboardBriefingLlmProvider({
-            apiKey: process.env.AUDIO_BRIEFING_LLM_API_KEY,
-            model: process.env.AUDIO_BRIEFING_LLM_MODEL,
-            baseUrl: process.env.AUDIO_BRIEFING_LLM_BASE_URL
-        });
+function createLlmProvider(tenantAiConfigurationService) {
+    if (process.env.NODE_ENV === 'test') {
+        return new StubDashboardBriefingLlmProvider();
     }
-    return new StubDashboardBriefingLlmProvider();
+    return new TenantConfiguredOpenAiDashboardBriefingLlmProvider(tenantAiConfigurationService);
 }
-function createTtsProviderFromEnvironment() {
-    if (process.env.AUDIO_BRIEFING_TTS_PROVIDER === 'openai' &&
-        process.env.AUDIO_BRIEFING_TTS_API_KEY &&
-        process.env.AUDIO_BRIEFING_TTS_MODEL) {
-        return new OpenAiDashboardBriefingTtsProvider({
-            apiKey: process.env.AUDIO_BRIEFING_TTS_API_KEY,
-            model: process.env.AUDIO_BRIEFING_TTS_MODEL,
-            baseUrl: process.env.AUDIO_BRIEFING_TTS_BASE_URL
-        });
+function createTtsProvider() {
+    if (process.env.NODE_ENV === 'test') {
+        return new StubDashboardBriefingTtsProvider();
     }
-    return new StubDashboardBriefingTtsProvider();
+    return new AwsPollyDashboardBriefingTtsProvider({
+        region: process.env.AWS_REGION || 'eu-west-3',
+        endpoint: process.env.AWS_ENDPOINT_URL_POLLY,
+        defaultVoiceId: process.env.AUDIO_BRIEFING_TTS_POLLY_VOICE || 'Joanna'
+    });
 }
 function getAudioStorageDirectory() {
     if (process.env.AUDIO_BRIEFING_STORAGE_DIR && process.env.AUDIO_BRIEFING_STORAGE_DIR.trim()) {

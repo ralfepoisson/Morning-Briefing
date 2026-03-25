@@ -13,6 +13,7 @@ export class PrismaDashboardBriefingRepository {
                 },
                 select: {
                     id: true,
+                    tenantId: true,
                     ownerUserId: true,
                     name: true
                 }
@@ -56,6 +57,7 @@ export class PrismaDashboardBriefingRepository {
             });
             return {
                 id: dashboard.id,
+                tenantId: dashboard.tenantId,
                 ownerUserId: dashboard.ownerUserId,
                 name: dashboard.name,
                 widgets: widgets.map(function mapWidget(widget) {
@@ -83,6 +85,7 @@ export class PrismaDashboardBriefingRepository {
                 },
                 select: {
                     id: true,
+                    tenantId: true,
                     ownerUserId: true,
                     name: true
                 }
@@ -125,6 +128,7 @@ export class PrismaDashboardBriefingRepository {
             });
             return {
                 id: dashboard.id,
+                tenantId: dashboard.tenantId,
                 ownerUserId: dashboard.ownerUserId,
                 name: dashboard.name,
                 widgets: widgets.map(function mapLegacyWidget(widget) {

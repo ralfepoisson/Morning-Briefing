@@ -222,9 +222,10 @@ Audio Briefing extends the existing snapshot architecture at the dashboard level
 1. Widgets produce structured `widget_snapshots`.
 2. A dashboard briefing aggregation step selects the latest eligible snapshots for the dashboard.
 3. Widget-type-specific transformers normalize those snapshots into one dashboard briefing input payload.
-4. An LLM generates a structured JSON script contract.
-5. A TTS provider converts the full script into audio and stores the generated file.
-6. The dashboard UI fetches the latest saved briefing metadata and plays the stored audio artifact.
+4. A tenant-scoped OpenAI configuration is loaded from admin-managed configuration.
+5. OpenAI generates a structured JSON script contract.
+6. AWS Polly converts the full script into audio and stores the generated file.
+7. The dashboard UI fetches the latest saved briefing metadata and plays the stored audio artifact.
 
 ### Design rules
 
@@ -233,6 +234,8 @@ Audio Briefing extends the existing snapshot architecture at the dashboard level
   - code-owned widget type defaults
   - per-widget instance overrides persisted on `dashboard_widgets`
 - Briefing preferences are dashboard-scoped and stored separately from widget configuration.
+- Tenant-scoped AI configuration is stored separately from both widget configuration and briefing preferences.
+- Manual regeneration belongs to admin tooling or scheduled jobs, not the end-user dashboard.
 - Cache reuse is based on a source hash built from the included widget snapshot identities and the current dashboard briefing preferences.
 
 ## Connectors And Secrets

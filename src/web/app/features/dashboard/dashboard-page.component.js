@@ -29,9 +29,6 @@
       '              <button type="button" class="btn btn-light text-dark btn-sm" ng-click="$ctrl.toggleAudioPlayback()" ng-disabled="!$ctrl.canPlayAudioBriefing()" title="{{ $ctrl.isAudioPlaying ? \'Pause audio briefing\' : \'Play audio briefing\' }}" aria-label="{{ $ctrl.isAudioPlaying ? \'Pause audio briefing\' : \'Play audio briefing\' }}">' +
       '                <i class="fa-solid" ng-class="$ctrl.isAudioPlaying ? \'fa-pause\' : \'fa-play\'" aria-hidden="true"></i>' +
       '              </button>' +
-      '              <button type="button" class="btn btn-outline-light btn-sm" ng-click="$ctrl.generateAudioBriefing(true)" ng-disabled="$ctrl.isGeneratingAudioBriefing || !$ctrl.audioBriefingPreferences.enabled" title="Regenerate audio briefing" aria-label="Regenerate audio briefing">' +
-      '                <i class="fa-solid" ng-class="$ctrl.isGeneratingAudioBriefing ? \'fa-spinner fa-spin\' : \'fa-wave-square\'" aria-hidden="true"></i>' +
-      '              </button>' +
       '            </div>' +
       '          </section>' +
       '          <button type="button" class="btn btn-outline-light icon-button" ng-if="$ctrl.isEditing" ng-click="$ctrl.openEditDashboardModal()" aria-label="Configure dashboard"><i class="fa-solid fa-gear" aria-hidden="true"></i></button>' +
@@ -112,7 +109,7 @@
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'weather\'">Pick the city this weather widget should use. Search results come from our reference city catalog.</p>' +
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'tasks\'">Choose which connection should power this task list. The selection is staged here and persisted when you click Save Dashboard.</p>' +
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'calendar\'">Choose which connection should power this calendar. The selection is staged here and persisted when you click Save Dashboard.</p>' +
-      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'news\'">Choose which LLM connection should summarize the configured RSS feeds for this widget. The selection is staged here and persisted when you click Save Dashboard.</p>' +
+      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'news\'">This widget uses the tenant-level OpenAI configuration from Admin > Configuration to summarize the configured RSS feeds.</p>' +
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type !== \'weather\' && $ctrl.widgetConfig.widget.type !== \'tasks\' && $ctrl.widgetConfig.widget.type !== \'calendar\' && $ctrl.widgetConfig.widget.type !== \'news\'">This widget type does not have configurable settings yet.</p>' +
       '      <form ng-if="$ctrl.widgetConfig.widget.type === \'weather\'" ng-submit="$ctrl.searchCities()">' +
       '        <label class="form-label" for="weatherLocationSearch">Location</label>' +
@@ -615,14 +612,28 @@
         return;
       }
 
+      console.info('[DashboardPage] regenerate audio requested', {
+        dashboardId: $ctrl.activeDashboard.id,
+        force: !!force
+      });
       $ctrl.isGeneratingAudioBriefing = true;
 
       AudioBriefingService.generate($ctrl.activeDashboard.id, {
         force: !!force
       }).then(function handleGeneratedAudioBriefing(result) {
         $ctrl.audioBriefing = result ? result.briefing : null;
+        console.info('[DashboardPage] regenerate audio completed', {
+          dashboardId: $ctrl.activeDashboard.id,
+          reused: !!(result && result.reused),
+          briefingId: result && result.briefing ? result.briefing.id : null,
+          audioId: result && result.briefing && result.briefing.audio ? result.briefing.audio.id : null
+        });
         NotificationService.success(result && result.reused ? 'The latest matching audio briefing was reused.' : 'A new audio briefing is ready to play.', 'Audio Briefing updated');
       }).catch(function handleGenerateAudioBriefingError(error) {
+        console.error('[DashboardPage] regenerate audio failed', {
+          dashboardId: $ctrl.activeDashboard.id,
+          error: getErrorMessage(error, 'Unable to generate the audio briefing right now.')
+        });
         NotificationService.error(getErrorMessage(error, 'Unable to generate the audio briefing right now.'), 'Audio Briefing failed');
       }).finally(function clearGeneratingState() {
         $ctrl.isGeneratingAudioBriefing = false;
@@ -638,6 +649,13 @@
         return;
       }
 
+      console.info('[DashboardPage] audio playback toggle', {
+        dashboardId: $ctrl.activeDashboard ? $ctrl.activeDashboard.id : null,
+        briefingId: $ctrl.audioBriefing ? $ctrl.audioBriefing.id : null,
+        audioId: $ctrl.audioBriefing && $ctrl.audioBriefing.audio ? $ctrl.audioBriefing.audio.id : null,
+        currentlyPlaying: !!(audioElement && !audioElement.paused)
+      });
+
       if (audioElement && !audioElement.paused) {
         audioElement.pause();
         return;
@@ -646,8 +664,17 @@
       $ctrl.isAudioLoading = true;
 
       ensureAudioElement().then(function handleAudioElementReady() {
+        console.info('[DashboardPage] audio element ready', {
+          dashboardId: $ctrl.activeDashboard ? $ctrl.activeDashboard.id : null,
+          audioId: $ctrl.audioBriefing && $ctrl.audioBriefing.audio ? $ctrl.audioBriefing.audio.id : null
+        });
         return audioElement.play();
       }).catch(function handleAudioPlayError(error) {
+        console.error('[DashboardPage] audio playback failed', {
+          dashboardId: $ctrl.activeDashboard ? $ctrl.activeDashboard.id : null,
+          audioId: $ctrl.audioBriefing && $ctrl.audioBriefing.audio ? $ctrl.audioBriefing.audio.id : null,
+          error: getErrorMessage(error, 'The audio briefing could not be played.')
+        });
         $scope.$applyAsync(function applyAudioPlayError() {
           $ctrl.isAudioLoading = false;
           $ctrl.isAudioPlaying = false;
@@ -658,14 +685,14 @@
 
     $ctrl.getAudioBriefingSummary = function getAudioBriefingSummary() {
       if (!$ctrl.audioBriefing) {
-        return 'Generate the latest dashboard-level spoken summary from your selected widgets.';
+        return 'The latest pre-generated dashboard audio briefing will appear here when an admin or scheduled job creates one.';
       }
 
       if ($ctrl.audioBriefing.sourceWidgetTypes && $ctrl.audioBriefing.sourceWidgetTypes.length) {
         return 'Includes ' + $ctrl.audioBriefing.sourceWidgetTypes.join(', ') + '.';
       }
 
-      return 'The latest dashboard-level spoken summary is ready.';
+      return 'The latest pre-generated dashboard-level spoken summary is ready.';
     };
 
     $ctrl.getAudioBriefingStatusLabel = function getAudioBriefingStatusLabel() {
@@ -1195,7 +1222,7 @@
     function widgetSupportsConnections(widgetType) {
       var type = widgetType || ($ctrl.widgetConfig.widget && $ctrl.widgetConfig.widget.type);
 
-      return type === 'tasks' || type === 'calendar' || type === 'news';
+      return type === 'tasks' || type === 'calendar';
     }
 
     function getConnectionProviderForWidgetType(widgetType) {
@@ -1205,10 +1232,6 @@
 
       if (widgetType === 'calendar') {
         return 'google-calendar';
-      }
-
-      if (widgetType === 'news') {
-        return 'openai';
       }
 
       return '';
@@ -1251,24 +1274,40 @@
 
       audioElement = new Audio(audioPlaybackUrl);
       audioElement.addEventListener('playing', function handlePlaying() {
+        console.info('[DashboardPage] audio playback started', {
+          dashboardId: $ctrl.activeDashboard ? $ctrl.activeDashboard.id : null,
+          audioId: $ctrl.audioBriefing && $ctrl.audioBriefing.audio ? $ctrl.audioBriefing.audio.id : null
+        });
         $scope.$applyAsync(function applyPlaying() {
           $ctrl.isAudioPlaying = true;
           $ctrl.isAudioLoading = false;
         });
       });
       audioElement.addEventListener('pause', function handlePause() {
+        console.info('[DashboardPage] audio playback paused', {
+          dashboardId: $ctrl.activeDashboard ? $ctrl.activeDashboard.id : null,
+          audioId: $ctrl.audioBriefing && $ctrl.audioBriefing.audio ? $ctrl.audioBriefing.audio.id : null
+        });
         $scope.$applyAsync(function applyPause() {
           $ctrl.isAudioPlaying = false;
           $ctrl.isAudioLoading = false;
         });
       });
       audioElement.addEventListener('ended', function handleEnded() {
+        console.info('[DashboardPage] audio playback ended', {
+          dashboardId: $ctrl.activeDashboard ? $ctrl.activeDashboard.id : null,
+          audioId: $ctrl.audioBriefing && $ctrl.audioBriefing.audio ? $ctrl.audioBriefing.audio.id : null
+        });
         $scope.$applyAsync(function applyEnded() {
           $ctrl.isAudioPlaying = false;
           $ctrl.isAudioLoading = false;
         });
       });
       audioElement.addEventListener('error', function handleError() {
+        console.error('[DashboardPage] audio element error', {
+          dashboardId: $ctrl.activeDashboard ? $ctrl.activeDashboard.id : null,
+          audioId: $ctrl.audioBriefing && $ctrl.audioBriefing.audio ? $ctrl.audioBriefing.audio.id : null
+        });
         $scope.$applyAsync(function applyError() {
           $ctrl.isAudioPlaying = false;
           $ctrl.isAudioLoading = false;
@@ -1282,6 +1321,10 @@
       }
 
       return AudioBriefingService.fetchAudioPlaybackUrl($ctrl.audioBriefing.audio).then(function handlePlaybackUrl(nextPlaybackUrl) {
+        console.info('[DashboardPage] audio blob URL created', {
+          dashboardId: $ctrl.activeDashboard ? $ctrl.activeDashboard.id : null,
+          audioId: $ctrl.audioBriefing && $ctrl.audioBriefing.audio ? $ctrl.audioBriefing.audio.id : null
+        });
         releaseAudioPlaybackUrl();
         audioPlaybackUrl = nextPlaybackUrl;
         attachAudioElement();

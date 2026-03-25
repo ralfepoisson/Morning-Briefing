@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
+import { logApplicationEvent } from './application-logger.js';
 import { DefaultUserService } from '../default-user/default-user-service.js';
 import { createDashboardBriefingService } from '../dashboard-briefings/dashboard-briefing-runtime.js';
 import type { DashboardBriefingService } from '../dashboard-briefings/dashboard-briefing-service.js';
@@ -137,6 +138,17 @@ export async function registerAdminDashboardRoutes(
         message: 'Admin access is required.'
       };
     }
+
+    logApplicationEvent({
+      level: 'info',
+      scope: 'dashboard-briefing',
+      event: 'admin_dashboard_briefing_regeneration_requested',
+      message: 'Admin requested dashboard audio briefing regeneration.',
+      context: {
+        dashboardId: params.dashboardId,
+        adminUserId: currentUser.userId
+      }
+    });
 
     const dashboard = await dependencies.prisma.dashboard.findFirst({
       where: {

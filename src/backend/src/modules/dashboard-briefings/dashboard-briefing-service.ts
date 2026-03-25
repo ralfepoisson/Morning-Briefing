@@ -92,6 +92,17 @@ export class DashboardBriefingService {
       force?: boolean;
     } = {}
   ): Promise<DashboardBriefingGenerationResult | null> {
+    logApplicationEvent({
+      level: 'info',
+      scope: 'dashboard-briefing',
+      event: 'dashboard_briefing_generation_requested',
+      message: 'Dashboard briefing generation requested.',
+      context: {
+        dashboardId,
+        ownerUserId: user.userId,
+        force: !!options.force
+      }
+    });
     const preferences = await this.repository.findPreference(dashboardId, user.userId) || buildDefaultPreference(dashboardId, user);
 
     if (!preferences.enabled) {
@@ -105,6 +116,17 @@ export class DashboardBriefingService {
     }
 
     if (!aggregation.input.sections.length) {
+      logApplicationEvent({
+        level: 'warn',
+        scope: 'dashboard-briefing',
+        event: 'dashboard_briefing_generation_skipped',
+        message: 'Dashboard briefing generation skipped because no eligible sections were available.',
+        context: {
+          dashboardId,
+          ownerUserId: user.userId,
+          skippedWidgets: aggregation.skippedWidgets
+        }
+      });
       throw new Error('No eligible widget snapshots are ready for an audio briefing yet.');
     }
 
@@ -112,6 +134,19 @@ export class DashboardBriefingService {
       const reusable = await this.repository.findReusableReadyBriefing(dashboardId, user.userId, aggregation.sourceSnapshotHash);
 
       if (reusable && reusable.audio) {
+        logApplicationEvent({
+          level: 'info',
+          scope: 'dashboard-briefing',
+          event: 'dashboard_briefing_reused',
+          message: 'Reusing the latest matching dashboard briefing.',
+          context: {
+            dashboardId,
+            ownerUserId: user.userId,
+            briefingId: reusable.id,
+            audioId: reusable.audio.id,
+            sourceSnapshotHash: aggregation.sourceSnapshotHash
+          }
+        });
         return {
           briefing: toBriefingResponse(reusable),
           reused: true
@@ -132,8 +167,35 @@ export class DashboardBriefingService {
       return null;
     }
 
+    logApplicationEvent({
+      level: 'info',
+      scope: 'dashboard-briefing',
+      event: 'dashboard_briefing_record_created',
+      message: 'Dashboard briefing record created.',
+      context: {
+        dashboardId,
+        ownerUserId: user.userId,
+        briefingId: created.id,
+        modelName: this.llmService.getModelName(),
+        sourceSnapshotHash: aggregation.sourceSnapshotHash
+      }
+    });
+
     try {
       const script = await this.llmService.generateScript(aggregation.input);
+      logApplicationEvent({
+        level: 'info',
+        scope: 'dashboard-briefing',
+        event: 'dashboard_briefing_script_ready',
+        message: 'Dashboard briefing script is ready for audio synthesis.',
+        context: {
+          dashboardId,
+          ownerUserId: user.userId,
+          briefingId: created.id,
+          estimatedDurationSeconds: script.estimatedDurationSeconds,
+          sectionCount: script.sections.length
+        }
+      });
       const audio = await this.ttsService.generateAndStore({
         briefingId: created.id,
         script: script.fullScript,
@@ -149,6 +211,20 @@ export class DashboardBriefingService {
         mimeType: audio.mimeType,
         durationSeconds: audio.durationSeconds,
         generatedAt: audio.generatedAt
+      });
+      logApplicationEvent({
+        level: 'info',
+        scope: 'dashboard-briefing',
+        event: 'dashboard_briefing_audio_saved',
+        message: 'Dashboard briefing audio metadata saved.',
+        context: {
+          dashboardId,
+          ownerUserId: user.userId,
+          briefingId: created.id,
+          provider: audio.provider,
+          voiceName: audio.voiceName,
+          storageKey: audio.storageKey
+        }
       });
       const updated = await this.repository.updateBriefing({
         briefingId: created.id,
@@ -228,6 +304,16 @@ export class DashboardBriefingService {
     mimeType: string;
     content: Buffer;
   } | null> {
+    logApplicationEvent({
+      level: 'info',
+      scope: 'dashboard-briefing',
+      event: 'dashboard_briefing_audio_content_requested',
+      message: 'Dashboard briefing audio content requested.',
+      context: {
+        audioId,
+        ownerUserId: user.userId
+      }
+    });
     const audio = await this.repository.findAudioById(audioId, user.userId);
 
     if (!audio) {
@@ -237,6 +323,19 @@ export class DashboardBriefingService {
     const storagePath = this.ttsService.resolveStoragePath(audio.storageKey);
 
     await access(storagePath, fsConstants.R_OK);
+
+    logApplicationEvent({
+      level: 'info',
+      scope: 'dashboard-briefing',
+      event: 'dashboard_briefing_audio_content_served',
+      message: 'Dashboard briefing audio content loaded from storage.',
+      context: {
+        audioId,
+        ownerUserId: user.userId,
+        storageKey: audio.storageKey,
+        mimeType: audio.mimeType
+      }
+    });
 
     return {
       mimeType: audio.mimeType,

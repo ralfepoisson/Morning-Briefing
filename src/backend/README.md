@@ -126,32 +126,37 @@ Audio Briefing is a dashboard-level derived artifact. It is not stored as a widg
 - Each widget instance can override that default with `include_in_briefing_override`.
 - The dashboard edit modal also stores dashboard-level Audio Briefing preferences such as enabled state, duration, tone, and voice.
 
-### LLM and TTS configuration
+### Shared AI configuration
+
+Shared AI settings are now tenant-scoped and edited from `Admin > Configuration`.
+
+For the MVP, the admin page stores:
+
+- the shared OpenAI API key
+- the shared OpenAI model
+
+That shared OpenAI configuration is used by:
+
+- the news summarization flow
+- the dashboard briefing script generation flow
+
+Audio synthesis now uses AWS Polly and stores the generated audio artifact before playback.
 
 Environment variables:
 
-- `AUDIO_BRIEFING_LLM_PROVIDER=stub|openai`
-- `AUDIO_BRIEFING_LLM_API_KEY`
-- `AUDIO_BRIEFING_LLM_MODEL`
-- `AUDIO_BRIEFING_LLM_BASE_URL`
-- `AUDIO_BRIEFING_TTS_PROVIDER=stub|openai`
-- `AUDIO_BRIEFING_TTS_API_KEY`
-- `AUDIO_BRIEFING_TTS_MODEL`
-- `AUDIO_BRIEFING_TTS_BASE_URL`
+- `AWS_REGION`
+- `AWS_ENDPOINT_URL_POLLY`
+- `AUDIO_BRIEFING_TTS_POLLY_VOICE`
 - `AUDIO_BRIEFING_STORAGE_DIR`
 
-Default behavior uses stub providers so the feature works locally without external credentials:
-
-- the stub LLM produces a deterministic structured script
-- the stub TTS produces a valid WAV file for playback
-
-When both provider type and required credentials are set to `openai`, the backend uses the OpenAI Responses API for script generation and the OpenAI speech endpoint for TTS.
+If shared OpenAI configuration is missing, AI-backed summarization and dashboard briefing generation fail with a clear admin-facing error that points to `Admin > Configuration`.
 
 ### Caching and regeneration
 
 - A dashboard briefing source hash is computed from dashboard id, briefing preferences, widget inclusion overrides, and the latest included widget snapshot ids, statuses, hashes, and timestamps.
-- `POST /api/v1/dashboards/:dashboardId/audio-briefing/generate` reuses the latest ready briefing when the source hash is unchanged.
-- Passing `{ "force": true }` bypasses that reuse and regenerates a fresh dashboard briefing from the same source snapshots.
+- Manual dashboard-side regeneration is disabled.
+- `POST /api/v1/admin/dashboards/:dashboardId/regenerate-audio-briefing` bypasses reuse checks and regenerates a fresh dashboard briefing from the latest eligible snapshots.
+- The dashboard page only plays the latest stored audio artifact.
 
 ## Current API
 
@@ -164,9 +169,11 @@ When both provider type and required credentials are set to `openai`, the backen
 - `PATCH /api/v1/dashboards/:dashboardId/audio-briefing/preferences`
 - `GET /api/v1/dashboards/:dashboardId/audio-briefing/input-preview`
 - `GET /api/v1/dashboards/:dashboardId/audio-briefing`
-- `POST /api/v1/dashboards/:dashboardId/audio-briefing/generate`
 - `GET /api/v1/dashboard-briefing-audio/:audioId`
 - `GET /api/v1/dashboard-briefing-audio/:audioId/content`
+- `GET /api/v1/admin/configuration`
+- `PATCH /api/v1/admin/configuration`
+- `POST /api/v1/admin/dashboards/:dashboardId/regenerate-audio-briefing`
 - `GET /api/v1/dashboards/:dashboardId/widgets`
 - `POST /api/v1/dashboards/:dashboardId/widgets`
 - `PATCH /api/v1/dashboards/:dashboardId/widgets/:widgetId`

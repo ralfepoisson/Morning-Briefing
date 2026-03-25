@@ -151,12 +151,25 @@
         return;
       }
 
+      console.info('[DashboardsAdminPage] regenerate audio requested', {
+        dashboardId: dashboard.id,
+        dashboardName: dashboard.name
+      });
       $ctrl.regeneratingById[dashboard.id] = true;
 
       return AdminDashboardService.regenerateAudioBriefing(dashboard.id).then(function handleSuccess() {
-        NotificationService.success('Audio briefing regeneration started for ' + dashboard.name + '.', 'Audio Briefing queued');
+        console.info('[DashboardsAdminPage] regenerate audio completed', {
+          dashboardId: dashboard.id,
+          dashboardName: dashboard.name
+        });
+        NotificationService.success('Audio briefing regeneration completed for ' + dashboard.name + '.', 'Audio Briefing updated');
         return loadDashboards();
       }).catch(function handleError(error) {
+        console.error('[DashboardsAdminPage] regenerate audio failed', {
+          dashboardId: dashboard.id,
+          dashboardName: dashboard.name,
+          error: getErrorMessage(error, 'Audio briefing regeneration is currently unavailable.')
+        });
         NotificationService.error(getErrorMessage(error, 'Audio briefing regeneration is currently unavailable.'), 'Audio Briefing failed');
       }).finally(function clearPending() {
         delete $ctrl.regeneratingById[dashboard.id];

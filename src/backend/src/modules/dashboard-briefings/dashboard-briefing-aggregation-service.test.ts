@@ -7,6 +7,7 @@ test('DashboardBriefingAggregationService builds structured input from eligible 
     async findDashboardAggregationContext() {
       return {
         id: 'dash-1',
+        tenantId: 'tenant-1',
         ownerUserId: 'user-1',
         name: 'Morning Briefing',
         widgets: [

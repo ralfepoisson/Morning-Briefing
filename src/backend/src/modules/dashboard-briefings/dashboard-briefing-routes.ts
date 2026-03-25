@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
+import { logApplicationEvent } from '../admin/application-logger.js';
 import { DefaultUserService } from '../default-user/default-user-service.js';
 import { createDashboardBriefingService } from './dashboard-briefing-runtime.js';
 import type { DashboardBriefingService } from './dashboard-briefing-service.js';
@@ -105,33 +106,10 @@ export async function registerDashboardBriefingRoutes(
   });
 
   app.post('/api/v1/dashboards/:dashboardId/audio-briefing/generate', async function handleGenerateBriefing(request, reply) {
-    const params = request.params as { dashboardId?: string };
-    const body = request.body as { force?: boolean } | undefined;
-
-    if (!params.dashboardId) {
-      reply.code(400);
-      return { message: 'Dashboard id is required.' };
-    }
-
-    const user = await defaultUserService.getDefaultUser(request);
-
-    try {
-      const result = await service.generateBriefing(params.dashboardId, user, {
-        force: !!(body && body.force)
-      });
-
-      if (!result) {
-        reply.code(404);
-        return { message: 'Dashboard not found.' };
-      }
-
-      return result;
-    } catch (error) {
-      reply.code(409);
-      return {
-        message: error instanceof Error ? error.message : 'Dashboard briefing generation failed.'
-      };
-    }
+    reply.code(403);
+    return {
+      message: 'Manual audio briefing generation is only available from Admin > Dashboards.'
+    };
   });
 
   app.get('/api/v1/dashboard-briefing-audio/:audioId', async function handleGetAudioMetadata(request, reply) {
@@ -162,6 +140,16 @@ export async function registerDashboardBriefingRoutes(
     }
 
     const user = await defaultUserService.getDefaultUser(request);
+    logApplicationEvent({
+      level: 'info',
+      scope: 'dashboard-briefing',
+      event: 'dashboard_briefing_audio_content_route_called',
+      message: 'Dashboard audio content route called.',
+      context: {
+        audioId: params.audioId,
+        ownerUserId: user.userId
+      }
+    });
 
     try {
       const audio = await service.getAudioContent(params.audioId, user);

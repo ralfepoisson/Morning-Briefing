@@ -1,6 +1,8 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import { registerAdminConfigurationRoutes } from '../modules/admin/configuration-routes.js';
 import { registerAdminConnectorRoutes } from '../modules/admin/connector-routes.js';
+import { registerAdminDashboardRoutes } from '../modules/admin/dashboard-routes.js';
 import { assertAuthenticatedRequest } from '../modules/default-user/default-user-service.js';
 import { registerLogRoutes } from '../modules/admin/log-routes.js';
 import { registerMessageBrokerRoutes } from '../modules/admin/message-broker-routes.js';
@@ -49,7 +51,9 @@ export async function buildApp() {
     await registerConnectionRoutes(app);
     await registerLogRoutes(app);
     await registerMessageBrokerRoutes(app);
+    await registerAdminConfigurationRoutes(app);
     await registerAdminConnectorRoutes(app);
+    await registerAdminDashboardRoutes(app);
     await registerAdminWidgetRoutes(app);
     await registerReferenceCityRoutes(app);
     await registerRssFeedRoutes(app);
