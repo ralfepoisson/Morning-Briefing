@@ -1,6 +1,6 @@
-import { createSnapshotJobProcessor } from './snapshot-runtime.js';
+import { createQueueJobProcessor } from './snapshot-runtime.js';
 export async function handleSnapshotQueueBatch(event) {
-    const processor = createSnapshotJobProcessor();
+    const processor = createQueueJobProcessor();
     for (const record of event.Records || []) {
         await processor.process({
             body: record.body,

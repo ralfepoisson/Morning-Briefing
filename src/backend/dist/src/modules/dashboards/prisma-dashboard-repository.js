@@ -4,17 +4,59 @@ export class PrismaDashboardRepository {
         this.prisma = prisma;
     }
     async listForOwner(ownerUserId) {
-        const dashboards = await this.prisma.dashboard.findMany({
-            where: {
-                ownerUserId,
-                archivedAt: null
-            },
-            orderBy: [
-                { isDefault: 'desc' },
-                { createdAt: 'asc' }
-            ]
-        });
-        return dashboards.map(mapDashboardRecord);
+        try {
+            const dashboards = await this.prisma.dashboard.findMany({
+                where: {
+                    ownerUserId,
+                    archivedAt: null
+                },
+                orderBy: [
+                    { isDefault: 'desc' },
+                    { createdAt: 'asc' }
+                ],
+                select: {
+                    id: true,
+                    ownerUserId: true,
+                    name: true,
+                    description: true,
+                    themeJson: true,
+                    isGenerating: true,
+                    createdAt: true,
+                    updatedAt: true
+                }
+            });
+            return dashboards.map(mapDashboardRecord);
+        }
+        catch (error) {
+            if (!isMissingDashboardGeneratingSchemaError(error)) {
+                throw error;
+            }
+            const dashboards = await this.prisma.dashboard.findMany({
+                where: {
+                    ownerUserId,
+                    archivedAt: null
+                },
+                orderBy: [
+                    { isDefault: 'desc' },
+                    { createdAt: 'asc' }
+                ],
+                select: {
+                    id: true,
+                    ownerUserId: true,
+                    name: true,
+                    description: true,
+                    themeJson: true,
+                    createdAt: true,
+                    updatedAt: true
+                }
+            });
+            return dashboards.map(function mapLegacyDashboard(dashboard) {
+                return mapDashboardRecord({
+                    ...dashboard,
+                    isGenerating: false
+                });
+            });
+        }
     }
     async create(input) {
         const owner = await this.prisma.appUser.findUniqueOrThrow({
@@ -109,6 +151,7 @@ function mapDashboardRecord(dashboard) {
         name: dashboard.name,
         description: dashboard.description || '',
         theme: getThemeKey(dashboard.themeJson),
+        isGenerating: 'isGenerating' in dashboard ? Boolean(dashboard.isGenerating) : false,
         createdAt: dashboard.createdAt,
         updatedAt: dashboard.updatedAt
     };
@@ -121,4 +164,8 @@ function getThemeKey(themeJson) {
         }
     }
     return 'aurora';
+}
+function isMissingDashboardGeneratingSchemaError(error) {
+    return error instanceof Error &&
+        error.message.includes('dashboards.is_generating');
 }

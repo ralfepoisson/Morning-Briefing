@@ -13,6 +13,32 @@ import type {
 export class PrismaDashboardBriefingRepository implements DashboardBriefingRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
+  async setDashboardGenerating(dashboardId: string, ownerUserId: string, isGenerating: boolean): Promise<void> {
+    const dashboard = await this.prisma.dashboard.findFirst({
+      where: {
+        id: dashboardId,
+        ownerUserId,
+        archivedAt: null
+      },
+      select: {
+        id: true
+      }
+    });
+
+    if (!dashboard) {
+      return;
+    }
+
+    await this.prisma.dashboard.update({
+      where: {
+        id: dashboard.id
+      },
+      data: {
+        isGenerating
+      }
+    });
+  }
+
   async findDashboardAggregationContext(
     dashboardId: string,
     ownerUserId: string

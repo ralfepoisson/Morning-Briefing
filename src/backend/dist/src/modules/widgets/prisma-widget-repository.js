@@ -327,6 +327,7 @@ export class PrismaWidgetRepository {
           w.version,
           w.config_json,
           w.config_hash,
+          false AS is_generating,
           w.created_at,
           w.updated_at
         FROM dashboard_widgets w
@@ -374,6 +375,7 @@ export class PrismaWidgetRepository {
             configJson: widget.config_json,
             configHash: widget.config_hash,
             includeInBriefingOverride: null,
+            isGenerating: Boolean(widget.is_generating),
             connectors: connectors.filter(function filterConnector(item) {
                 return item.dashboardWidgetId === widget.id;
             }),
@@ -403,6 +405,7 @@ function mapDashboardWidgetRecord(widget) {
         minWidth: widget.minWidth,
         minHeight: widget.minHeight,
         isVisible: widget.isVisible,
+        isGenerating: Boolean(widget.isGenerating),
         sortOrder: widget.sortOrder,
         refreshMode: widget.refreshMode,
         version: widget.version,

@@ -1240,6 +1240,8 @@ class InMemorySnapshotRepository implements SnapshotRepository {
 
   async completeSnapshotJob() {}
 
+  async setWidgetGenerating() {}
+
   async skipSnapshotJob() {}
 
   async failSnapshotJob() {}

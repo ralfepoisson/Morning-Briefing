@@ -12,6 +12,7 @@ export type DashboardWidgetRecord = {
   minWidth: number;
   minHeight: number;
   isVisible: boolean;
+  isGenerating: boolean;
   sortOrder: number;
   refreshMode: 'SNAPSHOT' | 'LIVE' | 'HYBRID';
   version: number;
@@ -86,6 +87,7 @@ export type DashboardWidgetResponse = {
   minWidth: number;
   minHeight: number;
   isVisible: boolean;
+  isGenerating: boolean;
   sortOrder: number;
   config: Record<string, unknown>;
   includeInBriefingDefault: boolean;

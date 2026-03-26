@@ -32,8 +32,6 @@ export function filterApplicationLogs(entries, filters = {}) {
         }
         return buildSearchableText(entry).includes(normalizedSearch);
     })
-        .slice()
-        .reverse()
         .slice(0, limit);
 }
 export function summarizeApplicationLogs() {

@@ -16,12 +16,12 @@ export async function registerLogRoutes(app, dependencies = createLogRouteDepend
         const range = parseRange(query.range);
         const since = range ? new Date(Date.now() - (range.minutes * 60 * 1000)).toISOString() : undefined;
         try {
-            const entries = await dependencies.listLogs({
+            const entries = sortEntriesByNewestFirst(await dependencies.listLogs({
                 search: query.q,
                 levels,
                 limit,
                 since
-            });
+            }));
             return {
                 filters: {
                     q: (query.q || '').trim(),
@@ -118,6 +118,11 @@ function serializeEntry(entry) {
         message: entry.message,
         context: entry.context
     };
+}
+function sortEntriesByNewestFirst(entries) {
+    return entries.slice().sort(function compareEntries(left, right) {
+        return Date.parse(right.timestamp) - Date.parse(left.timestamp);
+    });
 }
 function getLogAccessErrorMessage(error) {
     const message = error instanceof Error ? error.message : String(error);

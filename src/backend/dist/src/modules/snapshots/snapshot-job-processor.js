@@ -40,6 +40,7 @@ export class SnapshotJobProcessor {
             attemptCount: claim.attemptCount
         });
         try {
+            await this.repository.setWidgetGenerating(payload.widgetId, true);
             const result = await this.snapshotService.generateForWidget(payload);
             if (result.status === 'skipped') {
                 await this.repository.skipSnapshotJob(payload.idempotencyKey, result.reason || 'skipped');
@@ -78,6 +79,9 @@ export class SnapshotJobProcessor {
                 error: messageText
             });
             throw error;
+        }
+        finally {
+            await this.repository.setWidgetGenerating(payload.widgetId, false);
         }
     }
 }

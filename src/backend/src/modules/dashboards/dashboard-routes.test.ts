@@ -408,6 +408,7 @@ function createDashboardResponse(overrides: Partial<DashboardResponse>): Dashboa
     name: overrides.name || 'Morning Focus',
     description: overrides.description || 'Seed dashboard',
     theme: overrides.theme || 'aurora',
+    isGenerating: overrides.isGenerating || false,
     createdAt: overrides.createdAt || '2026-03-19T07:00:00.000Z',
     updatedAt: overrides.updatedAt || '2026-03-19T07:00:00.000Z'
   };

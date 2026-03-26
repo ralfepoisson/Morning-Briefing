@@ -76,10 +76,14 @@
       '              <div class="message-broker-table__secondary" ng-if="dashboard.audioBriefing && dashboard.audioBriefing.estimatedDurationSeconds">~{{$ctrl.formatDuration(dashboard.audioBriefing.estimatedDurationSeconds)}}</div>' +
       '            </td>' +
       '            <td>' +
-      '              <button type="button" class="btn btn-sm btn-outline-light widgets-admin-table__action" ng-click="$ctrl.regenerateAudioBriefing(dashboard)" ng-disabled="$ctrl.isRegenerating(dashboard.id)">' +
-      '                <i class="fa-solid" ng-class="$ctrl.isRegenerating(dashboard.id) ? \'fa-spinner fa-spin\' : \'fa-wave-square\'" aria-hidden="true"></i>' +
-      '                <span>{{$ctrl.isRegenerating(dashboard.id) ? "Generating..." : "Regenerate audio"}}</span>' +
+      '              <button type="button" class="btn btn-sm btn-outline-light widgets-admin-table__action" ng-if="!$ctrl.isRegenerating(dashboard.id)" ng-click="$ctrl.regenerateAudioBriefing(dashboard)">' +
+      '                <i class="fa-solid fa-wave-square" aria-hidden="true"></i>' +
+      '                <span>Regenerate audio</span>' +
       '              </button>' +
+      '              <span class="widgets-admin-table__loading" ng-if="$ctrl.isRegenerating(dashboard.id)" aria-live="polite">' +
+      '                <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>' +
+      '                <span>{{$ctrl.isQueuedRegeneration(dashboard.id) ? "Queueing..." : "Generating..."}}</span>' +
+      '              </span>' +
       '            </td>' +
       '          </tr>' +
       '          <tr ng-repeat-end ng-if="$ctrl.isExpanded(dashboard.id)">' +
@@ -112,10 +116,11 @@
     controller: DashboardsAdminPageController
   });
 
-  DashboardsAdminPageController.$inject = ['AdminDashboardService', 'NotificationService', 'CurrentUserService', '$location'];
+  DashboardsAdminPageController.$inject = ['AdminDashboardService', 'NotificationService', 'CurrentUserService', '$location', '$timeout'];
 
-  function DashboardsAdminPageController(AdminDashboardService, NotificationService, CurrentUserService, $location) {
+  function DashboardsAdminPageController(AdminDashboardService, NotificationService, CurrentUserService, $location, $timeout) {
     var $ctrl = this;
+    var pollPromise = null;
 
     $ctrl.data = null;
     $ctrl.isLoading = false;
@@ -128,6 +133,10 @@
           loadDashboards();
         }
       });
+    };
+
+    $ctrl.$onDestroy = function onDestroy() {
+      cancelPolling();
     };
 
     $ctrl.refresh = function refresh() {
@@ -143,6 +152,10 @@
     };
 
     $ctrl.isRegenerating = function isRegenerating(dashboardId) {
+      return !!$ctrl.regeneratingById[dashboardId] || hasPersistedGeneration(dashboardId);
+    };
+
+    $ctrl.isQueuedRegeneration = function isQueuedRegeneration(dashboardId) {
       return !!$ctrl.regeneratingById[dashboardId];
     };
 
@@ -158,11 +171,11 @@
       $ctrl.regeneratingById[dashboard.id] = true;
 
       return AdminDashboardService.regenerateAudioBriefing(dashboard.id).then(function handleSuccess() {
-        console.info('[DashboardsAdminPage] regenerate audio completed', {
+        console.info('[DashboardsAdminPage] regenerate audio queued', {
           dashboardId: dashboard.id,
           dashboardName: dashboard.name
         });
-        NotificationService.success('Audio briefing regeneration completed for ' + dashboard.name + '.', 'Audio Briefing updated');
+        NotificationService.success('Audio briefing regeneration was queued for ' + dashboard.name + '.', 'Audio Briefing queued');
         return loadDashboards();
       }).catch(function handleError(error) {
         console.error('[DashboardsAdminPage] regenerate audio failed', {
@@ -238,8 +251,10 @@
             }).length
           }
         };
+        syncPolling(items);
       }).catch(function handleError(error) {
         $ctrl.data = null;
+        cancelPolling();
         NotificationService.error(getErrorMessage(error, 'Dashboards are currently unavailable.'), 'Unable to load dashboards');
       }).finally(function clearLoading() {
         $ctrl.isLoading = false;
@@ -260,6 +275,43 @@
         $location.path('/');
         return null;
       });
+    }
+
+    function hasPersistedGeneration(dashboardId) {
+      return !!(($ctrl.data && $ctrl.data.items) || []).find(function findDashboard(item) {
+        return item.id === dashboardId && item.isGenerating;
+      });
+    }
+
+    function syncPolling(items) {
+      if (items.some(function hasGeneratingDashboard(item) {
+        return item.isGenerating;
+      })) {
+        schedulePolling();
+        return;
+      }
+
+      cancelPolling();
+    }
+
+    function schedulePolling() {
+      if (pollPromise) {
+        return;
+      }
+
+      pollPromise = $timeout(function pollDashboards() {
+        pollPromise = null;
+        loadDashboards();
+      }, 3000, false);
+    }
+
+    function cancelPolling() {
+      if (!pollPromise) {
+        return;
+      }
+
+      $timeout.cancel(pollPromise);
+      pollPromise = null;
     }
   }
 

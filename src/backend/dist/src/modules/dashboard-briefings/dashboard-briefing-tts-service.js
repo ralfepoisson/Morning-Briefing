@@ -2,7 +2,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { PollyClient, SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
-import { logApplicationEvent } from '../admin/application-logger.js';
+import { defaultProvider } from '@aws-sdk/credential-provider-node';
+import { logApplicationEvent, toLogErrorContext } from '../admin/application-logger.js';
 export class DashboardBriefingTtsService {
     provider;
     storageDirectory;
@@ -80,30 +81,72 @@ export class StubDashboardBriefingTtsProvider {
 export class AwsPollyDashboardBriefingTtsProvider {
     config;
     providerName = 'aws-polly';
+    credentialsProvider;
+    credentialSourceHint;
     constructor(config) {
         this.config = config;
+        const credentialProfile = normalizeCredentialProfile(config.credentialProfile);
+        this.credentialsProvider = credentialProfile
+            ? defaultProvider({ profile: credentialProfile })
+            : defaultProvider();
+        this.credentialSourceHint = credentialProfile ? `shared-profile:${credentialProfile}` : 'default-provider-chain';
     }
     async synthesize(input) {
-        const client = new PollyClient({
-            region: this.config.region,
-            endpoint: this.config.endpoint
-        });
-        const response = await client.send(new SynthesizeSpeechCommand({
-            Engine: 'neural',
-            OutputFormat: 'mp3',
-            Text: input.script,
-            TextType: 'text',
-            VoiceId: normalizePollyVoiceId(input.voiceName, this.config.defaultVoiceId)
-        }));
-        if (!response.AudioStream) {
-            throw new Error('AWS Polly did not return audio content.');
+        const voiceId = normalizePollyVoiceId(input.voiceName, this.config.defaultVoiceId);
+        try {
+            const credentials = await this.credentialsProvider();
+            logApplicationEvent({
+                level: 'info',
+                scope: 'dashboard-briefing',
+                event: 'dashboard_briefing_tts_credentials_resolved',
+                message: 'Resolved AWS credentials for Polly synthesis.',
+                context: {
+                    provider: this.providerName,
+                    region: this.config.region,
+                    voiceId,
+                    credentialSourceHint: this.credentialSourceHint,
+                    accessKeyIdSuffix: maskAccessKeyId(credentials.accessKeyId),
+                    sessionTokenPresent: !!credentials.sessionToken
+                }
+            });
+            const client = new PollyClient({
+                region: this.config.region,
+                endpoint: this.config.endpoint,
+                credentials
+            });
+            const response = await client.send(new SynthesizeSpeechCommand({
+                Engine: 'neural',
+                OutputFormat: 'mp3',
+                Text: input.script,
+                TextType: 'text',
+                VoiceId: voiceId
+            }));
+            if (!response.AudioStream) {
+                throw new Error('AWS Polly did not return audio content.');
+            }
+            const audio = Buffer.from(await response.AudioStream.transformToByteArray());
+            return {
+                audio,
+                mimeType: 'audio/mpeg',
+                durationSeconds: null
+            };
         }
-        const audio = Buffer.from(await response.AudioStream.transformToByteArray());
-        return {
-            audio,
-            mimeType: 'audio/mpeg',
-            durationSeconds: null
-        };
+        catch (error) {
+            logApplicationEvent({
+                level: 'error',
+                scope: 'dashboard-briefing',
+                event: 'dashboard_briefing_tts_provider_failed',
+                message: error instanceof Error ? error.message : 'AWS Polly synthesis failed.',
+                context: {
+                    provider: this.providerName,
+                    region: this.config.region,
+                    endpoint: this.config.endpoint || null,
+                    voiceId,
+                    ...toLogErrorContext(error)
+                }
+            });
+            throw error;
+        }
     }
 }
 function estimateDurationFromScript(script) {
@@ -160,4 +203,19 @@ function normalizePollyVoiceId(voiceName, fallbackVoiceId) {
         return fallbackVoiceId.trim();
     }
     return 'Joanna';
+}
+function normalizeCredentialProfile(profile) {
+    if (profile && profile.trim()) {
+        return profile.trim();
+    }
+    if (process.env.NODE_ENV !== 'production') {
+        return 'default';
+    }
+    return null;
+}
+function maskAccessKeyId(accessKeyId) {
+    if (!accessKeyId) {
+        return 'unknown';
+    }
+    return accessKeyId.length <= 4 ? accessKeyId : accessKeyId.slice(-4);
 }

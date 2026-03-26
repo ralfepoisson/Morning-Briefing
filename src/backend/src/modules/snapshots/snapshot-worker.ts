@@ -1,11 +1,10 @@
 import { DeleteMessageBatchCommand, ReceiveMessageCommand, type SQSClient } from '@aws-sdk/client-sqs';
 import { logSnapshotJob } from './snapshot-job-logger.js';
 import { getSnapshotQueueConfig } from './snapshot-queue-config.js';
-import type { SnapshotJobProcessor } from './snapshot-job-processor.js';
 
 export async function runSnapshotWorkerOnce(
   sqs: Pick<SQSClient, 'send'>,
-  processor: SnapshotJobProcessor,
+  processor: { process(message: { body: string; messageId?: string; receiptHandle?: string }): Promise<unknown> },
   env: NodeJS.ProcessEnv = process.env
 ): Promise<number> {
   const config = getSnapshotQueueConfig(env);
@@ -29,11 +28,23 @@ export async function runSnapshotWorkerOnce(
   const deletions: Array<{ Id: string; ReceiptHandle: string }> = [];
 
   for (const message of messages) {
-    await processor.process({
-      body: message.Body || '',
-      messageId: message.MessageId,
-      receiptHandle: message.ReceiptHandle
-    });
+    try {
+      await processor.process({
+        body: message.Body || '',
+        messageId: message.MessageId,
+        receiptHandle: message.ReceiptHandle
+      });
+    } catch (error) {
+      if (!isInvalidQueueMessageError(error)) {
+        throw error;
+      }
+
+      logSnapshotJob('warn', 'snapshot_worker_message_discarded', {
+        messageId: message.MessageId || null,
+        receiptHandle: message.ReceiptHandle || null,
+        error: error instanceof Error ? error.message : 'Queue message is invalid.'
+      });
+    }
 
     if (message.ReceiptHandle && message.MessageId) {
       deletions.push({
@@ -59,7 +70,7 @@ export async function runSnapshotWorkerOnce(
 
 export async function runSnapshotWorkerLoop(
   sqs: Pick<SQSClient, 'send'>,
-  processor: SnapshotJobProcessor,
+  processor: { process(message: { body: string; messageId?: string; receiptHandle?: string }): Promise<unknown> },
   env: NodeJS.ProcessEnv = process.env
 ): Promise<void> {
   const config = getSnapshotQueueConfig(env);
@@ -81,4 +92,18 @@ async function wait(durationMs: number): Promise<void> {
   await new Promise(function resolveWait(resolve) {
     setTimeout(resolve, durationMs);
   });
+}
+
+function isInvalidQueueMessageError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message === 'Queue message type is invalid.' ||
+    error.message === 'Snapshot queue message is invalid.' ||
+    error.message === 'Snapshot queue message payload is invalid.' ||
+    error.message === 'Dashboard briefing queue message is invalid.' ||
+    error.message === 'Dashboard briefing queue message payload is invalid.'
+  );
 }

@@ -65,8 +65,10 @@ InfraLayer --> AwsPolly
 Scheduler --> AppLayer : invokes nightly enqueue
 Sqs --> Lambda : event source mapping
 Lambda --> [Snapshot Job Processor]
-[Snapshot Queue Publisher] ..> Sqs : enqueue commands
+[Snapshot Queue Publisher] ..> Sqs : enqueue widget commands
+[Audio Briefing Use Cases] ..> Sqs : enqueue audio commands
 [Snapshot Job Processor] ..> [Briefing Use Cases] : generate widget snapshots
+[Snapshot Job Processor] ..> [Audio Briefing Use Cases] : generate dashboard audio
 [Snapshot Job Processor] ..> Postgres : job state + snapshots
 [Admin Configuration Use Cases] ..> [Tenant AI Configuration] : load/update shared model + key
 [Audio Briefing Use Cases] ..> [LLM Provider] : script generation
@@ -91,6 +93,8 @@ note bottom of InfraLayer
 The worker logic stays inside the modular monolith,
 but SQS and Lambda provide the first production queue
 runtime with a clean path to ECS/Fargate later.
+Dashboard and widget rows also carry is_generating flags
+so admin views can reflect in-flight regeneration state.
 end note
 
 @enduml

@@ -41,12 +41,12 @@ export async function registerLogRoutes(
     const range = parseRange(query.range);
     const since = range ? new Date(Date.now() - (range.minutes * 60 * 1000)).toISOString() : undefined;
     try {
-      const entries = await dependencies.listLogs({
+      const entries = sortEntriesByNewestFirst(await dependencies.listLogs({
         search: query.q,
         levels,
         limit,
         since
-      });
+      }));
 
       return {
         filters: {
@@ -160,6 +160,12 @@ function serializeEntry(entry: ApplicationLogEntry) {
     message: entry.message,
     context: entry.context
   };
+}
+
+function sortEntriesByNewestFirst(entries: ApplicationLogEntry[]): ApplicationLogEntry[] {
+  return entries.slice().sort(function compareEntries(left, right) {
+    return Date.parse(right.timestamp) - Date.parse(left.timestamp);
+  });
 }
 
 function getLogAccessErrorMessage(error: unknown): string {

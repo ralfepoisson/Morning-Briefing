@@ -1,5 +1,5 @@
 import { describeFetchFailure } from '../../shared/fetch-error.js';
-import { logApplicationEvent } from '../admin/application-logger.js';
+import { logApplicationEvent, toLogErrorContext } from '../admin/application-logger.js';
 import type { TenantAiConfigurationService } from '../tenant-ai-configuration/tenant-ai-configuration-service.js';
 import type {
   DashboardBriefingInput,
@@ -67,7 +67,8 @@ export class DashboardBriefingLlmService {
         context: {
           dashboardId: input.dashboardId,
           provider: this.provider.providerName,
-          modelName: this.provider.modelName
+          modelName: this.provider.modelName,
+          ...toLogErrorContext(error)
         }
       });
 

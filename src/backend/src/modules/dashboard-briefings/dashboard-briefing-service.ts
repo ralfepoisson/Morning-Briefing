@@ -1,6 +1,6 @@
 import { access, readFile } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
-import { logApplicationEvent } from '../admin/application-logger.js';
+import { logApplicationEvent, toLogErrorContext } from '../admin/application-logger.js';
 import type { DefaultUserContext } from '../default-user/default-user-service.js';
 import { DashboardBriefingAggregationService } from './dashboard-briefing-aggregation-service.js';
 import { DASHBOARD_BRIEFING_PROMPT_VERSION } from './dashboard-briefing-prompt-service.js';
@@ -152,36 +152,52 @@ export class DashboardBriefingService {
           reused: true
         };
       }
+    } else {
+      logApplicationEvent({
+        level: 'info',
+        scope: 'dashboard-briefing',
+        event: 'dashboard_briefing_force_regeneration_requested',
+        message: 'Dashboard briefing force regeneration requested.',
+        context: {
+          dashboardId,
+          ownerUserId: user.userId,
+          sourceSnapshotHash: aggregation.sourceSnapshotHash
+        }
+      });
     }
 
-    const created = await this.repository.createBriefing({
-      dashboardId,
-      ownerUserId: user.userId,
-      status: 'GENERATING',
-      sourceSnapshotHash: aggregation.sourceSnapshotHash,
-      modelName: this.llmService.getModelName(),
-      promptVersion: DASHBOARD_BRIEFING_PROMPT_VERSION
-    });
-
-    if (!created) {
-      return null;
-    }
-
-    logApplicationEvent({
-      level: 'info',
-      scope: 'dashboard-briefing',
-      event: 'dashboard_briefing_record_created',
-      message: 'Dashboard briefing record created.',
-      context: {
-        dashboardId,
-        ownerUserId: user.userId,
-        briefingId: created.id,
-        modelName: this.llmService.getModelName(),
-        sourceSnapshotHash: aggregation.sourceSnapshotHash
-      }
-    });
+    let created: Awaited<ReturnType<DashboardBriefingRepository['createBriefing']>> | null = null;
 
     try {
+      await this.repository.setDashboardGenerating(dashboardId, user.userId, true);
+
+      created = await this.repository.createBriefing({
+        dashboardId,
+        ownerUserId: user.userId,
+        status: 'GENERATING',
+        sourceSnapshotHash: aggregation.sourceSnapshotHash,
+        modelName: this.llmService.getModelName(),
+        promptVersion: DASHBOARD_BRIEFING_PROMPT_VERSION
+      });
+
+      if (!created) {
+        return null;
+      }
+
+      logApplicationEvent({
+        level: 'info',
+        scope: 'dashboard-briefing',
+        event: 'dashboard_briefing_record_created',
+        message: 'Dashboard briefing record created.',
+        context: {
+          dashboardId,
+          ownerUserId: user.userId,
+          briefingId: created.id,
+          modelName: this.llmService.getModelName(),
+          sourceSnapshotHash: aggregation.sourceSnapshotHash
+        }
+      });
+
       const script = await this.llmService.generateScript(aggregation.input);
       logApplicationEvent({
         level: 'info',
@@ -269,16 +285,18 @@ export class DashboardBriefingService {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Dashboard briefing generation failed.';
 
-      await this.repository.updateBriefing({
-        briefingId: created.id,
-        ownerUserId: user.userId,
-        status: 'FAILED',
-        generatedAt: new Date(),
-        modelName: this.llmService.getModelName(),
-        promptVersion: DASHBOARD_BRIEFING_PROMPT_VERSION,
-        errorMessage: message,
-        sourceWidgetTypes: aggregation.includedWidgetTypes
-      });
+      if (created) {
+        await this.repository.updateBriefing({
+          briefingId: created.id,
+          ownerUserId: user.userId,
+          status: 'FAILED',
+          generatedAt: new Date(),
+          modelName: this.llmService.getModelName(),
+          promptVersion: DASHBOARD_BRIEFING_PROMPT_VERSION,
+          errorMessage: message,
+          sourceWidgetTypes: aggregation.includedWidgetTypes
+        });
+      }
       logApplicationEvent({
         level: 'error',
         scope: 'dashboard-briefing',
@@ -286,12 +304,15 @@ export class DashboardBriefingService {
         message,
         context: {
           dashboardId,
-          briefingId: created.id,
+          briefingId: created ? created.id : null,
           widgetTypes: aggregation.includedWidgetTypes,
-          sourceSnapshotHash: aggregation.sourceSnapshotHash
+          sourceSnapshotHash: aggregation.sourceSnapshotHash,
+          ...toLogErrorContext(error)
         }
       });
       throw error;
+    } finally {
+      await this.repository.setDashboardGenerating(dashboardId, user.userId, false);
     }
   }
 

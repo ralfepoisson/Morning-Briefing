@@ -15,6 +15,7 @@ test('GET /api/v1/admin/dashboards returns dashboards, owners, widgets, and late
               id: 'dash-1',
               name: 'Morning Briefing',
               description: 'Start the day',
+              isGenerating: true,
               createdAt: new Date('2026-03-25T06:00:00.000Z'),
               updatedAt: new Date('2026-03-25T07:00:00.000Z'),
               owner: {
@@ -80,8 +81,8 @@ test('GET /api/v1/admin/dashboards returns dashboards, owners, widgets, and late
         };
       }
     },
-    dashboardBriefingService: {
-      async generateBriefing() {
+    dashboardBriefingJobPublisher: {
+      async publishGenerateDashboardAudioBriefing() {
         throw new Error('not used');
       }
     }
@@ -100,6 +101,7 @@ test('GET /api/v1/admin/dashboards returns dashboards, owners, widgets, and late
           id: 'dash-1',
           name: 'Morning Briefing',
           description: 'Start the day',
+          isGenerating: true,
           createdAt: '2026-03-25T06:00:00.000Z',
           updatedAt: '2026-03-25T07:00:00.000Z',
           owner: {
@@ -147,8 +149,81 @@ test('GET /api/v1/admin/dashboards returns dashboards, owners, widgets, and late
   }
 });
 
-test('POST /api/v1/admin/dashboards/:dashboardId/regenerate-audio-briefing regenerates as the dashboard owner', async function () {
+test('GET /api/v1/admin/dashboards falls back when dashboard generating schema is unavailable', async function () {
   const app = Fastify();
+  let callCount = 0;
+
+  await registerAdminDashboardRoutes(app, {
+    prisma: {
+      dashboard: {
+        async findMany() {
+          callCount += 1;
+
+          if (callCount === 1) {
+            throw new Error('The column `dashboards.is_generating` does not exist in the current database.');
+          }
+
+          return [
+            {
+              id: 'dash-1',
+              name: 'Morning Briefing',
+              description: 'Start the day',
+              createdAt: new Date('2026-03-25T06:00:00.000Z'),
+              updatedAt: new Date('2026-03-25T07:00:00.000Z'),
+              owner: {
+                id: 'user-1',
+                displayName: 'Ralfe',
+                email: 'ralfe@example.com'
+              },
+              widgets: []
+            }
+          ];
+        }
+      },
+      dashboardBriefing: {
+        async findMany() {
+          return [];
+        }
+      }
+    },
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'admin-1',
+          displayName: 'Admin User',
+          timezone: 'Europe/Paris',
+          locale: 'en-GB',
+          email: 'admin@example.com',
+          isAdmin: true
+        };
+      }
+    },
+    dashboardBriefingJobPublisher: {
+      async publishGenerateDashboardAudioBriefing() {
+        throw new Error('not used');
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/dashboards'
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(callCount, 2);
+    assert.equal(response.json().items[0].isGenerating, false);
+  } finally {
+    await app.close();
+  }
+});
+
+test('POST /api/v1/admin/dashboards/:dashboardId/regenerate-audio-briefing queues async generation as the dashboard owner', async function () {
+  const app = Fastify();
+  let publishedInput = null;
+  const dashboardUpdates = [];
 
   await registerAdminDashboardRoutes(app, {
     prisma: {
@@ -156,9 +231,14 @@ test('POST /api/v1/admin/dashboards/:dashboardId/regenerate-audio-briefing regen
         async findMany() {
           throw new Error('not used');
         },
+        async update(input) {
+          dashboardUpdates.push(input);
+          return {};
+        },
         async findFirst() {
           return {
             id: 'dash-1',
+            isGenerating: false,
             owner: {
               id: 'owner-1',
               tenantId: 'tenant-1',
@@ -190,34 +270,24 @@ test('POST /api/v1/admin/dashboards/:dashboardId/regenerate-audio-briefing regen
         };
       }
     },
-    dashboardBriefingService: {
-      async generateBriefing(dashboardId, user, options) {
-        assert.equal(dashboardId, 'dash-1');
-        assert.equal(user.userId, 'owner-1');
-        assert.equal(user.email, 'ralfe@example.com');
-        assert.deepEqual(options, {
-          force: true
-        });
-
+    dashboardBriefingJobPublisher: {
+      async publishGenerateDashboardAudioBriefing(input) {
+        publishedInput = input;
         return {
-          briefing: {
-            id: 'brief-1',
-            dashboardId: 'dash-1',
-            status: 'READY',
-            sourceSnapshotHash: 'hash-1',
-            generatedAt: '2026-03-25T07:15:00.000Z',
-            modelName: 'stub',
-            promptVersion: 'v1',
-            scriptText: 'Hello world',
-            scriptJson: {},
-            estimatedDurationSeconds: 82,
-            errorMessage: null,
-            sourceWidgetTypes: ['weather', 'news'],
-            createdAt: '2026-03-25T07:14:00.000Z',
-            updatedAt: '2026-03-25T07:15:00.000Z',
-            audio: null
-          },
-          reused: false
+          schemaVersion: 1,
+          jobId: 'job-1',
+          dashboardId: input.dashboardId,
+          tenantId: input.tenantId,
+          ownerUserId: input.ownerUserId,
+          ownerDisplayName: input.ownerDisplayName,
+          ownerTimezone: input.ownerTimezone,
+          ownerLocale: input.ownerLocale,
+          ownerEmail: input.ownerEmail,
+          ownerIsAdmin: input.ownerIsAdmin,
+          force: input.force,
+          correlationId: input.correlationId || null,
+          causationId: input.causationId || null,
+          requestedAt: '2026-03-25T07:14:00.000Z'
         };
       }
     }
@@ -229,8 +299,20 @@ test('POST /api/v1/admin/dashboards/:dashboardId/regenerate-audio-briefing regen
       url: '/api/v1/admin/dashboards/dash-1/regenerate-audio-briefing'
     });
 
-    assert.equal(response.statusCode, 200);
-    assert.equal(response.json().briefing.id, 'brief-1');
+    assert.equal(response.statusCode, 202);
+    assert.equal((publishedInput as { ownerUserId: string }).ownerUserId, 'owner-1');
+    assert.equal((publishedInput as { ownerEmail: string }).ownerEmail, 'ralfe@example.com');
+    assert.deepEqual(dashboardUpdates.map(function mapUpdate(item) {
+      return (item as { data: { isGenerating: boolean } }).data.isGenerating;
+    }), [true]);
+    assert.deepEqual(response.json(), {
+      status: 'queued',
+      job: {
+        dashboardId: 'dash-1',
+        force: true,
+        requestedAt: '2026-03-25T07:14:00.000Z'
+      }
+    });
   } finally {
     await app.close();
   }

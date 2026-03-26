@@ -13,7 +13,7 @@ export class SnapshotJobProcessor {
   constructor(
     private readonly repository: Pick<
       SnapshotRepository,
-      'claimSnapshotJob' | 'completeSnapshotJob' | 'skipSnapshotJob' | 'failSnapshotJob'
+      'claimSnapshotJob' | 'setWidgetGenerating' | 'completeSnapshotJob' | 'skipSnapshotJob' | 'failSnapshotJob'
     >,
     private readonly snapshotService: Pick<SnapshotService, 'generateForWidget'>
   ) {}
@@ -58,6 +58,7 @@ export class SnapshotJobProcessor {
     });
 
     try {
+      await this.repository.setWidgetGenerating(payload.widgetId, true);
       const result = await this.snapshotService.generateForWidget(payload);
 
       if (result.status === 'skipped') {
@@ -104,18 +105,21 @@ export class SnapshotJobProcessor {
       });
 
       throw error;
+    } finally {
+      await this.repository.setWidgetGenerating(payload.widgetId, false);
     }
   }
 }
 
 export function parseGenerateWidgetSnapshotMessage(body: string): GenerateWidgetSnapshotRequested {
-  const parsed = JSON.parse(body) as GenerateWidgetSnapshotEnvelope;
+  const parsed = JSON.parse(body) as GenerateWidgetSnapshotEnvelope & GenerateWidgetSnapshotRequested;
+  const payload = parsed && parsed.type === 'GenerateWidgetSnapshotRequested'
+    ? (parsed.payload || parsed)
+    : null;
 
-  if (!parsed || parsed.type !== 'GenerateWidgetSnapshotRequested' || !parsed.payload) {
+  if (!payload) {
     throw new Error('Snapshot queue message is invalid.');
   }
-
-  const payload = parsed.payload;
 
   if (
     payload.schemaVersion !== 1 ||

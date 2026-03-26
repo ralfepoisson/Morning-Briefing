@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
-import { logApplicationEvent } from '../admin/application-logger.js';
+import { logApplicationEvent, toLogErrorContext } from '../admin/application-logger.js';
 import { DefaultUserService } from '../default-user/default-user-service.js';
 import { createDashboardBriefingService } from './dashboard-briefing-runtime.js';
 import type { DashboardBriefingService } from './dashboard-briefing-service.js';
@@ -162,6 +162,17 @@ export async function registerDashboardBriefingRoutes(
       reply.type(audio.mimeType);
       return reply.send(audio.content);
     } catch (error) {
+      logApplicationEvent({
+        level: 'error',
+        scope: 'dashboard-briefing',
+        event: 'dashboard_briefing_audio_content_route_failed',
+        message: error instanceof Error ? error.message : 'Audio file is missing.',
+        context: {
+          audioId: params.audioId,
+          ownerUserId: user.userId,
+          ...toLogErrorContext(error)
+        }
+      });
       reply.code(404);
       return {
         message: error instanceof Error ? error.message : 'Audio file is missing.'

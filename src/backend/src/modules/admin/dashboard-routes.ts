@@ -1,21 +1,22 @@
 import type { PrismaClient } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
-import { logApplicationEvent } from './application-logger.js';
+import { logApplicationEvent, toLogErrorContext } from './application-logger.js';
 import { DefaultUserService } from '../default-user/default-user-service.js';
-import { createDashboardBriefingService } from '../dashboard-briefings/dashboard-briefing-runtime.js';
-import type { DashboardBriefingService } from '../dashboard-briefings/dashboard-briefing-service.js';
+import { createDashboardBriefingJobPublisherFromEnvironment } from '../dashboard-briefings/dashboard-briefing-runtime.js';
+import type { DashboardBriefingJobPublisher } from '../dashboard-briefings/dashboard-briefing-job-publisher.js';
 
 type AdminDashboardRouteDependencies = {
   prisma: Pick<PrismaClient, 'dashboard' | 'dashboardBriefing'>;
   defaultUserService: Pick<DefaultUserService, 'getDefaultUser'>;
-  dashboardBriefingService: Pick<DashboardBriefingService, 'generateBriefing'>;
+  dashboardBriefingJobPublisher: Pick<DashboardBriefingJobPublisher, 'publishGenerateDashboardAudioBriefing'> | null;
 };
 
 type AdminDashboardListRecord = {
   id: string;
   name: string;
   description: string | null;
+  isGenerating: boolean;
   createdAt: Date;
   updatedAt: Date;
   owner: {
@@ -62,9 +63,197 @@ export async function registerAdminDashboardRoutes(
       };
     }
 
-    const dashboards = await dependencies.prisma.dashboard.findMany({
+    const dashboards = await listAdminDashboards(dependencies.prisma, user.tenantId);
+
+    const latestBriefings = await listLatestBriefingsForTenant(dependencies.prisma, user.tenantId);
+    const items = dashboards.map(function mapDashboard(dashboard) {
+      return mapAdminDashboardRecord(dashboard, latestBriefings.get(dashboard.id) || null);
+    });
+
+    return {
+      items: items
+    };
+  });
+
+  app.post('/api/v1/admin/dashboards/:dashboardId/regenerate-audio-briefing', async function handleRegenerateAudioBriefing(request, reply) {
+    const params = request.params as { dashboardId?: string };
+
+    if (!params.dashboardId) {
+      reply.code(400);
+      return {
+        message: 'Dashboard id is required.'
+      };
+    }
+
+    if (!dependencies.dashboardBriefingJobPublisher) {
+      reply.code(503);
+      return {
+        message: 'Audio briefing regeneration is currently unavailable.'
+      };
+    }
+
+    const currentUser = await dependencies.defaultUserService.getDefaultUser(request);
+
+    if (!currentUser.isAdmin) {
+      reply.code(403);
+      return {
+        message: 'Admin access is required.'
+      };
+    }
+
+    logApplicationEvent({
+      level: 'info',
+      scope: 'dashboard-briefing',
+      event: 'admin_dashboard_briefing_regeneration_requested',
+      message: 'Admin requested dashboard audio briefing regeneration.',
+      context: {
+        dashboardId: params.dashboardId,
+        adminUserId: currentUser.userId
+      }
+    });
+
+    const dashboard = await findDashboardForRegeneration(dependencies.prisma, params.dashboardId, currentUser.tenantId);
+
+    if (!dashboard) {
+      reply.code(404);
+      return {
+        message: 'Dashboard not found.'
+      };
+    }
+
+    if (dashboard.isGenerating) {
+      reply.code(202);
+      return {
+        status: 'queued',
+        alreadyQueued: true,
+        job: {
+          dashboardId: dashboard.id,
+          force: true
+        }
+      };
+    }
+
+    try {
+      await setDashboardGeneratingSafe(dependencies.prisma, dashboard.id, true);
+
+      const published = await dependencies.dashboardBriefingJobPublisher.publishGenerateDashboardAudioBriefing({
+        dashboardId: dashboard.id,
+        tenantId: dashboard.owner.tenantId,
+        ownerUserId: dashboard.owner.id,
+        ownerDisplayName: dashboard.owner.displayName,
+        ownerTimezone: dashboard.owner.timezone,
+        ownerLocale: dashboard.owner.locale,
+        ownerEmail: dashboard.owner.email,
+        ownerIsAdmin: dashboard.owner.isAdmin,
+        force: true,
+        correlationId: request.id,
+        causationId: request.id
+      });
+
+      logApplicationEvent({
+        level: 'info',
+        scope: 'dashboard-briefing',
+        event: 'admin_dashboard_briefing_regeneration_queued',
+        message: 'Admin dashboard audio briefing regeneration queued.',
+        context: {
+          dashboardId: dashboard.id,
+          adminUserId: currentUser.userId,
+          ownerUserId: dashboard.owner.id,
+          jobId: published.jobId
+        }
+      });
+
+      reply.code(202);
+      return {
+        status: 'queued',
+        job: {
+          dashboardId: dashboard.id,
+          force: true,
+          requestedAt: published.requestedAt
+        }
+      };
+    } catch (error) {
+      await setDashboardGeneratingSafe(dependencies.prisma, dashboard.id, false);
+      logApplicationEvent({
+        level: 'error',
+        scope: 'dashboard-briefing',
+        event: 'admin_dashboard_briefing_regeneration_failed',
+        message: error instanceof Error ? error.message : 'Audio briefing regeneration failed.',
+        context: {
+          dashboardId: params.dashboardId,
+          adminUserId: currentUser.userId,
+          ...toLogErrorContext(error)
+        }
+      });
+      reply.code(409);
+      return {
+        message: error instanceof Error ? error.message : 'Audio briefing regeneration failed.'
+      };
+    }
+  });
+}
+
+async function listAdminDashboards(
+  prisma: Pick<PrismaClient, 'dashboard'>,
+  tenantId: string
+): Promise<AdminDashboardListRecord[]> {
+  try {
+    return await prisma.dashboard.findMany({
       where: {
-        tenantId: user.tenantId,
+        tenantId,
+        archivedAt: null
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        isGenerating: true,
+        createdAt: true,
+        updatedAt: true,
+        owner: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true
+          }
+        },
+        widgets: {
+          where: {
+            archivedAt: null
+          },
+          orderBy: [
+            { sortOrder: 'asc' },
+            { createdAt: 'asc' }
+          ],
+          select: {
+            id: true,
+            widgetType: true,
+            title: true,
+            isVisible: true,
+            refreshMode: true,
+            updatedAt: true
+          }
+        }
+      },
+      orderBy: [
+        {
+          owner: {
+            displayName: 'asc'
+          }
+        },
+        {
+          name: 'asc'
+        }
+      ]
+    });
+  } catch (error) {
+    if (!isMissingDashboardGeneratingSchemaError(error)) {
+      throw error;
+    }
+
+    const dashboards = await prisma.dashboard.findMany({
+      where: {
+        tenantId,
         archivedAt: null
       },
       select: {
@@ -110,50 +299,64 @@ export async function registerAdminDashboardRoutes(
       ]
     });
 
-    const latestBriefings = await listLatestBriefingsForTenant(dependencies.prisma, user.tenantId);
-    const items = dashboards.map(function mapDashboard(dashboard) {
-      return mapAdminDashboardRecord(dashboard, latestBriefings.get(dashboard.id) || null);
+    return dashboards.map(function mapLegacyDashboard(dashboard) {
+      return {
+        ...dashboard,
+        isGenerating: false
+      };
     });
+  }
+}
 
-    return {
-      items: items
-    };
-  });
-
-  app.post('/api/v1/admin/dashboards/:dashboardId/regenerate-audio-briefing', async function handleRegenerateAudioBriefing(request, reply) {
-    const params = request.params as { dashboardId?: string };
-
-    if (!params.dashboardId) {
-      reply.code(400);
-      return {
-        message: 'Dashboard id is required.'
-      };
-    }
-
-    const currentUser = await dependencies.defaultUserService.getDefaultUser(request);
-
-    if (!currentUser.isAdmin) {
-      reply.code(403);
-      return {
-        message: 'Admin access is required.'
-      };
-    }
-
-    logApplicationEvent({
-      level: 'info',
-      scope: 'dashboard-briefing',
-      event: 'admin_dashboard_briefing_regeneration_requested',
-      message: 'Admin requested dashboard audio briefing regeneration.',
-      context: {
-        dashboardId: params.dashboardId,
-        adminUserId: currentUser.userId
+async function findDashboardForRegeneration(
+  prisma: Pick<PrismaClient, 'dashboard'>,
+  dashboardId: string,
+  tenantId: string
+): Promise<{
+  id: string;
+  isGenerating: boolean;
+  owner: {
+    id: string;
+    tenantId: string;
+    displayName: string;
+    timezone: string;
+    locale: string;
+    email: string;
+    isAdmin: boolean;
+  };
+} | null> {
+  try {
+    return await prisma.dashboard.findFirst({
+      where: {
+        id: dashboardId,
+        tenantId,
+        archivedAt: null
+      },
+      select: {
+        id: true,
+        isGenerating: true,
+        owner: {
+          select: {
+            id: true,
+            tenantId: true,
+            displayName: true,
+            timezone: true,
+            locale: true,
+            email: true,
+            isAdmin: true
+          }
+        }
       }
     });
+  } catch (error) {
+    if (!isMissingDashboardGeneratingSchemaError(error)) {
+      throw error;
+    }
 
-    const dashboard = await dependencies.prisma.dashboard.findFirst({
+    const dashboard = await prisma.dashboard.findFirst({
       where: {
-        id: params.dashboardId,
-        tenantId: currentUser.tenantId,
+        id: dashboardId,
+        tenantId,
         archivedAt: null
       },
       select: {
@@ -173,44 +376,35 @@ export async function registerAdminDashboardRoutes(
     });
 
     if (!dashboard) {
-      reply.code(404);
-      return {
-        message: 'Dashboard not found.'
-      };
+      return null;
     }
 
-    try {
-      const result = await dependencies.dashboardBriefingService.generateBriefing(
-        dashboard.id,
-        {
-          tenantId: dashboard.owner.tenantId,
-          userId: dashboard.owner.id,
-          displayName: dashboard.owner.displayName,
-          timezone: dashboard.owner.timezone,
-          locale: dashboard.owner.locale,
-          email: dashboard.owner.email,
-          isAdmin: dashboard.owner.isAdmin
-        },
-        {
-          force: true
-        }
-      );
+    return {
+      ...dashboard,
+      isGenerating: false
+    };
+  }
+}
 
-      if (!result) {
-        reply.code(404);
-        return {
-          message: 'Dashboard not found.'
-        };
+async function setDashboardGeneratingSafe(
+  prisma: Pick<PrismaClient, 'dashboard'>,
+  dashboardId: string,
+  isGenerating: boolean
+): Promise<void> {
+  try {
+    await prisma.dashboard.update({
+      where: {
+        id: dashboardId
+      },
+      data: {
+        isGenerating
       }
-
-      return result;
-    } catch (error) {
-      reply.code(409);
-      return {
-        message: error instanceof Error ? error.message : 'Audio briefing regeneration failed.'
-      };
+    });
+  } catch (error) {
+    if (!isMissingDashboardGeneratingSchemaError(error)) {
+      throw error;
     }
-  });
+  }
 }
 
 function createAdminDashboardRouteDependencies(): AdminDashboardRouteDependencies {
@@ -219,7 +413,7 @@ function createAdminDashboardRouteDependencies(): AdminDashboardRouteDependencie
   return {
     prisma: prisma,
     defaultUserService: new DefaultUserService(prisma),
-    dashboardBriefingService: createDashboardBriefingService()
+    dashboardBriefingJobPublisher: createDashboardBriefingJobPublisherFromEnvironment()
   };
 }
 
@@ -286,6 +480,7 @@ function mapAdminDashboardRecord(dashboard: AdminDashboardListRecord, briefing: 
     id: dashboard.id,
     name: dashboard.name,
     description: dashboard.description || '',
+    isGenerating: dashboard.isGenerating,
     createdAt: dashboard.createdAt.toISOString(),
     updatedAt: dashboard.updatedAt.toISOString(),
     owner: {
@@ -322,6 +517,11 @@ function mapAdminDashboardRecord(dashboard: AdminDashboardListRecord, briefing: 
       }
       : null
   };
+}
+
+function isMissingDashboardGeneratingSchemaError(error: unknown): boolean {
+  return error instanceof Error &&
+    error.message.includes('dashboards.is_generating');
 }
 
 function isMissingBriefingSchemaError(error: unknown): boolean {

@@ -11,18 +11,61 @@ export class PrismaDashboardRepository implements DashboardRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async listForOwner(ownerUserId: string): Promise<DashboardRecord[]> {
-    const dashboards = await this.prisma.dashboard.findMany({
-      where: {
-        ownerUserId,
-        archivedAt: null
-      },
-      orderBy: [
-        { isDefault: 'desc' },
-        { createdAt: 'asc' }
-      ]
-    });
+    try {
+      const dashboards = await this.prisma.dashboard.findMany({
+        where: {
+          ownerUserId,
+          archivedAt: null
+        },
+        orderBy: [
+          { isDefault: 'desc' },
+          { createdAt: 'asc' }
+        ],
+        select: {
+          id: true,
+          ownerUserId: true,
+          name: true,
+          description: true,
+          themeJson: true,
+          isGenerating: true,
+          createdAt: true,
+          updatedAt: true
+        }
+      });
 
-    return dashboards.map(mapDashboardRecord);
+      return dashboards.map(mapDashboardRecord);
+    } catch (error) {
+      if (!isMissingDashboardGeneratingSchemaError(error)) {
+        throw error;
+      }
+
+      const dashboards = await this.prisma.dashboard.findMany({
+        where: {
+          ownerUserId,
+          archivedAt: null
+        },
+        orderBy: [
+          { isDefault: 'desc' },
+          { createdAt: 'asc' }
+        ],
+        select: {
+          id: true,
+          ownerUserId: true,
+          name: true,
+          description: true,
+          themeJson: true,
+          createdAt: true,
+          updatedAt: true
+        }
+      });
+
+      return dashboards.map(function mapLegacyDashboard(dashboard) {
+        return mapDashboardRecord({
+          ...dashboard,
+          isGenerating: false
+        });
+      });
+    }
   }
 
   async create(input: CreateDashboardInput): Promise<DashboardRecord> {
@@ -138,6 +181,7 @@ function mapDashboardRecord(dashboard: {
     name: dashboard.name,
     description: dashboard.description || '',
     theme: getThemeKey(dashboard.themeJson),
+    isGenerating: 'isGenerating' in dashboard ? Boolean(dashboard.isGenerating) : false,
     createdAt: dashboard.createdAt,
     updatedAt: dashboard.updatedAt
   };
@@ -153,4 +197,9 @@ function getThemeKey(themeJson: unknown): string {
   }
 
   return 'aurora';
+}
+
+function isMissingDashboardGeneratingSchemaError(error: unknown): boolean {
+  return error instanceof Error &&
+    error.message.includes('dashboards.is_generating');
 }

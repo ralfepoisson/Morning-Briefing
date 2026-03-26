@@ -35,6 +35,7 @@ export interface DashboardBriefingAggregationRepository {
 }
 
 export interface DashboardBriefingRepository extends DashboardBriefingAggregationRepository {
+  setDashboardGenerating(dashboardId: string, ownerUserId: string, isGenerating: boolean): Promise<void>;
   findPreference(dashboardId: string, ownerUserId: string): Promise<DashboardBriefingPreferenceRecord | null>;
   upsertPreference(input: {
     dashboardId: string;

@@ -56,8 +56,8 @@ test('application log repository maps persisted rows into API log entries', asyn
   });
 
   assert.equal(logs.length, 2);
-  assert.equal(logs[0].id, 'log-2');
-  assert.equal(logs[1].id, 'log-1');
+  assert.equal(logs[0].id, 'log-1');
+  assert.equal(logs[1].id, 'log-2');
 });
 
 test('application log repository summarizes persisted log levels', async function () {

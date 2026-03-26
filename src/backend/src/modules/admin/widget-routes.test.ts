@@ -18,6 +18,7 @@ test('GET /api/v1/admin/widgets returns widgets with latest snapshot state', asy
               widgetType: 'weather',
               title: 'Weather Outlook',
               isVisible: true,
+              isGenerating: true,
               refreshMode: 'SNAPSHOT',
               version: 3,
               configHash: 'hash-1',
@@ -58,6 +59,7 @@ test('GET /api/v1/admin/widgets returns widgets with latest snapshot state', asy
               widgetType: 'news',
               title: 'News Briefing',
               isVisible: true,
+              isGenerating: false,
               refreshMode: 'SNAPSHOT',
               version: 2,
               configHash: 'hash-2',
@@ -119,6 +121,7 @@ test('GET /api/v1/admin/widgets returns widgets with latest snapshot state', asy
           type: 'weather',
           title: 'Weather Outlook',
           isVisible: true,
+          isGenerating: true,
           refreshMode: 'SNAPSHOT',
           latestSnapshotAt: '2026-03-20T06:15:00.000Z',
           latestSnapshotDate: '2026-03-20',
@@ -141,6 +144,7 @@ test('GET /api/v1/admin/widgets returns widgets with latest snapshot state', asy
           type: 'news',
           title: 'News Briefing',
           isVisible: true,
+          isGenerating: false,
           refreshMode: 'SNAPSHOT',
           latestSnapshotAt: null,
           latestSnapshotDate: null,
@@ -163,6 +167,7 @@ test('GET /api/v1/admin/widgets returns widgets with latest snapshot state', asy
 test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual refresh', async function () {
   const app = Fastify();
   let publishedInput = null;
+  const widgetUpdates = [];
   const expectedSnapshotDate = formatSnapshotDateForTimezone(new Date(), 'Europe/Paris');
 
   await registerAdminWidgetRoutes(app, {
@@ -170,6 +175,10 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual
       dashboardWidget: {
         findMany: async function findMany() {
           return [];
+        },
+        update: async function update(input) {
+          widgetUpdates.push(input);
+          return {};
         },
         findFirst: async function findFirst() {
           return {
@@ -243,6 +252,8 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual
     });
 
     assert.equal(response.statusCode, 202);
+    assert.equal(widgetUpdates.length, 1);
+    assert.equal((widgetUpdates[0] as { data: { isGenerating: boolean } }).data.isGenerating, true);
     assert.equal((publishedInput as { triggerSource: string }).triggerSource, 'manual_refresh');
     assert.equal((publishedInput as { bypassDuplicateCheck: boolean }).bypassDuplicateCheck, true);
     assert.equal((publishedInput as { snapshotDate: string }).snapshotDate, expectedSnapshotDate);
@@ -264,6 +275,7 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual
 test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot falls back to direct generation when queue publishing fails', async function () {
   const app = Fastify();
   let generatedInput = null;
+  const widgetUpdates = [];
   const expectedSnapshotDate = formatSnapshotDateForTimezone(new Date(), 'Europe/Paris');
 
   await registerAdminWidgetRoutes(app, {
@@ -271,6 +283,10 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot falls back to dir
       dashboardWidget: {
         findMany: async function findMany() {
           return [];
+        },
+        update: async function update(input) {
+          widgetUpdates.push(input);
+          return {};
         },
         findFirst: async function findFirst() {
           return {
@@ -329,6 +345,9 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot falls back to dir
     });
 
     assert.equal(response.statusCode, 200);
+    assert.deepEqual(widgetUpdates.map(function mapUpdate(item) {
+      return (item as { data: { isGenerating: boolean } }).data.isGenerating;
+    }), [true, false]);
     assert.equal((generatedInput as { triggerSource: string }).triggerSource, 'manual_refresh');
     assert.equal((generatedInput as { snapshotDate: string }).snapshotDate, expectedSnapshotDate);
     assert.deepEqual(response.json(), {

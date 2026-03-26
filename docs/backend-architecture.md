@@ -198,13 +198,14 @@ This model keeps the dashboard editor fast and independent from the timing of da
 
 ### Current queue-based implementation
 
-The codebase now uses an AWS-managed, serverless-first snapshot pipeline:
+The codebase now uses an AWS-managed, serverless-first generation pipeline:
 
 - widget configuration changes enqueue `GenerateWidgetSnapshotRequested` messages to SQS Standard
+- admin dashboard audio regeneration enqueues `GenerateDashboardAudioBriefingRequested` messages to the same queue
 - EventBridge Scheduler is intended to trigger a nightly enqueue function that lists eligible widgets and enqueues one message per widget
 - Lambda is the initial worker runtime, but the consumer logic is written as a transport-agnostic processor so it can move to ECS/Fargate later
 - `snapshot_generation_jobs` persists idempotency, attempt counts, and skip/failure state
-- workers detect stale jobs by comparing the queued widget config version/hash with the current widget row before generating anything
+- workers detect stale widget jobs by comparing the queued widget config version/hash with the current widget row before generating anything
 - a DLQ receives messages that exhaust SQS retries
 
 The logical idempotency key is:
@@ -236,6 +237,7 @@ Audio Briefing extends the existing snapshot architecture at the dashboard level
 - Briefing preferences are dashboard-scoped and stored separately from widget configuration.
 - Tenant-scoped AI configuration is stored separately from both widget configuration and briefing preferences.
 - Manual regeneration belongs to admin tooling or scheduled jobs, not the end-user dashboard.
+- Manual audio regeneration is queue-backed so the HTTP request only enqueues work and the worker performs the heavy generation.
 - Cache reuse is based on a source hash built from the included widget snapshot identities and the current dashboard briefing preferences.
 
 ## Connectors And Secrets

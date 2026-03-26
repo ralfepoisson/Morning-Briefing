@@ -50,6 +50,7 @@ export interface SnapshotRepository {
   findWidgetForSnapshotGeneration(widgetId: string): Promise<DashboardWidgetRecord | null>;
   listWidgetsForScheduledRefresh(): Promise<DashboardWidgetRecord[]>;
   claimSnapshotJob(message: GenerateWidgetSnapshotRequested, messageReceiptId: string | null): Promise<ClaimSnapshotJobResult>;
+  setWidgetGenerating(widgetId: string, isGenerating: boolean): Promise<void>;
   completeSnapshotJob(idempotencyKey: string): Promise<void>;
   skipSnapshotJob(idempotencyKey: string, reason: string): Promise<void>;
   failSnapshotJob(idempotencyKey: string, reason: string): Promise<void>;

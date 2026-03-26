@@ -38,6 +38,7 @@ class Dashboard {
   dashboard_type : varchar
   is_default : boolean
   is_active : boolean
+  is_generating : boolean
   version : int
   activation_rule_json : json
   theme_json : json
@@ -59,6 +60,7 @@ class DashboardWidget {
   min_width : int
   min_height : int
   is_visible : boolean
+  is_generating : boolean
   refresh_mode : varchar
   sort_order : int
   version : int

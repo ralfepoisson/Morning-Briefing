@@ -28,6 +28,7 @@ test('DashboardService lists dashboards in repository order and maps theme', asy
     name: 'Morning Focus',
     description: 'A calm start',
     theme: 'aurora',
+    isGenerating: false,
     createdAt: repository.items[0].createdAt.toISOString(),
     updatedAt: repository.items[0].updatedAt.toISOString()
   });
@@ -141,6 +142,7 @@ function createDashboardRecord(overrides: Partial<DashboardRecord>): DashboardRe
     name: overrides.name || 'Morning Focus',
     description: overrides.description || '',
     theme: overrides.theme || 'aurora',
+    isGenerating: overrides.isGenerating || false,
     createdAt: overrides.createdAt || new Date('2026-03-19T07:00:00.000Z'),
     updatedAt: overrides.updatedAt || new Date('2026-03-19T07:00:00.000Z')
   };

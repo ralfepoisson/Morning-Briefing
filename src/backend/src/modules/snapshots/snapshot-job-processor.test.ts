@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SnapshotJobProcessor } from './snapshot-job-processor.js';
+import { SnapshotJobProcessor, parseGenerateWidgetSnapshotMessage } from './snapshot-job-processor.js';
 import type { ClaimSnapshotJobResult } from './snapshot-repository.js';
 
 test('SnapshotJobProcessor skips stale messages and records the skip', async function () {
@@ -52,12 +52,54 @@ test('SnapshotJobProcessor marks successful work as completed', async function (
 
   assert.equal(result, 'processed');
   assert.deepEqual(repository.completed, ['widget-1:2026-03-19:hash-1']);
+  assert.deepEqual(repository.generating, [
+    { widgetId: 'widget-1', isGenerating: true },
+    { widgetId: 'widget-1', isGenerating: false }
+  ]);
+});
+
+test('SnapshotJobProcessor clears the generating flag when work is skipped', async function () {
+  const repository = new InMemoryJobRepository({
+    status: 'claimed',
+    jobId: 'job-1',
+    attemptCount: 1
+  });
+  const snapshotService = new InMemorySnapshotService({
+    status: 'skipped',
+    reason: 'stale_message'
+  });
+  const processor = new SnapshotJobProcessor(repository, snapshotService);
+
+  await processor.process({
+    body: JSON.stringify({
+      type: 'GenerateWidgetSnapshotRequested',
+      payload: createMessage()
+    }),
+    messageId: 'sqs-1'
+  });
+
+  assert.deepEqual(repository.generating, [
+    { widgetId: 'widget-1', isGenerating: true },
+    { widgetId: 'widget-1', isGenerating: false }
+  ]);
+});
+
+test('parseGenerateWidgetSnapshotMessage accepts the legacy top-level payload shape', function () {
+  const payload = parseGenerateWidgetSnapshotMessage(JSON.stringify({
+    type: 'GenerateWidgetSnapshotRequested',
+    ...createMessage()
+  }));
+
+  assert.equal(payload.jobId, 'job-1');
+  assert.equal(payload.widgetId, 'widget-1');
+  assert.equal(payload.snapshotDate, '2026-03-19');
 });
 
 class InMemoryJobRepository {
   public completed: string[] = [];
   public skipped: Array<{ idempotencyKey: string; reason: string }> = [];
   public failed: Array<{ idempotencyKey: string; reason: string }> = [];
+  public generating: Array<{ widgetId: string; isGenerating: boolean }> = [];
 
   constructor(private readonly claimResult: ClaimSnapshotJobResult) {}
 
@@ -67,6 +109,10 @@ class InMemoryJobRepository {
 
   async completeSnapshotJob(idempotencyKey: string) {
     this.completed.push(idempotencyKey);
+  }
+
+  async setWidgetGenerating(widgetId: string, isGenerating: boolean) {
+    this.generating.push({ widgetId, isGenerating });
   }
 
   async skipSnapshotJob(idempotencyKey: string, reason: string) {

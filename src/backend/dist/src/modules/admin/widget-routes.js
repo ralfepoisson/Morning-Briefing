@@ -26,6 +26,7 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
                 widgetType: true,
                 title: true,
                 isVisible: true,
+                isGenerating: true,
                 refreshMode: true,
                 version: true,
                 configHash: true,
@@ -113,6 +114,7 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
                 dashboardId: true,
                 widgetType: true,
                 title: true,
+                isGenerating: true,
                 refreshMode: true,
                 version: true,
                 configHash: true,
@@ -160,6 +162,14 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
             requestedAt
         };
         try {
+            await dependencies.prisma.dashboardWidget.update({
+                where: {
+                    id: widget.id
+                },
+                data: {
+                    isGenerating: true
+                }
+            });
             const published = await dependencies.snapshotJobPublisher.publishGenerateWidgetSnapshot(jobInput);
             reply.code(202);
             return {
@@ -174,31 +184,43 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
             };
         }
         catch (error) {
-            await dependencies.snapshotService.generateForWidget({
-                schemaVersion: 1,
-                jobId: 'manual-refresh-' + widget.id + '-' + snapshotDate,
-                idempotencyKey: buildSnapshotJobIdempotencyKey({
+            try {
+                await dependencies.snapshotService.generateForWidget({
+                    schemaVersion: 1,
+                    jobId: 'manual-refresh-' + widget.id + '-' + snapshotDate,
+                    idempotencyKey: buildSnapshotJobIdempotencyKey({
+                        widgetId: widget.id,
+                        snapshotDate,
+                        widgetConfigHash: widget.configHash,
+                        triggerSource: 'manual_refresh',
+                        requestedAt,
+                        bypassDuplicateCheck
+                    }),
                     widgetId: widget.id,
-                    snapshotDate,
+                    dashboardId: widget.dashboardId,
+                    tenantId: widget.tenantId,
+                    userId: user.userId,
+                    widgetConfigVersion: widget.version,
                     widgetConfigHash: widget.configHash,
+                    snapshotDate,
+                    snapshotPeriod: 'day',
                     triggerSource: 'manual_refresh',
-                    requestedAt,
-                    bypassDuplicateCheck
-                }),
-                widgetId: widget.id,
-                dashboardId: widget.dashboardId,
-                tenantId: widget.tenantId,
-                userId: user.userId,
-                widgetConfigVersion: widget.version,
-                widgetConfigHash: widget.configHash,
-                snapshotDate,
-                snapshotPeriod: 'day',
-                triggerSource: 'manual_refresh',
-                bypassDuplicateCheck,
-                correlationId: request.id,
-                causationId: request.id,
-                requestedAt: requestedAt.toISOString()
-            });
+                    bypassDuplicateCheck,
+                    correlationId: request.id,
+                    causationId: request.id,
+                    requestedAt: requestedAt.toISOString()
+                });
+            }
+            finally {
+                await dependencies.prisma.dashboardWidget.update({
+                    where: {
+                        id: widget.id
+                    },
+                    data: {
+                        isGenerating: false
+                    }
+                });
+            }
             reply.code(200);
             return {
                 status: 'generated',
@@ -244,6 +266,7 @@ function mapAdminWidgetRecord(widget) {
         type: widget.widgetType,
         title: widget.title,
         isVisible: widget.isVisible,
+        isGenerating: widget.isGenerating,
         refreshMode: widget.refreshMode,
         latestSnapshotAt: latestSnapshot ? latestSnapshot.generatedAt.toISOString() : null,
         latestSnapshotDate: latestSnapshot ? latestSnapshot.snapshot.snapshotDate.toISOString().slice(0, 10) : null,

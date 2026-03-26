@@ -34,8 +34,9 @@ Default values assume:
 ## Snapshot Queue Architecture
 
 - Widget updates publish `GenerateWidgetSnapshotRequested` commands to SQS.
+- Admin dashboard audio regeneration publishes `GenerateDashboardAudioBriefingRequested` commands to the same SQS queue.
 - The queue carries commands only, never snapshot payloads.
-- A worker consumes messages, checks idempotency and stale config state, generates the widget snapshot, and upserts it into the daily `briefing_snapshots` / `widget_snapshots` records.
+- A worker consumes messages, routes them by command type, generates widget snapshots or dashboard audio briefings, and persists the resulting state.
 - EventBridge Scheduler is expected to invoke the nightly enqueue handler, which enumerates eligible widgets and pushes one command per widget to SQS.
 - Failed deliveries retry through the source queue until SQS redrives them to the DLQ.
 
@@ -67,7 +68,7 @@ Copy the reported queue URL into `SNAPSHOT_QUEUE_URL`.
 
 - `npm run snapshot:worker`
 
-The worker long-polls SQS, processes available messages, and leaves failed messages for retry/DLQ handling.
+The worker long-polls SQS, processes available widget snapshot and dashboard audio jobs, and leaves failed messages for retry/DLQ handling.
 
 ### Run the nightly refresh locally
 
@@ -155,7 +156,7 @@ If shared OpenAI configuration is missing, AI-backed summarization and dashboard
 
 - A dashboard briefing source hash is computed from dashboard id, briefing preferences, widget inclusion overrides, and the latest included widget snapshot ids, statuses, hashes, and timestamps.
 - Manual dashboard-side regeneration is disabled.
-- `POST /api/v1/admin/dashboards/:dashboardId/regenerate-audio-briefing` bypasses reuse checks and regenerates a fresh dashboard briefing from the latest eligible snapshots.
+- `POST /api/v1/admin/dashboards/:dashboardId/regenerate-audio-briefing` now queues an asynchronous regeneration job that bypasses reuse checks and regenerates a fresh dashboard briefing from the latest eligible snapshots.
 - The dashboard page only plays the latest stored audio artifact.
 
 ## Current API

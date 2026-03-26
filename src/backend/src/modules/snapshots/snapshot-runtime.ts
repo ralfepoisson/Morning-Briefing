@@ -1,3 +1,4 @@
+import { createDashboardBriefingJobProcessor } from '../dashboard-briefings/dashboard-briefing-runtime.js';
 import { getGoogleCalendarOAuthClientFromEnvironment } from '../connections/google-calendar-oauth-client.js';
 import { PrismaRssFeedRepository } from '../rss-feeds/prisma-rss-feed-repository.js';
 import { PrismaTenantAiConfigurationRepository } from '../tenant-ai-configuration/prisma-tenant-ai-configuration-repository.js';
@@ -11,6 +12,7 @@ import { HttpRssFeedClient } from './rss-feed-client.js';
 import { getSnapshotQueueConfig } from './snapshot-queue-config.js';
 import { createSnapshotSqsClient } from './snapshot-sqs-client.js';
 import { SnapshotJobProcessor } from './snapshot-job-processor.js';
+import { QueueJobProcessor } from './queue-job-processor.js';
 import type { SnapshotJobPublisher } from './snapshot-job-publisher.js';
 import { SnapshotService } from './snapshot-service.js';
 import { SqsSnapshotJobPublisher, NoopSnapshotJobPublisher } from './sqs-snapshot-job-publisher.js';
@@ -62,6 +64,13 @@ export function createSnapshotJobProcessor(): SnapshotJobProcessor {
   return new SnapshotJobProcessor(
     new PrismaSnapshotRepository(prisma),
     createSnapshotService()
+  );
+}
+
+export function createQueueJobProcessor(): QueueJobProcessor {
+  return new QueueJobProcessor(
+    createSnapshotJobProcessor(),
+    createDashboardBriefingJobProcessor()
   );
 }
 

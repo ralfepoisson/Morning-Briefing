@@ -348,6 +348,17 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
     };
   }
 
+  async setWidgetGenerating(widgetId: string, isGenerating: boolean): Promise<void> {
+    await this.prisma.dashboardWidget.updateMany({
+      where: {
+        id: widgetId
+      },
+      data: {
+        isGenerating
+      }
+    });
+  }
+
   async completeSnapshotJob(idempotencyKey: string): Promise<void> {
     await this.prisma.snapshotGenerationJob.update({
       where: {
@@ -473,7 +484,7 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
             snapshotDate
           }
         },
-        update: {
+      update: {
           generatedAt: input.widgetSnapshot.generatedAt
         },
         create: {
@@ -516,6 +527,15 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
           contentHash,
           errorMessage: input.widgetSnapshot.errorMessage,
           generatedAt: input.widgetSnapshot.generatedAt
+        }
+      });
+
+      await tx.dashboardWidget.update({
+        where: {
+          id: input.widget.id
+        },
+        data: {
+          isGenerating: false
         }
       });
 

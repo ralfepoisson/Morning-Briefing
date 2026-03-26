@@ -61,8 +61,6 @@ export function filterApplicationLogs(entries: ApplicationLogEntry[], filters: A
 
       return buildSearchableText(entry).includes(normalizedSearch);
     })
-    .slice()
-    .reverse()
     .slice(0, limit);
 }
 

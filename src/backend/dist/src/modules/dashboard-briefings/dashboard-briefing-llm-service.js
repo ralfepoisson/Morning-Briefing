@@ -1,5 +1,5 @@
 import { describeFetchFailure } from '../../shared/fetch-error.js';
-import { logApplicationEvent } from '../admin/application-logger.js';
+import { logApplicationEvent, toLogErrorContext } from '../admin/application-logger.js';
 export class DashboardBriefingLlmService {
     provider;
     promptService;
@@ -52,7 +52,8 @@ export class DashboardBriefingLlmService {
                 context: {
                     dashboardId: input.dashboardId,
                     provider: this.provider.providerName,
-                    modelName: this.provider.modelName
+                    modelName: this.provider.modelName,
+                    ...toLogErrorContext(error)
                 }
             });
             if (this.provider.providerName === 'stub') {

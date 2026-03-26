@@ -51,6 +51,7 @@ function toResponse(dashboard) {
         name: dashboard.name,
         description: dashboard.description,
         theme: dashboard.theme,
+        isGenerating: dashboard.isGenerating,
         createdAt: dashboard.createdAt.toISOString(),
         updatedAt: dashboard.updatedAt.toISOString()
     };

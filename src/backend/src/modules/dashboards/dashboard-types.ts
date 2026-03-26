@@ -4,6 +4,7 @@ export type DashboardRecord = {
   name: string;
   description: string;
   theme: string;
+  isGenerating: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -32,6 +33,7 @@ export type DashboardResponse = {
   name: string;
   description: string;
   theme: string;
+  isGenerating: boolean;
   createdAt: string;
   updatedAt: string;
 };

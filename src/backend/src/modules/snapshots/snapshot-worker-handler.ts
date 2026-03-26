@@ -1,4 +1,4 @@
-import { createSnapshotJobProcessor } from './snapshot-runtime.js';
+import { createQueueJobProcessor } from './snapshot-runtime.js';
 
 type LambdaSqsRecord = {
   body: string;
@@ -7,7 +7,7 @@ type LambdaSqsRecord = {
 };
 
 export async function handleSnapshotQueueBatch(event: { Records: LambdaSqsRecord[] }) {
-  const processor = createSnapshotJobProcessor();
+  const processor = createQueueJobProcessor();
 
   for (const record of event.Records || []) {
     await processor.process({
