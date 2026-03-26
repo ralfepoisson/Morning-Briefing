@@ -87,10 +87,12 @@ export class SnapshotJobProcessor {
 }
 export function parseGenerateWidgetSnapshotMessage(body) {
     const parsed = JSON.parse(body);
-    if (!parsed || parsed.type !== 'GenerateWidgetSnapshotRequested' || !parsed.payload) {
+    const payload = parsed && parsed.type === 'GenerateWidgetSnapshotRequested'
+        ? (parsed.payload || parsed)
+        : null;
+    if (!payload) {
         throw new Error('Snapshot queue message is invalid.');
     }
-    const payload = parsed.payload;
     if (payload.schemaVersion !== 1 ||
         typeof payload.jobId !== 'string' ||
         typeof payload.idempotencyKey !== 'string' ||

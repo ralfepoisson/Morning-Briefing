@@ -46,7 +46,8 @@ package "Backend API\nNode.js + Fastify" as Api {
 database "PostgreSQL\n(Local + AWS RDS)" as Postgres
 queue "Amazon SQS\nSnapshot Jobs + DLQ" as Sqs
 cloud "AWS Lambda\nSnapshot Worker" as Lambda
-cloud "EventBridge Scheduler\nNightly Refresh" as Scheduler
+cloud "EventBridge Scheduler\nWidget Snapshot Refresh" as SnapshotScheduler
+cloud "EventBridge Scheduler\nDashboard Audio Refresh" as AudioScheduler
 cloud "Secret Backend\n(Local env / AWS Secrets Manager)" as Secrets
 cloud "External Providers\nWeather / Calendar / Tasks / News" as Providers
 cloud "OpenAI Responses API" as OpenAiResponses
@@ -62,7 +63,8 @@ InfraLayer --> Secrets
 InfraLayer --> Providers
 InfraLayer --> OpenAiResponses
 InfraLayer --> AwsPolly
-Scheduler --> AppLayer : invokes nightly enqueue
+SnapshotScheduler --> AppLayer : invokes widget snapshot enqueue
+AudioScheduler --> AppLayer : invokes dashboard audio enqueue
 Sqs --> Lambda : event source mapping
 Lambda --> [Snapshot Job Processor]
 [Snapshot Queue Publisher] ..> Sqs : enqueue widget commands
@@ -91,8 +93,8 @@ end note
 
 note bottom of InfraLayer
 The worker logic stays inside the modular monolith,
-but SQS and Lambda provide the first production queue
-runtime with a clean path to ECS/Fargate later.
+while ECS scheduled tasks trigger the daily UTC refresh jobs
+and SQS provides the queue runtime for async processing.
 Dashboard and widget rows also carry is_generating flags
 so admin views can reflect in-flight regeneration state.
 end note

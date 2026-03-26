@@ -10,6 +10,7 @@ import type { DashboardBriefingJobPublisher } from './dashboard-briefing-job-pub
 import { DashboardBriefingLlmService, StubDashboardBriefingLlmProvider, TenantConfiguredOpenAiDashboardBriefingLlmProvider } from './dashboard-briefing-llm-service.js';
 import { DashboardBriefingPromptService } from './dashboard-briefing-prompt-service.js';
 import { PrismaDashboardBriefingRepository } from './prisma-dashboard-briefing-repository.js';
+import { ScheduledDashboardBriefingRefreshService } from './scheduled-dashboard-briefing-refresh-service.js';
 import { DashboardBriefingService } from './dashboard-briefing-service.js';
 import { SqsDashboardBriefingJobPublisher } from './sqs-dashboard-briefing-job-publisher.js';
 import { AwsPollyDashboardBriefingTtsProvider, DashboardBriefingTtsService, StubDashboardBriefingTtsProvider } from './dashboard-briefing-tts-service.js';
@@ -43,6 +44,21 @@ export function createDashboardBriefingJobPublisherFromEnvironment(): DashboardB
 
 export function createDashboardBriefingJobProcessor(): DashboardBriefingJobProcessor {
   return new DashboardBriefingJobProcessor(createDashboardBriefingService());
+}
+
+export function createScheduledDashboardBriefingRefreshService(): ScheduledDashboardBriefingRefreshService | null {
+  const publisher = createDashboardBriefingJobPublisherFromEnvironment();
+
+  if (!publisher) {
+    return null;
+  }
+
+  const prisma = getPrismaClient();
+
+  return new ScheduledDashboardBriefingRefreshService(
+    new PrismaDashboardBriefingRepository(prisma),
+    publisher
+  );
 }
 
 function createLlmProvider(tenantAiConfigurationService: TenantAiConfigurationService) {

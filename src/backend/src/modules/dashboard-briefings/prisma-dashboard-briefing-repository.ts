@@ -13,6 +13,90 @@ import type {
 export class PrismaDashboardBriefingRepository implements DashboardBriefingRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
+  async listDashboardsForScheduledGeneration() {
+    try {
+      const dashboards = await this.prisma.dashboard.findMany({
+        where: {
+          archivedAt: null
+        },
+        orderBy: [
+          { createdAt: 'asc' }
+        ],
+        select: {
+          id: true,
+          tenantId: true,
+          isGenerating: true,
+          owner: {
+            select: {
+              id: true,
+              displayName: true,
+              timezone: true,
+              locale: true,
+              email: true,
+              isAdmin: true
+            }
+          },
+          briefingPreferences: {
+            select: {
+              enabled: true
+            }
+          }
+        }
+      });
+
+      return dashboards.map(function mapDashboard(dashboard) {
+        return {
+          id: dashboard.id,
+          tenantId: dashboard.tenantId,
+          isGenerating: dashboard.isGenerating,
+          owner: dashboard.owner,
+          briefingPreference: dashboard.briefingPreferences
+            ? {
+              enabled: dashboard.briefingPreferences.enabled
+            }
+            : null
+        };
+      });
+    } catch (error) {
+      if (!isMissingBriefingSchemaError(error) && !isMissingDashboardGeneratingSchemaError(error)) {
+        throw error;
+      }
+
+      const dashboards = await this.prisma.dashboard.findMany({
+        where: {
+          archivedAt: null
+        },
+        orderBy: [
+          { createdAt: 'asc' }
+        ],
+        select: {
+          id: true,
+          tenantId: true,
+          owner: {
+            select: {
+              id: true,
+              displayName: true,
+              timezone: true,
+              locale: true,
+              email: true,
+              isAdmin: true
+            }
+          }
+        }
+      });
+
+      return dashboards.map(function mapLegacyDashboard(dashboard) {
+        return {
+          id: dashboard.id,
+          tenantId: dashboard.tenantId,
+          isGenerating: false,
+          owner: dashboard.owner,
+          briefingPreference: null
+        };
+      });
+    }
+  }
+
   async setDashboardGenerating(dashboardId: string, ownerUserId: string, isGenerating: boolean): Promise<void> {
     const dashboard = await this.prisma.dashboard.findFirst({
       where: {
@@ -723,4 +807,12 @@ function isMissingBriefingSchemaError(error: unknown): boolean {
     || candidate.code === 'P2022'
     || message.includes('dashboard_briefing_')
     || message.includes('include_in_briefing_override');
+}
+
+function isMissingDashboardGeneratingSchemaError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return error.message.includes('dashboards.is_generating');
 }

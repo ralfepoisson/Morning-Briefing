@@ -76,10 +76,14 @@
       '                  <i class="fa-solid fa-eye" aria-hidden="true"></i>' +
       '                  <span>View JSON</span>' +
       '                </button>' +
-      '                <button type="button" class="btn btn-sm btn-outline-light widgets-admin-table__action" ng-click="$ctrl.regenerate(widget)" ng-disabled="$ctrl.isRegenerating(widget.id)">' +
-      '                  <i class="fa-solid" ng-class="$ctrl.isRegenerating(widget.id) ? \'fa-spinner fa-spin\' : \'fa-arrows-rotate\'" aria-hidden="true"></i>' +
-      '                  <span>{{$ctrl.isRegenerating(widget.id) ? "Queueing..." : "Regenerate"}}</span>' +
+      '                <button type="button" class="btn btn-sm btn-outline-light widgets-admin-table__action" ng-if="!$ctrl.isRegenerating(widget.id)" ng-click="$ctrl.regenerate(widget)">' +
+      '                  <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>' +
+      '                  <span>Regenerate</span>' +
       '                </button>' +
+      '                <span class="widgets-admin-table__loading" ng-if="$ctrl.isRegenerating(widget.id)" aria-live="polite">' +
+      '                  <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>' +
+      '                  <span>{{$ctrl.isQueuedRegeneration(widget.id) ? "Queueing..." : "Generating..."}}</span>' +
+      '                </span>' +
       '              </div>' +
       '            </td>' +
       '          </tr>' +
@@ -146,6 +150,10 @@
     };
 
     $ctrl.isRegenerating = function isRegenerating(widgetId) {
+      return !!$ctrl.regeneratingById[widgetId] || hasPersistedGeneration(widgetId);
+    };
+
+    $ctrl.isQueuedRegeneration = function isQueuedRegeneration(widgetId) {
       return !!$ctrl.regeneratingById[widgetId];
     };
 
@@ -241,6 +249,12 @@
         NotificationService.error(getErrorMessage(error, 'We could not verify your access right now.'), 'Unable to verify access');
         $location.path('/');
         return null;
+      });
+    }
+
+    function hasPersistedGeneration(widgetId) {
+      return !!(($ctrl.data && $ctrl.data.items) || []).find(function findWidget(item) {
+        return item.id === widgetId && item.isGenerating;
       });
     }
   }

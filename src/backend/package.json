@@ -24,6 +24,9 @@
     "snapshot:worker:prod": "node dist/scripts/run-snapshot-worker.js",
     "snapshot:refresh:nightly": "tsx scripts/run-nightly-refresh.ts",
     "snapshot:refresh:nightly:prod": "node dist/scripts/run-nightly-refresh.js",
+    "dashboard-briefing:refresh:scheduled": "tsx scripts/run-scheduled-dashboard-briefings.ts",
+    "dashboard-briefing:refresh:scheduled:prod": "node dist/scripts/run-scheduled-dashboard-briefings.js",
+    "scheduler:local": "tsx scripts/run-local-scheduler.ts",
     "prisma:studio": "prisma studio",
     "test": "node --test --import tsx",
     "watch": "watch 'npm run build' ./"

@@ -35,6 +35,22 @@ export interface DashboardBriefingAggregationRepository {
 }
 
 export interface DashboardBriefingRepository extends DashboardBriefingAggregationRepository {
+  listDashboardsForScheduledGeneration(): Promise<Array<{
+    id: string;
+    tenantId: string;
+    isGenerating: boolean;
+    owner: {
+      id: string;
+      displayName: string;
+      timezone: string;
+      locale: string;
+      email: string;
+      isAdmin: boolean;
+    };
+    briefingPreference: {
+      enabled: boolean;
+    } | null;
+  }>>;
   setDashboardGenerating(dashboardId: string, ownerUserId: string, isGenerating: boolean): Promise<void>;
   findPreference(dashboardId: string, ownerUserId: string): Promise<DashboardBriefingPreferenceRecord | null>;
   upsertPreference(input: {

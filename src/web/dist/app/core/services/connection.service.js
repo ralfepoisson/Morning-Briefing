@@ -66,26 +66,40 @@
       }
     };
 
-    this.consumeWidgetOAuthContext = function consumeWidgetOAuthContext() {
-      var storedValue;
-
-      try {
-        storedValue = $window.sessionStorage.getItem(WIDGET_OAUTH_CONTEXT_KEY);
-        $window.sessionStorage.removeItem(WIDGET_OAUTH_CONTEXT_KEY);
-      } catch (error) {
-        return null;
-      }
-
-      if (!storedValue) {
-        return null;
-      }
-
-      try {
-        return JSON.parse(storedValue);
-      } catch (error) {
-        return null;
-      }
+    this.getWidgetOAuthContext = function getWidgetOAuthContext() {
+      return readWidgetOAuthContext($window);
     };
+
+    this.consumeWidgetOAuthContext = function consumeWidgetOAuthContext() {
+      var context = readWidgetOAuthContext($window);
+
+      clearWidgetOAuthContext($window);
+      return context;
+    };
+
+    this.clearWidgetOAuthContext = function clearWidgetOAuthContextPublic() {
+      clearWidgetOAuthContext($window);
+    };
+  }
+
+  function readWidgetOAuthContext($window) {
+    var storedValue;
+
+    try {
+      storedValue = $window.sessionStorage.getItem(WIDGET_OAUTH_CONTEXT_KEY);
+    } catch (error) {
+      return null;
+    }
+
+    if (!storedValue) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(storedValue);
+    } catch (error) {
+      return null;
+    }
   }
 
   function clearWidgetOAuthContext($window) {

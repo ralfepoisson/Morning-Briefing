@@ -28,6 +28,11 @@ cd /Users/ralfe/Dev/Morning-Briefing/cicd
 4. Runs Prisma migrations and the production seed in ECS.
 5. Re-deploys the stack with frontend, backend, and worker desired counts restored to `1`.
 
+The production stack also provisions two UTC EventBridge schedules:
+
+- widget snapshot refresh at `01:00` UTC every day
+- dashboard audio briefing refresh at `05:00` UTC every day
+
 ## Preconditions before every production deploy
 
 Before running the deploy:
@@ -96,6 +101,9 @@ Perform these smoke tests in order.
 1. Open [https://briefing.ralfepoisson.com/](https://briefing.ralfepoisson.com/) and verify the app shell loads.
 2. Sign in and verify the dashboard home page renders.
 3. Open `Admin > Logs` and check for new error-level entries related to startup, OAuth, connectors, widgets, snapshots, or database access.
+4. After any scheduler-related deployment, confirm the EventBridge rules exist and still target the backend ECS task with:
+   - snapshot refresh at `01:00` UTC
+   - dashboard audio refresh at `05:00` UTC
 
 ### Core product smoke tests
 

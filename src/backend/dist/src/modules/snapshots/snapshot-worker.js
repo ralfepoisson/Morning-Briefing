@@ -18,11 +18,23 @@ export async function runSnapshotWorkerOnce(sqs, processor, env = process.env) {
     }
     const deletions = [];
     for (const message of messages) {
-        await processor.process({
-            body: message.Body || '',
-            messageId: message.MessageId,
-            receiptHandle: message.ReceiptHandle
-        });
+        try {
+            await processor.process({
+                body: message.Body || '',
+                messageId: message.MessageId,
+                receiptHandle: message.ReceiptHandle
+            });
+        }
+        catch (error) {
+            if (!isInvalidQueueMessageError(error)) {
+                throw error;
+            }
+            logSnapshotJob('warn', 'snapshot_worker_message_discarded', {
+                messageId: message.MessageId || null,
+                receiptHandle: message.ReceiptHandle || null,
+                error: error instanceof Error ? error.message : 'Queue message is invalid.'
+            });
+        }
         if (message.ReceiptHandle && message.MessageId) {
             deletions.push({
                 Id: message.MessageId,
@@ -59,4 +71,14 @@ async function wait(durationMs) {
     await new Promise(function resolveWait(resolve) {
         setTimeout(resolve, durationMs);
     });
+}
+function isInvalidQueueMessageError(error) {
+    if (!(error instanceof Error)) {
+        return false;
+    }
+    return (error.message === 'Queue message type is invalid.' ||
+        error.message === 'Snapshot queue message is invalid.' ||
+        error.message === 'Snapshot queue message payload is invalid.' ||
+        error.message === 'Dashboard briefing queue message is invalid.' ||
+        error.message === 'Dashboard briefing queue message payload is invalid.');
 }

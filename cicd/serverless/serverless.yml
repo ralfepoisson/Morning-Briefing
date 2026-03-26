@@ -23,7 +23,8 @@ custom:
   frontendDesiredCount: ${param:frontendDesiredCount, 1}
   backendDesiredCount: ${param:backendDesiredCount, 1}
   workerDesiredCount: ${param:workerDesiredCount, 1}
-  nightlyRefreshSchedule: ${param:nightlyRefreshSchedule, 'cron(0 4 * * ? *)'}
+  snapshotRefreshSchedule: ${param:snapshotRefreshSchedule, 'cron(0 1 * * ? *)'}
+  dashboardBriefingRefreshSchedule: ${param:dashboardBriefingRefreshSchedule, 'cron(0 5 * * ? *)'}
 
 provider:
   name: aws
@@ -674,10 +675,10 @@ resources:
             ContainerPort: 8080
             TargetGroupArn: !Ref FrontendTargetGroup
 
-    NightlyRefreshEventRole:
+    SnapshotRefreshEventRole:
       Type: AWS::IAM::Role
       Properties:
-        RoleName: ${self:custom.namePrefix}-nightly-refresh
+        RoleName: ${self:custom.namePrefix}-snapshot-refresh
         AssumeRolePolicyDocument:
           Version: '2012-10-17'
           Statement:
@@ -687,7 +688,7 @@ resources:
                   - events.amazonaws.com
               Action: sts:AssumeRole
         Policies:
-          - PolicyName: ${self:custom.namePrefix}-nightly-refresh
+          - PolicyName: ${self:custom.namePrefix}-snapshot-refresh
             PolicyDocument:
               Version: '2012-10-17'
               Statement:
@@ -703,16 +704,16 @@ resources:
                     - !GetAtt EcsExecutionRole.Arn
                     - !GetAtt EcsTaskRole.Arn
 
-    NightlyRefreshRule:
+    SnapshotRefreshRule:
       Type: AWS::Events::Rule
       Properties:
-        Name: ${self:custom.namePrefix}-nightly-refresh
-        ScheduleExpression: ${self:custom.nightlyRefreshSchedule}
+        Name: ${self:custom.namePrefix}-snapshot-refresh
+        ScheduleExpression: ${self:custom.snapshotRefreshSchedule}
         State: ENABLED
         Targets:
-          - Id: nightly-refresh-task
+          - Id: snapshot-refresh-task
             Arn: !GetAtt AppCluster.Arn
-            RoleArn: !GetAtt NightlyRefreshEventRole.Arn
+            RoleArn: !GetAtt SnapshotRefreshEventRole.Arn
             EcsParameters:
               LaunchType: FARGATE
               TaskCount: 1
@@ -731,6 +732,67 @@ resources:
                   {
                     "name": "backend",
                     "command": ["npm", "run", "snapshot:refresh:nightly:prod"]
+                  }
+                ]
+              }
+
+    DashboardBriefingRefreshEventRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:custom.namePrefix}-dashboard-briefing-refresh
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - events.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: ${self:custom.namePrefix}-dashboard-briefing-refresh
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - ecs:RunTask
+                  Resource:
+                    - !Ref BackendTaskDefinition
+                - Effect: Allow
+                  Action:
+                    - iam:PassRole
+                  Resource:
+                    - !GetAtt EcsExecutionRole.Arn
+                    - !GetAtt EcsTaskRole.Arn
+
+    DashboardBriefingRefreshRule:
+      Type: AWS::Events::Rule
+      Properties:
+        Name: ${self:custom.namePrefix}-dashboard-briefing-refresh
+        ScheduleExpression: ${self:custom.dashboardBriefingRefreshSchedule}
+        State: ENABLED
+        Targets:
+          - Id: dashboard-briefing-refresh-task
+            Arn: !GetAtt AppCluster.Arn
+            RoleArn: !GetAtt DashboardBriefingRefreshEventRole.Arn
+            EcsParameters:
+              LaunchType: FARGATE
+              TaskCount: 1
+              TaskDefinitionArn: !Ref BackendTaskDefinition
+              NetworkConfiguration:
+                AwsVpcConfiguration:
+                  AssignPublicIp: ENABLED
+                  SecurityGroups:
+                    - !Ref EcsSecurityGroup
+                  Subnets:
+                    - !Ref PublicSubnetA
+                    - !Ref PublicSubnetB
+            Input: !Sub |
+              {
+                "containerOverrides": [
+                  {
+                    "name": "backend",
+                    "command": ["npm", "run", "dashboard-briefing:refresh:scheduled:prod"]
                   }
                 ]
               }
