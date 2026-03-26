@@ -125,7 +125,6 @@ test('DashboardBriefingService toggles dashboard generating state around fresh g
         return {
           title: 'Morning Briefing',
           estimatedDurationSeconds: 60,
-          sections: [{ name: 'Weather', script: 'Sunny today.' }],
           fullScript: 'Sunny today.'
         };
       }

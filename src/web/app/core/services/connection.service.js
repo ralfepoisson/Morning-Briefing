@@ -53,6 +53,21 @@
       });
     };
 
+    this.startGmailOAuth = function startGmailOAuth(returnTo, connectionId) {
+      return $http.post(ApiConfig.baseUrl + '/connections/gmail/oauth/start', {
+        returnTo: returnTo || $window.location.href,
+        connectionId: connectionId || ''
+      }).then(function handleResponse(response) {
+        var url = response.data && response.data.authorizationUrl ? response.data.authorizationUrl : '';
+
+        if (!url) {
+          throw new Error('Google OAuth could not be started.');
+        }
+
+        $window.location.href = url;
+      });
+    };
+
     this.saveWidgetOAuthContext = function saveWidgetOAuthContext(context) {
       if (!context) {
         clearWidgetOAuthContext($window);

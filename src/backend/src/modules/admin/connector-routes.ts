@@ -170,6 +170,13 @@ function sanitizeConnectionConfig(type: string, config: Record<string, unknown>)
     };
   }
 
+  if (type === 'gmail') {
+    return {
+      accountEmail: typeof config.accountEmail === 'string' ? config.accountEmail : '',
+      accountLabel: typeof config.accountLabel === 'string' ? config.accountLabel : ''
+    };
+  }
+
   if (type === 'openai') {
     return {
       model: typeof config.model === 'string' ? config.model : 'gpt-5-mini',

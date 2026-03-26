@@ -2,12 +2,30 @@ import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
 import { logApplicationEvent } from '../admin/application-logger.js';
 import { DefaultUserService } from '../default-user/default-user-service.js';
 import { ConnectionService } from './connection-service.js';
+import { getGmailOAuthClientFromEnvironment } from './gmail-oauth-client.js';
 import { getDefaultFrontendBaseUrl, getGoogleCalendarOAuthClientFromEnvironment } from './google-calendar-oauth-client.js';
 import { PrismaConnectionRepository } from './prisma-connection-repository.js';
 export async function registerConnectionRoutes(app, dependencies = createConnectionRouteDependencies()) {
     const connectionService = dependencies.connectionService;
     const defaultUserService = dependencies.defaultUserService;
     const googleCalendarOAuthClient = dependencies.googleCalendarOAuthClient;
+    const gmailOAuthClient = dependencies.gmailOAuthClient || {
+        createAuthorizationUrl() {
+            throw new Error('Google OAuth is not configured.');
+        },
+        async exchangeAuthorizationCode() {
+            throw new Error('Google OAuth is not configured.');
+        },
+        async getAccount() {
+            throw new Error('Google OAuth is not configured.');
+        },
+        normalizeReturnTo(value) {
+            return value && value.trim() ? value : getDefaultFrontendBaseUrl();
+        },
+        verifyState() {
+            throw new Error('Google OAuth is not configured.');
+        }
+    };
     app.get('/api/v1/connections', async function handleListConnections(request) {
         const query = request.query;
         const user = await defaultUserService.getDefaultUser(request);
@@ -42,7 +60,10 @@ export async function registerConnectionRoutes(app, dependencies = createConnect
                     error.message === 'OpenAI API key is required.' ||
                     error.message === 'Google Calendar access token is required.' ||
                     error.message === 'Google Calendar refresh token is required.' ||
-                    error.message === 'Google Calendar calendar id is required.')) {
+                    error.message === 'Google Calendar calendar id is required.' ||
+                    error.message === 'Gmail access token is required.' ||
+                    error.message === 'Gmail refresh token is required.' ||
+                    error.message === 'Gmail account email is required.')) {
                 reply.code(400);
                 return {
                     message: error.message
@@ -78,7 +99,9 @@ export async function registerConnectionRoutes(app, dependencies = createConnect
                     error.message === 'Todoist API key is required.' ||
                     error.message === 'OpenAI API key is required.' ||
                     error.message === 'Google Calendar refresh token is required.' ||
-                    error.message === 'Google Calendar calendar id is required.')) {
+                    error.message === 'Google Calendar calendar id is required.' ||
+                    error.message === 'Gmail refresh token is required.' ||
+                    error.message === 'Gmail account email is required.')) {
                 reply.code(error.message === 'Connection was not found.' ? 404 : 400);
                 return {
                     message: error.message
@@ -191,6 +214,107 @@ export async function registerConnectionRoutes(app, dependencies = createConnect
             reply.redirect(returnTo);
         }
     });
+    app.get('/api/v1/connections/gmail/oauth/start', async function handleStartGmailOAuth(request, reply) {
+        const query = request.query;
+        const authorizationUrl = await buildGmailAuthorizationUrl(request, query, defaultUserService, gmailOAuthClient);
+        reply.redirect(authorizationUrl);
+    });
+    app.post('/api/v1/connections/gmail/oauth/start', async function handleStartGmailOAuthApi(request) {
+        const body = request.body;
+        const authorizationUrl = await buildGmailAuthorizationUrl(request, body || {}, defaultUserService, gmailOAuthClient);
+        return {
+            authorizationUrl
+        };
+    });
+    app.get('/api/v1/connections/gmail/oauth/callback', async function handleGmailOAuthCallback(request, reply) {
+        const query = request.query;
+        let returnTo = gmailOAuthClient.normalizeReturnTo();
+        let resolvedConnectionId = null;
+        try {
+            if (!query.state || typeof query.state !== 'string') {
+                throw new Error('Google OAuth state is invalid.');
+            }
+            const state = gmailOAuthClient.verifyState(query.state);
+            returnTo = state.returnTo;
+            if (query.error) {
+                logApplicationEvent({
+                    level: 'warn',
+                    scope: 'connections',
+                    event: 'gmail_oauth_denied',
+                    message: 'Gmail OAuth was cancelled or denied.',
+                    context: {
+                        tenantId: state.tenantId,
+                        userId: state.userId,
+                        connectionId: state.connectionId || null,
+                        error: query.error
+                    }
+                });
+                reply.redirect(returnTo);
+                return;
+            }
+            if (!query.code || typeof query.code !== 'string' || !query.code.trim()) {
+                throw new Error('Google OAuth authorization code is missing.');
+            }
+            const tokenSet = await gmailOAuthClient.exchangeAuthorizationCode(query.code.trim());
+            const account = await gmailOAuthClient.getAccount(tokenSet.accessToken);
+            const input = {
+                tenantId: state.tenantId,
+                ownerUserId: state.userId,
+                type: 'gmail',
+                credentials: {
+                    accessToken: tokenSet.accessToken,
+                    refreshToken: tokenSet.refreshToken,
+                    expiresAt: tokenSet.expiresAt,
+                    scope: tokenSet.scope,
+                    tokenType: tokenSet.tokenType,
+                    accountEmail: account.accountEmail,
+                    accountLabel: account.accountLabel
+                }
+            };
+            if (state.connectionId) {
+                const updatedConnection = await connectionService.update({
+                    tenantId: state.tenantId,
+                    connectionId: state.connectionId,
+                    ownerUserId: state.userId,
+                    name: account.accountLabel || 'Gmail',
+                    credentials: input.credentials
+                });
+                resolvedConnectionId = updatedConnection.id;
+            }
+            else {
+                const createdConnection = await connectionService.create(input);
+                resolvedConnectionId = createdConnection.id;
+            }
+            logApplicationEvent({
+                level: 'info',
+                scope: 'connections',
+                event: 'gmail_oauth_saved',
+                message: 'Gmail OAuth connection saved.',
+                context: {
+                    tenantId: state.tenantId,
+                    userId: state.userId,
+                    connectionId: state.connectionId || null,
+                    accountEmail: input.credentials.accountEmail
+                }
+            });
+            reply.redirect(appendOAuthResultToReturnTo(returnTo, resolvedConnectionId, input.type));
+        }
+        catch (error) {
+            logApplicationEvent({
+                level: 'error',
+                scope: 'connections',
+                event: 'gmail_oauth_callback_failed',
+                message: 'Gmail OAuth callback failed.',
+                context: {
+                    error: error instanceof Error ? error.message : String(error),
+                    codePresent: typeof query.code === 'string' && !!query.code.trim(),
+                    errorParam: typeof query.error === 'string' ? query.error : null,
+                    returnTo
+                }
+            });
+            reply.redirect(returnTo);
+        }
+    });
 }
 function appendOAuthResultToReturnTo(returnTo, connectionId, provider) {
     if (!connectionId) {
@@ -220,6 +344,7 @@ function appendOAuthResultToReturnTo(returnTo, connectionId, provider) {
 function createConnectionRouteDependencies() {
     const prisma = getPrismaClient();
     let googleCalendarOAuthClient;
+    let gmailOAuthClient;
     try {
         googleCalendarOAuthClient = getGoogleCalendarOAuthClientFromEnvironment();
     }
@@ -242,16 +367,50 @@ function createConnectionRouteDependencies() {
             }
         };
     }
+    try {
+        gmailOAuthClient = getGmailOAuthClientFromEnvironment();
+    }
+    catch {
+        gmailOAuthClient = {
+            createAuthorizationUrl() {
+                throw new Error('Google OAuth is not configured.');
+            },
+            async exchangeAuthorizationCode() {
+                throw new Error('Google OAuth is not configured.');
+            },
+            async getAccount() {
+                throw new Error('Google OAuth is not configured.');
+            },
+            normalizeReturnTo(value) {
+                return value && value.trim() ? value : getDefaultFrontendBaseUrl();
+            },
+            verifyState() {
+                throw new Error('Google OAuth is not configured.');
+            }
+        };
+    }
     return {
         connectionService: new ConnectionService(new PrismaConnectionRepository(prisma)),
         defaultUserService: new DefaultUserService(prisma),
-        googleCalendarOAuthClient
+        googleCalendarOAuthClient,
+        gmailOAuthClient
     };
 }
 async function buildGoogleCalendarAuthorizationUrl(request, input, defaultUserService, googleCalendarOAuthClient) {
     const user = await defaultUserService.getDefaultUser(request);
     const returnTo = googleCalendarOAuthClient.normalizeReturnTo(input.returnTo);
     return googleCalendarOAuthClient.createAuthorizationUrl({
+        tenantId: user.tenantId,
+        userId: user.userId,
+        returnTo,
+        connectionId: typeof input.connectionId === 'string' && input.connectionId.trim() ? input.connectionId.trim() : undefined,
+        issuedAt: Date.now()
+    });
+}
+async function buildGmailAuthorizationUrl(request, input, defaultUserService, gmailOAuthClient) {
+    const user = await defaultUserService.getDefaultUser(request);
+    const returnTo = gmailOAuthClient.normalizeReturnTo(input.returnTo);
+    return gmailOAuthClient.createAuthorizationUrl({
         tenantId: user.tenantId,
         userId: user.userId,
         returnTo,

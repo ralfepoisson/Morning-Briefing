@@ -8,7 +8,7 @@
       '    <div>' +
       '      <div class="stage-kicker">Connectors</div>' +
       '      <h1 class="stage-title stage-title--compact">Manage integrations</h1>' +
-      '      <p class="stage-copy stage-copy--compact mb-0">Review the connectors you already have and update details like API keys or calendar ids whenever credentials change.</p>' +
+      '      <p class="stage-copy stage-copy--compact mb-0">Review the connectors you already have and update details like API keys or reconnect Google-powered services whenever credentials change.</p>' +
       '    </div>' +
       '    <button type="button" class="btn btn-outline-light connectors-refresh-button" ng-click="$ctrl.refresh()" ng-disabled="$ctrl.isLoading">' +
       '      <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>' +
@@ -70,8 +70,11 @@
       '        <p class="connectors-panel-copy" ng-if="$ctrl.selectedConnection.type === \'todoist\'">Enter a new API key only when you want to replace the current Todoist credential.</p>' +
       '        <p class="connectors-panel-copy" ng-if="$ctrl.selectedConnection.type === \'openai\'">Update the model or base URL here, and enter a new API key only when you want to replace the saved credential.</p>' +
       '        <p class="connectors-panel-copy" ng-if="$ctrl.selectedConnection.type === \'google-calendar\'">This connection uses OAuth. You can change the calendar id here or reconnect the Google account.</p>' +
+      '        <p class="connectors-panel-copy" ng-if="$ctrl.selectedConnection.type === \'gmail\'">This connection uses OAuth. Reconnect the Google account here if Gmail access needs to be refreshed.</p>' +
+      '        <p class="connectors-panel-copy" ng-if="$ctrl.selectedConnection.type === \'gmail\' && $ctrl.selectedConnection.config && $ctrl.selectedConnection.config.accountEmail">Connected account: <strong>{{$ctrl.selectedConnection.config.accountEmail}}</strong></p>' +
       '        <div class="modal-actions modal-actions--page">' +
       '          <button type="button" class="btn btn-outline-light" ng-if="$ctrl.selectedConnection.type === \'google-calendar\'" ng-click="$ctrl.reconnectGoogleCalendar()" ng-disabled="$ctrl.isSaving">Reconnect Google</button>' +
+      '          <button type="button" class="btn btn-outline-light" ng-if="$ctrl.selectedConnection.type === \'gmail\'" ng-click="$ctrl.reconnectGmail()" ng-disabled="$ctrl.isSaving">Reconnect Google</button>' +
       '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.resetForm()" ng-disabled="$ctrl.isSaving">Reset</button>' +
       '          <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.isSaving || !$ctrl.form.name">Save changes</button>' +
       '        </div>' +
@@ -128,6 +131,16 @@
 
       ConnectionService.startGoogleCalendarOAuth($window.location.href, $ctrl.selectedConnection.id).catch(function handleReconnectError(error) {
         NotificationService.error(getErrorMessage(error, 'Unable to start Google Calendar reconnection right now.'), 'Unable to reconnect Google Calendar');
+      });
+    };
+
+    $ctrl.reconnectGmail = function reconnectGmail() {
+      if (!$ctrl.selectedConnection || $ctrl.selectedConnection.type !== 'gmail') {
+        return;
+      }
+
+      ConnectionService.startGmailOAuth($window.location.href, $ctrl.selectedConnection.id).catch(function handleReconnectError(error) {
+        NotificationService.error(getErrorMessage(error, 'Unable to start Gmail reconnection right now.'), 'Unable to reconnect Gmail');
       });
     };
 

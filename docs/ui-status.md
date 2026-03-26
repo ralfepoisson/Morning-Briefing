@@ -60,6 +60,13 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 - Each appointment shows time, title, and location
 - Calendar tile supports vertical resizing in edit mode
 
+### Email widget
+
+- Gmail-backed email widget implemented
+- Email tile supports multiple Gmail search filters and merges the matching messages into a single list
+- Each email row shows timestamp, sender, subject, and read or unread status
+- Email widget follows the same dashboard connection flow pattern as the calendar widget
+
 ### Connectors management
 
 - Top navigation now routes to a dedicated Connectors page
@@ -69,16 +76,16 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 
 ## Current limitations
 
-- Widget content is mocked and does not yet come from briefing snapshots or live connectors
+- Some widget states still fall back to mocked previews while configuration is being staged in edit mode
 - Dashboard metadata updates are only partially wired and broader dashboard management is still minimal
 - Layout editing is custom and lightweight rather than using a dedicated dashboard grid library
 - Widget resizing is currently implemented only for calendar widgets
-- Only weather and task widgets currently expose meaningful configuration flows
+- Weather, calendar, task, and email widgets expose meaningful configuration flows, while other widgets remain simpler
 
 ## Next likely UI steps
 
 - Add more widget types to the widget library
-- Add configuration UIs for calendar widgets and deeper task connector settings
+- Add richer configuration for newly introduced providers across calendar, email, and task widgets
 - Improve dashboard switching and multi-dashboard management
 - Connect widgets to snapshot-backed or live data
 - Refine spacing, responsive behaviour, and visual polish across themes

@@ -242,7 +242,7 @@ Audio Briefing extends the existing snapshot architecture at the dashboard level
 
 ## Connectors And Secrets
 
-Connectors should be tenant-scoped integrations such as weather, calendar, tasks, RSS, or news. The connector row should store stable metadata only:
+Connectors should be tenant-scoped integrations such as weather, calendar, email, tasks, RSS, or news. The connector row should store stable metadata only:
 
 - connector type
 - display name

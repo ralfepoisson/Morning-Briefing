@@ -140,6 +140,10 @@
           widget.title = 'Today on Calendar';
         }
 
+        if (widget.type === 'email') {
+          widget.title = 'Email';
+        }
+
         if (widget.type === 'xkcd') {
           widget.title = 'Latest xkcd';
         }
@@ -181,6 +185,8 @@
         details: widgetPayload.data && widgetPayload.data.details,
         dateLabel: widgetPayload.data && widgetPayload.data.dateLabel,
         appointments: widgetPayload.data && widgetPayload.data.appointments,
+        filters: widgetPayload.data && widgetPayload.data.filters,
+        messages: widgetPayload.data && widgetPayload.data.messages,
         groups: widgetPayload.data && widgetPayload.data.groups,
         comicId: widgetPayload.data && widgetPayload.data.comicId,
         altText: widgetPayload.data && widgetPayload.data.altText,

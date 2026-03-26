@@ -106,15 +106,9 @@ export type DashboardBriefingInput = {
   sections: DashboardBriefingSectionInput[];
 };
 
-export type DashboardBriefingScriptSection = {
-  name: string;
-  script: string;
-};
-
 export type DashboardBriefingScript = {
   title: string;
   estimatedDurationSeconds: number;
-  sections: DashboardBriefingScriptSection[];
   fullScript: string;
 };
 

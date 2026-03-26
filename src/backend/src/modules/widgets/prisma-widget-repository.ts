@@ -561,6 +561,7 @@ function withConnectionConfig(
   const nextConfig = { ...config };
   applyConnectorConfig(nextConfig, connectors, 'tasks');
   applyConnectorConfig(nextConfig, connectors, 'calendar');
+  applyConnectorConfig(nextConfig, connectors, 'email');
   applyConnectorConfig(nextConfig, connectors, 'llm');
 
   return nextConfig;
@@ -581,6 +582,13 @@ function getWidgetConnectorBinding(widgetType: string): {
     return {
       usageRole: 'calendar',
       connectorTypes: ['google-calendar']
+    };
+  }
+
+  if (widgetType === 'email') {
+    return {
+      usageRole: 'email',
+      connectorTypes: ['gmail']
     };
   }
 

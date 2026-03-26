@@ -24,7 +24,34 @@
       },
       createMockWidget: function createMockWidget(options) {
         var data = options.data || {};
-        var connectionLabel = data.connectionLabel || options.connectionLabel || (options.config && options.config.connectionName) || 'Not connected';
+        var config = options.config || {};
+        var connectionLabel = data.connectionLabel || options.connectionLabel || (config && config.connectionName) || 'Not connected';
+        var groups = connectionLabel === 'Not connected' ? [] : [
+          {
+            label: 'Due Today',
+            items: [
+              { title: 'Reply to insurance email', meta: 'today' },
+              { title: 'Confirm dinner reservation', meta: 'today' }
+            ]
+          },
+          {
+            label: 'Due Tomorrow',
+            items: [
+              { title: 'Draft project update', meta: 'tomorrow' },
+              { title: 'Buy birthday card', meta: 'tomorrow' }
+            ]
+          }
+        ];
+
+        if (config.showUndatedTasks !== false && connectionLabel !== 'Not connected') {
+          groups.push({
+            label: 'No Due Date',
+            items: [
+              { title: 'Declutter camera roll', meta: '' },
+              { title: 'Research standing desk options', meta: '' }
+            ]
+          });
+        }
 
         return {
           id: options.id,
@@ -36,36 +63,14 @@
           y: options.y,
           width: options.width || 360,
           height: options.height || 360,
-          config: options.config || {},
+          config: config,
           data: {
             provider: data.provider || 'todoist',
             connectionLabel: connectionLabel,
             emptyMessage: data.emptyMessage || (connectionLabel === 'Not connected'
               ? 'Choose a connection in edit mode to configure this widget.'
               : 'Live tasks will appear after you save the dashboard.'),
-            groups: data.groups || options.groups || (connectionLabel === 'Not connected' ? [] : [
-              {
-                label: 'Due Today',
-                items: [
-                  { title: 'Reply to insurance email', meta: 'today' },
-                  { title: 'Confirm dinner reservation', meta: 'today' }
-                ]
-              },
-              {
-                label: 'Due Tomorrow',
-                items: [
-                  { title: 'Draft project update', meta: 'tomorrow' },
-                  { title: 'Buy birthday card', meta: 'tomorrow' }
-                ]
-              },
-              {
-                label: 'No Due Date',
-                items: [
-                  { title: 'Declutter camera roll', meta: '' },
-                  { title: 'Research standing desk options', meta: '' }
-                ]
-              }
-            ])
+            groups: data.groups || options.groups || groups
           }
         };
       }

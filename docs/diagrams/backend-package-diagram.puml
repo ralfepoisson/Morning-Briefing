@@ -49,7 +49,7 @@ cloud "AWS Lambda\nSnapshot Worker" as Lambda
 cloud "EventBridge Scheduler\nWidget Snapshot Refresh" as SnapshotScheduler
 cloud "EventBridge Scheduler\nDashboard Audio Refresh" as AudioScheduler
 cloud "Secret Backend\n(Local env / AWS Secrets Manager)" as Secrets
-cloud "External Providers\nWeather / Calendar / Tasks / News" as Providers
+cloud "External Providers\nWeather / Calendar / Email / Tasks / News" as Providers
 cloud "OpenAI Responses API" as OpenAiResponses
 cloud "AWS Polly" as AwsPolly
 

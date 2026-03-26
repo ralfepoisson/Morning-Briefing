@@ -128,6 +128,10 @@
       '        </div>' +
       '        <p class="widget-config-helper" ng-if="$ctrl.widgetConfig.isLoadingConnections">Loading connections...</p>' +
       '      </div>' +
+      '      <label class="form-check mt-3" ng-if="$ctrl.widgetConfig.widget.type === \'tasks\'">' +
+      '        <input class="form-check-input" type="checkbox" ng-model="$ctrl.widgetConfig.showUndatedTasks" />' +
+      '        <span class="form-check-label">Show tasks without a due date</span>' +
+      '      </label>' +
       '      <p class="widget-config-selected" ng-if="$ctrl.widgetConfig.selectedCity">Selected city: <strong>{{ $ctrl.getSelectedCityDisplayName($ctrl.widgetConfig.selectedCity) }}</strong></p>' +
       '      <p class="widget-config-selected" ng-if="$ctrl.widgetSupportsConnections() && $ctrl.getSelectedConnection()">Selected connection: <strong>{{ $ctrl.getSelectedConnection().name }}</strong></p>' +
       '      <label class="form-check mt-3">' +
@@ -397,6 +401,7 @@
         includeInBriefing: widget.includeInBriefing,
         availableConnections: [],
         selectedConnectionId: widget.config && widget.config.connectionId ? widget.config.connectionId : '',
+        showUndatedTasks: widget.type === 'tasks' ? widget.config.showUndatedTasks !== false : true,
         isLoadingConnections: false,
         isSearching: false,
         hasSearched: false
@@ -886,6 +891,7 @@
         includeInBriefing: false,
         availableConnections: [],
         selectedConnectionId: '',
+        showUndatedTasks: true,
         isLoadingConnections: false,
         isSearching: false,
         hasSearched: false
@@ -1045,6 +1051,8 @@
     }
 
     function applyTasksWidgetPreview(widget, connection) {
+      var groups;
+
       if (!connection) {
         return;
       }
@@ -1052,33 +1060,39 @@
       widget.config.connectionId = connection.id;
       widget.config.connectionName = connection.name;
       widget.config.provider = connection.type;
+      widget.config.showUndatedTasks = $ctrl.widgetConfig.showUndatedTasks !== false;
+      groups = [
+        {
+          label: 'Due Today',
+          items: [
+            { title: 'Reply to insurance email', meta: 'today' },
+            { title: 'Confirm dinner reservation', meta: 'today' }
+          ]
+        },
+        {
+          label: 'Due Tomorrow',
+          items: [
+            { title: 'Draft project update', meta: 'tomorrow' },
+            { title: 'Buy birthday card', meta: 'tomorrow' }
+          ]
+        }
+      ];
+
+      if (widget.config.showUndatedTasks) {
+        groups.push({
+          label: 'No Due Date',
+          items: [
+            { title: 'Declutter camera roll', meta: '' },
+            { title: 'Research standing desk options', meta: '' }
+          ]
+        });
+      }
+
       widget.data = {
         provider: connection.type,
         connectionLabel: connection.name,
         emptyMessage: 'Live tasks will appear after you save the dashboard.',
-        groups: [
-          {
-            label: 'Due Today',
-            items: [
-              { title: 'Reply to insurance email', meta: 'today' },
-              { title: 'Confirm dinner reservation', meta: 'today' }
-            ]
-          },
-          {
-            label: 'Due Tomorrow',
-            items: [
-              { title: 'Draft project update', meta: 'tomorrow' },
-              { title: 'Buy birthday card', meta: 'tomorrow' }
-            ]
-          },
-          {
-            label: 'No Due Date',
-            items: [
-              { title: 'Declutter camera roll', meta: '' },
-              { title: 'Research standing desk options', meta: '' }
-            ]
-          }
-        ]
+        groups: groups
       };
     }
 

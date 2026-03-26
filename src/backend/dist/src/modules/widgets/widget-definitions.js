@@ -109,6 +109,58 @@ const widgetDefinitions = [
         }
     },
     {
+        type: 'email',
+        name: 'Email',
+        title: 'Recent Email',
+        description: 'Messages from your mail filters',
+        briefingDefaultIncluded: true,
+        defaultSize: { width: 420, height: 360 },
+        minSize: { width: 360, height: 260 },
+        refreshMode: 'SNAPSHOT',
+        createDefaultConfig: function createDefaultConfig() {
+            return {
+                filters: ['in:inbox']
+            };
+        },
+        createMockData: function createMockData(config) {
+            const connectionLabel = getEmailConnectionLabel(config);
+            const filters = getEmailFilters(config);
+            return {
+                provider: 'gmail',
+                connectionLabel: connectionLabel || 'Not connected',
+                filters,
+                emptyMessage: connectionLabel
+                    ? 'Live messages will appear after you save the dashboard.'
+                    : 'Choose a Gmail connection in edit mode to configure this widget.',
+                messages: connectionLabel
+                    ? [
+                        {
+                            id: 'email-1',
+                            subject: 'Project kickoff agenda',
+                            from: 'Alex Morgan <alex@example.com>',
+                            receivedAt: '2026-03-26T07:45:00.000Z',
+                            isUnread: true
+                        },
+                        {
+                            id: 'email-2',
+                            subject: 'Travel confirmation for next week',
+                            from: 'Airline Updates <updates@example.com>',
+                            receivedAt: '2026-03-26T06:10:00.000Z',
+                            isUnread: false
+                        },
+                        {
+                            id: 'email-3',
+                            subject: 'Design review notes',
+                            from: 'Priya Shah <priya@example.com>',
+                            receivedAt: '2026-03-25T20:20:00.000Z',
+                            isUnread: true
+                        }
+                    ]
+                    : []
+            };
+        }
+    },
+    {
         type: 'tasks',
         name: 'Task list',
         title: 'Task List',
@@ -118,41 +170,44 @@ const widgetDefinitions = [
         minSize: { width: 360, height: 260 },
         refreshMode: 'SNAPSHOT',
         createDefaultConfig: function createDefaultConfig() {
-            return {};
+            return {
+                showUndatedTasks: true
+            };
         },
         createMockData: function createMockData(config) {
             const connectionLabel = getTaskConnectionLabel(config);
+            const groups = [
+                {
+                    label: 'Due Today',
+                    items: [
+                        { title: 'Reply to insurance email' },
+                        { title: 'Confirm dinner reservation' }
+                    ]
+                },
+                {
+                    label: 'Due Tomorrow',
+                    items: [
+                        { title: 'Draft project update' },
+                        { title: 'Buy birthday card' }
+                    ]
+                }
+            ];
+            if (shouldShowUndatedTasks(config)) {
+                groups.push({
+                    label: 'No Due Date',
+                    items: [
+                        { title: 'Declutter camera roll' },
+                        { title: 'Research standing desk options' }
+                    ]
+                });
+            }
             return {
                 provider: 'todoist',
                 connectionLabel: connectionLabel || 'Not connected',
                 emptyMessage: connectionLabel
                     ? 'Live tasks will appear after you save the dashboard.'
                     : 'Choose a Todoist connection in edit mode to configure this widget.',
-                groups: connectionLabel
-                    ? [
-                        {
-                            label: 'Due Today',
-                            items: [
-                                { title: 'Reply to insurance email' },
-                                { title: 'Confirm dinner reservation' }
-                            ]
-                        },
-                        {
-                            label: 'Due Tomorrow',
-                            items: [
-                                { title: 'Draft project update' },
-                                { title: 'Buy birthday card' }
-                            ]
-                        },
-                        {
-                            label: 'No Due Date',
-                            items: [
-                                { title: 'Declutter camera roll' },
-                                { title: 'Research standing desk options' }
-                            ]
-                        }
-                    ]
-                    : []
+                groups: connectionLabel ? groups : []
             };
         }
     }
@@ -190,9 +245,29 @@ function getTaskConnectionLabel(config) {
     }
     return '';
 }
+function shouldShowUndatedTasks(config) {
+    return config.showUndatedTasks !== false;
+}
 function getCalendarConnectionLabel(config) {
     if (typeof config.connectionName === 'string' && config.connectionName.trim()) {
         return config.connectionName;
     }
     return '';
+}
+function getEmailConnectionLabel(config) {
+    if (typeof config.connectionName === 'string' && config.connectionName.trim()) {
+        return config.connectionName;
+    }
+    return '';
+}
+function getEmailFilters(config) {
+    if (!Array.isArray(config.filters)) {
+        return ['in:inbox'];
+    }
+    const filters = config.filters.filter(function filterValue(value) {
+        return typeof value === 'string' && value.trim();
+    }).map(function mapValue(value) {
+        return value.trim();
+    });
+    return filters.length ? filters : ['in:inbox'];
 }

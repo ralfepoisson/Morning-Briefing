@@ -184,6 +184,77 @@ test('POST /api/v1/dashboards/:dashboardId/widgets creates an xkcd widget', asyn
   }
 });
 
+test('POST /api/v1/dashboards/:dashboardId/widgets creates an email widget', async function () {
+  const app = Fastify();
+
+  await registerWidgetRoutes(app, {
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
+        };
+      }
+    },
+    widgetService: {
+      async listForDashboard() {
+        throw new Error('not used');
+      },
+      async create(input) {
+        assert.equal(input.dashboardId, 'dash-1');
+        assert.equal(input.ownerUserId, 'user-1');
+        assert.equal(input.type, 'email');
+        assert.equal(input.timezone, 'Europe/Paris');
+
+        return createWidgetResponse({
+          id: 'widget-email',
+          dashboardId: 'dash-1',
+          type: 'email',
+          title: 'Email',
+          width: 420,
+          height: 360,
+          minWidth: 360,
+          minHeight: 260,
+          config: {
+            filters: ['in:inbox']
+          },
+          data: {
+            provider: 'gmail',
+            connectionLabel: 'Not connected',
+            filters: ['in:inbox'],
+            messages: [],
+            emptyMessage: 'Choose a Gmail connection in edit mode to configure this widget.'
+          }
+        });
+      },
+      async update() {
+        throw new Error('not used');
+      },
+      async archive() {
+        throw new Error('not used');
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/dashboards/dash-1/widgets',
+      payload: {
+        type: 'email'
+      }
+    });
+
+    assert.equal(response.statusCode, 201);
+    assert.equal(response.json().type, 'email');
+    assert.equal(response.json().title, 'Email');
+  } finally {
+    await app.close();
+  }
+});
+
 test('POST /api/v1/dashboards/:dashboardId/widgets rejects blank widget type', async function () {
   const app = Fastify();
 

@@ -34,7 +34,7 @@ export class ConnectionService {
     }
 }
 function validateCreateInput(input) {
-    if (input.type !== 'todoist' && input.type !== 'google-calendar' && input.type !== 'openai') {
+    if (input.type !== 'todoist' && input.type !== 'google-calendar' && input.type !== 'gmail' && input.type !== 'openai') {
         throw new Error('Connection provider is not supported.');
     }
     if (input.type === 'todoist' && (typeof input.credentials.apiKey !== 'string' || !input.credentials.apiKey.trim())) {
@@ -43,12 +43,15 @@ function validateCreateInput(input) {
     if (input.type === 'google-calendar') {
         validateGoogleCalendarOAuthCredentials(input.credentials);
     }
+    if (input.type === 'gmail') {
+        validateGmailOAuthCredentials(input.credentials);
+    }
     if (input.type === 'openai') {
         validateOpenAiCredentials(input.credentials);
     }
 }
 function validateUpdateInput(type, name, credentials) {
-    if (type !== 'todoist' && type !== 'google-calendar' && type !== 'openai') {
+    if (type !== 'todoist' && type !== 'google-calendar' && type !== 'gmail' && type !== 'openai') {
         throw new Error('Connection provider is not supported.');
     }
     if (!name) {
@@ -59,6 +62,9 @@ function validateUpdateInput(type, name, credentials) {
     }
     if (type === 'google-calendar') {
         validateGoogleCalendarStoredCredentials(credentials);
+    }
+    if (type === 'gmail') {
+        validateGmailStoredCredentials(credentials);
     }
     if (type === 'openai') {
         validateOpenAiCredentials(credentials);
@@ -106,6 +112,30 @@ function validateGoogleCalendarStoredCredentials(credentials) {
         throw new Error('Google Calendar calendar id is required.');
     }
 }
+function validateGmailOAuthCredentials(credentials) {
+    const accessToken = typeof credentials.accessToken === 'string' ? credentials.accessToken.trim() : '';
+    const refreshToken = typeof credentials.refreshToken === 'string' ? credentials.refreshToken.trim() : '';
+    const accountEmail = typeof credentials.accountEmail === 'string' ? credentials.accountEmail.trim() : '';
+    if (!accessToken) {
+        throw new Error('Gmail access token is required.');
+    }
+    if (!refreshToken) {
+        throw new Error('Gmail refresh token is required.');
+    }
+    if (!accountEmail) {
+        throw new Error('Gmail account email is required.');
+    }
+}
+function validateGmailStoredCredentials(credentials) {
+    const refreshToken = typeof credentials.refreshToken === 'string' ? credentials.refreshToken.trim() : '';
+    const accountEmail = typeof credentials.accountEmail === 'string' ? credentials.accountEmail.trim() : '';
+    if (!refreshToken) {
+        throw new Error('Gmail refresh token is required.');
+    }
+    if (!accountEmail) {
+        throw new Error('Gmail account email is required.');
+    }
+}
 function toResponse(connection) {
     return {
         id: connection.id,
@@ -122,6 +152,12 @@ function sanitizeConnectionConfig(type, config) {
     if (type === 'google-calendar') {
         return {
             calendarId: typeof config.calendarId === 'string' ? config.calendarId : '',
+            accountEmail: typeof config.accountEmail === 'string' ? config.accountEmail : '',
+            accountLabel: typeof config.accountLabel === 'string' ? config.accountLabel : ''
+        };
+    }
+    if (type === 'gmail') {
+        return {
             accountEmail: typeof config.accountEmail === 'string' ? config.accountEmail : '',
             accountLabel: typeof config.accountLabel === 'string' ? config.accountLabel : ''
         };

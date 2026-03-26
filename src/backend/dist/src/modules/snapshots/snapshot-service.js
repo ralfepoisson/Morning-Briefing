@@ -7,11 +7,21 @@ export class SnapshotService {
     todoistTaskClient;
     googleCalendarClient;
     googleCalendarOAuthClient;
+    gmailClient;
+    gmailOAuthClient;
     rssFeedClient;
     openAiNewsSummarizer;
     xkcdClient;
     tenantAiConfigurationService;
-    constructor(repository, rssFeedRepository, weatherClient, todoistTaskClient, googleCalendarClient, googleCalendarOAuthClient, rssFeedClient, openAiNewsSummarizer, xkcdClient = new XkcdClientImpl(), tenantAiConfigurationService = {
+    constructor(repository, rssFeedRepository, weatherClient, todoistTaskClient, googleCalendarClient, googleCalendarOAuthClient, gmailClient = {
+        async listMessages() {
+            throw new Error('Gmail is not configured.');
+        }
+    }, gmailOAuthClient = {
+        async refreshAccessToken() {
+            throw new Error('Gmail is not configured.');
+        }
+    }, rssFeedClient, openAiNewsSummarizer, xkcdClient = new XkcdClientImpl(), tenantAiConfigurationService = {
         async getRequiredOpenAiConfiguration() {
             throw new Error('OpenAI configuration is missing. Add the API key in Admin > Configuration.');
         }
@@ -22,6 +32,8 @@ export class SnapshotService {
         this.todoistTaskClient = todoistTaskClient;
         this.googleCalendarClient = googleCalendarClient;
         this.googleCalendarOAuthClient = googleCalendarOAuthClient;
+        this.gmailClient = gmailClient;
+        this.gmailOAuthClient = gmailOAuthClient;
         this.rssFeedClient = rssFeedClient;
         this.openAiNewsSummarizer = openAiNewsSummarizer;
         this.xkcdClient = xkcdClient;
@@ -168,6 +180,9 @@ export class SnapshotService {
         }
         if (widget.type === 'calendar') {
             return this.buildCalendarWidgetSnapshot(widget, generatedAt);
+        }
+        if (widget.type === 'email') {
+            return this.buildEmailWidgetSnapshot(widget, generatedAt);
         }
         if (widget.type === 'tasks') {
             return this.buildTaskWidgetSnapshot(widget, generatedAt);
@@ -596,7 +611,7 @@ export class SnapshotService {
                 widgetType: widget.type,
                 title: widget.title,
                 status: 'READY',
-                content: buildTaskSnapshotContent(tasks, generatedAt, connector.connector.name),
+                content: buildTaskSnapshotContent(tasks, generatedAt, connector.connector.name, shouldShowUndatedTasks(widget.config)),
                 errorMessage: null,
                 generatedAt: generatedAt
             };
@@ -745,6 +760,134 @@ export class SnapshotService {
             };
         }
     }
+    async buildEmailWidgetSnapshot(widget, generatedAt) {
+        const connector = widget.connections.find(function findConnector(item) {
+            return item.usageRole === 'email';
+        });
+        const filters = getEmailFilters(widget.config);
+        if (!connector) {
+            return {
+                widgetId: widget.id,
+                widgetType: widget.type,
+                title: widget.title,
+                status: 'FAILED',
+                content: {
+                    provider: 'gmail',
+                    connectionLabel: 'Not connected',
+                    filters,
+                    messages: [],
+                    emptyMessage: 'Choose a Gmail connection in edit mode to configure this widget.'
+                },
+                errorMessage: 'Email widget is missing a configured connection.',
+                generatedAt
+            };
+        }
+        if (connector.connector.type !== 'gmail') {
+            return {
+                widgetId: widget.id,
+                widgetType: widget.type,
+                title: widget.title,
+                status: 'FAILED',
+                content: {
+                    provider: connector.connector.type,
+                    connectionLabel: connector.connector.name,
+                    filters,
+                    messages: [],
+                    emptyMessage: 'The selected email provider is not supported yet.'
+                },
+                errorMessage: 'Email widget is configured with an unsupported provider.',
+                generatedAt
+            };
+        }
+        const accessToken = getOAuthAccessToken(connector.connector.config);
+        const refreshToken = getOAuthRefreshToken(connector.connector.config);
+        const accountEmail = getGmailAccountEmail(connector.connector.config);
+        if (connector.connector.authType !== 'OAUTH') {
+            return {
+                widgetId: widget.id,
+                widgetType: widget.type,
+                title: widget.title,
+                status: 'FAILED',
+                content: {
+                    provider: 'gmail',
+                    connectionLabel: connector.connector.name,
+                    filters,
+                    messages: [],
+                    emptyMessage: 'This Gmail connection needs OAuth access before it can load private messages.'
+                },
+                errorMessage: 'Gmail connection is using an unsupported authentication mode.',
+                generatedAt
+            };
+        }
+        if (!refreshToken) {
+            return {
+                widgetId: widget.id,
+                widgetType: widget.type,
+                title: widget.title,
+                status: 'FAILED',
+                content: {
+                    provider: 'gmail',
+                    connectionLabel: connector.connector.name,
+                    filters,
+                    messages: [],
+                    emptyMessage: 'The selected Gmail connection is missing its refresh token.'
+                },
+                errorMessage: 'Gmail connection is missing a refresh token.',
+                generatedAt
+            };
+        }
+        if (!accountEmail) {
+            return {
+                widgetId: widget.id,
+                widgetType: widget.type,
+                title: widget.title,
+                status: 'FAILED',
+                content: {
+                    provider: 'gmail',
+                    connectionLabel: connector.connector.name,
+                    filters,
+                    messages: [],
+                    emptyMessage: 'The selected Gmail connection is missing its account email.'
+                },
+                errorMessage: 'Gmail connection is missing an account email.',
+                generatedAt
+            };
+        }
+        try {
+            const token = accessToken && !isTokenExpired(connector.connector.config)
+                ? {
+                    accessToken
+                }
+                : await this.gmailOAuthClient.refreshAccessToken(refreshToken);
+            const messages = await this.gmailClient.listMessages(token.accessToken, filters);
+            return {
+                widgetId: widget.id,
+                widgetType: widget.type,
+                title: widget.title,
+                status: 'READY',
+                content: buildEmailSnapshotContent(messages, connector.connector.name, filters),
+                errorMessage: null,
+                generatedAt
+            };
+        }
+        catch (error) {
+            return {
+                widgetId: widget.id,
+                widgetType: widget.type,
+                title: widget.title,
+                status: 'FAILED',
+                content: {
+                    provider: 'gmail',
+                    connectionLabel: connector.connector.name,
+                    filters,
+                    messages: [],
+                    emptyMessage: 'Gmail could not be reached. Please check the connection and try again.'
+                },
+                errorMessage: error instanceof Error ? error.message : 'Gmail snapshot generation failed.',
+                generatedAt
+            };
+        }
+    }
 }
 function getWeatherLocation(config) {
     if (!config.location || typeof config.location !== 'object') {
@@ -807,6 +950,16 @@ function buildSummary(widgets) {
             ? `${appointmentCount} appointments loaded from Google Calendar.`
             : 'No Google Calendar appointments are scheduled for today.';
     }
+    const emailWidget = widgets.find(function findEmailWidget(widget) {
+        return widget.widgetType === 'email' && widget.status === 'READY';
+    });
+    if (emailWidget) {
+        const emailCount = countEmailMessages(emailWidget.content.messages);
+        const unreadCount = countUnreadEmailMessages(emailWidget.content.messages);
+        return emailCount
+            ? `${emailCount} email messages loaded from Gmail, ${unreadCount} unread.`
+            : 'No Gmail messages matched the configured filters.';
+    }
     const xkcdWidget = widgets.find(function findXkcdWidget(widget) {
         return widget.widgetType === 'xkcd' && widget.status === 'READY';
     });
@@ -849,14 +1002,26 @@ function getGoogleCalendarId(config) {
     return '';
 }
 function getGoogleCalendarAccessToken(config) {
+    return getOAuthAccessToken(config);
+}
+function getOAuthAccessToken(config) {
     if (typeof config.accessToken === 'string' && config.accessToken.trim()) {
         return config.accessToken.trim();
     }
     return '';
 }
 function getGoogleCalendarRefreshToken(config) {
+    return getOAuthRefreshToken(config);
+}
+function getOAuthRefreshToken(config) {
     if (typeof config.refreshToken === 'string' && config.refreshToken.trim()) {
         return config.refreshToken.trim();
+    }
+    return '';
+}
+function getGmailAccountEmail(config) {
+    if (typeof config.accountEmail === 'string' && config.accountEmail.trim()) {
+        return config.accountEmail.trim();
     }
     return '';
 }
@@ -877,7 +1042,7 @@ function isTokenExpired(config) {
     }
     return Date.parse(config.expiresAt) <= Date.now() + 60_000;
 }
-function buildTaskSnapshotContent(tasks, generatedAt, connectionName) {
+function buildTaskSnapshotContent(tasks, generatedAt, connectionName, includeUndatedItems) {
     const today = formatDateKey(generatedAt);
     const tomorrow = formatDateKey(addDays(generatedAt, 1));
     const todayItems = [];
@@ -900,18 +1065,12 @@ function buildTaskSnapshotContent(tasks, generatedAt, connectionName) {
     return {
         provider: 'todoist',
         connectionLabel: connectionName,
-        groups: [
-            { label: 'Due Today', items: todayItems },
-            { label: 'Due Tomorrow', items: tomorrowItems },
-            { label: 'No Due Date', items: undatedItems }
-        ],
-        emptyMessage: countTaskItems([
-            { items: todayItems },
-            { items: tomorrowItems },
-            { items: undatedItems }
-        ])
+        groups: buildTaskGroups(todayItems, tomorrowItems, undatedItems, includeUndatedItems),
+        emptyMessage: countTaskItems(buildTaskGroups(todayItems, tomorrowItems, undatedItems, includeUndatedItems))
             ? ''
-            : 'No incomplete tasks are due today, tomorrow, or without a due date.'
+            : includeUndatedItems
+                ? 'No incomplete tasks are due today, tomorrow, or without a due date.'
+                : 'No incomplete tasks are due today or tomorrow.'
     };
 }
 function toTaskSnapshotItem(task) {
@@ -943,6 +1102,29 @@ function buildCalendarSnapshotContent(events, connectionName) {
             : 'No appointments are scheduled for today.'
     };
 }
+function buildEmailSnapshotContent(messages, connectionName, filters) {
+    return {
+        provider: 'gmail',
+        connectionLabel: connectionName,
+        filters,
+        messages: messages.slice(0, 25).map(function mapMessage(message) {
+            return {
+                id: message.id,
+                threadId: message.threadId,
+                subject: message.subject,
+                from: message.from,
+                snippet: message.snippet,
+                receivedAt: message.receivedAt,
+                isUnread: message.isUnread,
+                matchedFilters: message.matchedFilters,
+                url: message.webUrl
+            };
+        }),
+        emptyMessage: messages.length
+            ? ''
+            : 'No messages matched the configured filters.'
+    };
+}
 function buildTaskMeta(task) {
     const parts = [];
     if (task.due && typeof task.due.string === 'string' && task.due.string.trim()) {
@@ -964,11 +1146,46 @@ function countTaskItems(groups) {
         return total + group.items.length;
     }, 0);
 }
+function shouldShowUndatedTasks(config) {
+    return config.showUndatedTasks !== false;
+}
+function getEmailFilters(config) {
+    if (!Array.isArray(config.filters)) {
+        return ['in:inbox'];
+    }
+    const filters = config.filters.filter(function filterValue(value) {
+        return typeof value === 'string' && value.trim();
+    }).map(function mapValue(value) {
+        return value.trim();
+    });
+    return filters.length ? filters : ['in:inbox'];
+}
+function buildTaskGroups(todayItems, tomorrowItems, undatedItems, includeUndatedItems) {
+    const groups = [
+        { label: 'Due Today', items: todayItems },
+        { label: 'Due Tomorrow', items: tomorrowItems }
+    ];
+    if (includeUndatedItems) {
+        groups.push({ label: 'No Due Date', items: undatedItems });
+    }
+    return groups;
+}
 function countCalendarAppointments(appointments) {
     if (!Array.isArray(appointments)) {
         return 0;
     }
     return appointments.length;
+}
+function countEmailMessages(messages) {
+    return Array.isArray(messages) ? messages.length : 0;
+}
+function countUnreadEmailMessages(messages) {
+    if (!Array.isArray(messages)) {
+        return 0;
+    }
+    return messages.filter(function filterUnread(message) {
+        return !!(message && typeof message === 'object' && message.isUnread);
+    }).length;
 }
 function addDays(date, days) {
     const next = new Date(date);

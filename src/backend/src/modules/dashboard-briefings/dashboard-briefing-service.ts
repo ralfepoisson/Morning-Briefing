@@ -209,7 +209,7 @@ export class DashboardBriefingService {
           ownerUserId: user.userId,
           briefingId: created.id,
           estimatedDurationSeconds: script.estimatedDurationSeconds,
-          sectionCount: script.sections.length
+          scriptCharacterCount: script.fullScript.length
         }
       });
       const audio = await this.ttsService.generateAndStore({
@@ -253,7 +253,6 @@ export class DashboardBriefingService {
         scriptJson: {
           title: script.title,
           estimatedDurationSeconds: script.estimatedDurationSeconds,
-          sections: script.sections,
           fullScript: script.fullScript
         },
         estimatedDurationSeconds: script.estimatedDurationSeconds,

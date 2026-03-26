@@ -1,7 +1,7 @@
 # Page snapshot
 
 ```yaml
-- generic [active] [ref=e1]:
+- generic [ref=e1]:
   - navigation [ref=e3]:
     - generic [ref=e4]:
       - link "Morning Briefing logo" [ref=e5] [cursor=pointer]:
@@ -30,16 +30,18 @@
           - generic [ref=e33]: Dashboard
           - heading "Ralfe's Morning Briefing" [level=1] [ref=e34]
           - paragraph [ref=e35]: Primary dashboard
-        - button "Edit Dashboard" [ref=e37] [cursor=pointer]
-      - article [ref=e39]:
-        - button "Refresh widget snapshot"
-        - generic [ref=e41]:
-          - generic [ref=e42]: Calendar widget
-          - heading "Today on Calendar" [level=3] [ref=e43]
-        - generic [ref=e46]:
-          - generic [ref=e47]:
-            - text: "Connection:"
-            - strong [ref=e48]: Not connected
-          - generic [ref=e49]: Today
-          - paragraph [ref=e50]: Choose a Google Calendar connection in edit mode to configure this widget.
+        - generic [ref=e36]:
+          - generic [ref=e37]:
+            - generic [ref=e39]:
+              - generic [ref=e40]: Audio Briefing
+              - generic [ref=e41]: Not generated
+            - generic [ref=e42]:
+              - button "Play audio briefing" [disabled]
+              - button "View audio briefing text" [disabled]
+          - button "Configure dashboard" [ref=e43] [cursor=pointer]
+          - button "Save Dashboard" [active] [ref=e44] [cursor=pointer]
+          - button "+ Widget" [ref=e45] [cursor=pointer]
+      - generic [ref=e48]:
+        - heading "Blank dashboard" [level=3] [ref=e49]
+        - paragraph [ref=e50]: Add a widget to start shaping this personal briefing.
 ```

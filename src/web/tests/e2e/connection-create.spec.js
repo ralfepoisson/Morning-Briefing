@@ -56,7 +56,7 @@ test.describe('Create Todoist connection from the task widget', function () {
       }));
     }, [TOKEN_KEY, SESSION_KEY, token]);
 
-    await page.route('http://127.0.0.1:3000/api/v1/dashboards', async function (route) {
+    await page.route('**/api/v1/dashboards', async function (route) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -66,7 +66,7 @@ test.describe('Create Todoist connection from the task widget', function () {
       });
     });
 
-    await page.route('http://127.0.0.1:3000/api/v1/dashboards/' + dashboard.id + '/widgets', async function (route) {
+    await page.route('**/api/v1/dashboards/' + dashboard.id + '/widgets', async function (route) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -76,7 +76,7 @@ test.describe('Create Todoist connection from the task widget', function () {
       });
     });
 
-    await page.route('http://127.0.0.1:3000/api/v1/dashboards/' + dashboard.id + '/snapshots/latest', async function (route) {
+    await page.route('**/api/v1/dashboards/' + dashboard.id + '/snapshots/latest', async function (route) {
       await route.fulfill({
         status: 404,
         contentType: 'application/json',

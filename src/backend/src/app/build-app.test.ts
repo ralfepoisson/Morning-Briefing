@@ -70,6 +70,21 @@ test('protected api routes allow CORS preflight requests without an authorizatio
   }
 });
 
+test('gmail oauth callback is not blocked by api authentication', async function () {
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/connections/gmail/oauth/callback?state=bad-state'
+    });
+
+    assert.notEqual(response.statusCode, 401);
+  } finally {
+    await app.close();
+  }
+});
+
 test('connection preflight requests allow authorization and content-type headers', async function () {
   const app = await buildApp();
 

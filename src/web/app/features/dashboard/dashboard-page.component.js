@@ -21,13 +21,16 @@
       '                <div class="audio-briefing-panel__copy audio-briefing-panel__copy--compact">{{ $ctrl.getAudioBriefingStatusLabel() }}</div>' +
       '              </div>' +
       '              <div class="audio-briefing-panel__status">' +
-      '                <span class="audio-briefing-chip" ng-if="$ctrl.audioBriefing && $ctrl.audioBriefing.estimatedDurationSeconds">{{ $ctrl.formatDuration($ctrl.audioBriefing.estimatedDurationSeconds) }}</span>' +
-      '                <span class="audio-briefing-chip" ng-if="$ctrl.audioBriefing && $ctrl.audioBriefing.generatedAt">{{ $ctrl.formatTimestamp($ctrl.audioBriefing.generatedAt) }}</span>' +
+      '                <span class="audio-briefing-chip" ng-if="$ctrl.getAudioBriefingDurationSeconds()">{{ $ctrl.formatDuration($ctrl.getAudioBriefingDurationSeconds()) }}</span>' +
+      '                <span class="audio-briefing-panel__timestamp" ng-if="$ctrl.audioBriefing && $ctrl.audioBriefing.generatedAt">{{ $ctrl.formatTimestamp($ctrl.audioBriefing.generatedAt) }}</span>' +
       '              </div>' +
       '            </div>' +
       '            <div class="audio-briefing-panel__actions">' +
       '              <button type="button" class="btn btn-light text-dark btn-sm" ng-click="$ctrl.toggleAudioPlayback()" ng-disabled="!$ctrl.canPlayAudioBriefing()" title="{{ $ctrl.isAudioPlaying ? \'Pause audio briefing\' : \'Play audio briefing\' }}" aria-label="{{ $ctrl.isAudioPlaying ? \'Pause audio briefing\' : \'Play audio briefing\' }}">' +
       '                <i class="fa-solid" ng-class="$ctrl.isAudioPlaying ? \'fa-pause\' : \'fa-play\'" aria-hidden="true"></i>' +
+      '              </button>' +
+      '              <button type="button" class="btn btn-outline-light btn-sm" ng-click="$ctrl.openAudioBriefingScriptModal()" ng-disabled="!$ctrl.canViewAudioBriefingScript()" title="View audio briefing text" aria-label="View audio briefing text">' +
+      '                <i class="fa-solid fa-align-left" aria-hidden="true"></i>' +
       '              </button>' +
       '            </div>' +
       '          </section>' +
@@ -101,6 +104,17 @@
       '        </div>' +
       '      </form>' +
       '    </div>' +
+  '  </div>' +
+      '  <div class="modal-shell" ng-if="$ctrl.isAudioBriefingScriptModalOpen" ng-click="$ctrl.closeAudioBriefingScriptModal()">' +
+      '    <div class="modal-card audio-briefing-script-modal" role="dialog" aria-modal="true" ng-click="$event.stopPropagation()">' +
+      '      <div class="eyebrow">Audio Briefing Script</div>' +
+      '      <h2 class="modal-title">Generated script</h2>' +
+      '      <p class="modal-copy">This is the text version of the latest generated audio briefing.</p>' +
+      '      <pre class="audio-briefing-script-modal__text">{{$ctrl.audioBriefing.scriptText}}</pre>' +
+      '      <div class="modal-actions">' +
+      '        <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeAudioBriefingScriptModal()">Close</button>' +
+      '      </div>' +
+      '    </div>' +
       '  </div>' +
       '  <div class="modal-shell" ng-if="$ctrl.widgetConfig.isOpen" ng-click="$ctrl.closeWidgetConfigModal()">' +
       '    <div class="modal-card widget-config-modal" role="dialog" aria-modal="true" ng-click="$event.stopPropagation()">' +
@@ -109,8 +123,9 @@
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'weather\'">Pick the city this weather widget should use. Search results come from our reference city catalog.</p>' +
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'tasks\'">Choose which connection should power this task list. The selection is staged here and persisted when you click Save Dashboard.</p>' +
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'calendar\'">Choose which connection should power this calendar. The selection is staged here and persisted when you click Save Dashboard.</p>' +
+      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'email\'">Choose which connection should power this email widget, then add one or more Gmail search filters. The combined matching messages will be staged here and persisted when you click Save Dashboard.</p>' +
       '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type === \'news\'">This widget uses the tenant-level OpenAI configuration from Admin > Configuration to summarize the configured RSS feeds.</p>' +
-      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type !== \'weather\' && $ctrl.widgetConfig.widget.type !== \'tasks\' && $ctrl.widgetConfig.widget.type !== \'calendar\' && $ctrl.widgetConfig.widget.type !== \'news\'">This widget type does not have configurable settings yet.</p>' +
+      '      <p class="modal-copy" ng-if="$ctrl.widgetConfig.widget.type !== \'weather\' && $ctrl.widgetConfig.widget.type !== \'tasks\' && $ctrl.widgetConfig.widget.type !== \'calendar\' && $ctrl.widgetConfig.widget.type !== \'email\' && $ctrl.widgetConfig.widget.type !== \'news\'">This widget type does not have configurable settings yet.</p>' +
       '      <form ng-if="$ctrl.widgetConfig.widget.type === \'weather\'" ng-submit="$ctrl.searchCities()">' +
       '        <label class="form-label" for="weatherLocationSearch">Location</label>' +
       '        <div class="d-flex gap-2">' +
@@ -128,6 +143,21 @@
       '        </div>' +
       '        <p class="widget-config-helper" ng-if="$ctrl.widgetConfig.isLoadingConnections">Loading connections...</p>' +
       '      </div>' +
+      '      <div ng-if="$ctrl.widgetConfig.widget.type === \'email\'">' +
+      '        <label class="form-label mt-3">Mail filters</label>' +
+      '        <p class="widget-config-helper">Use Gmail search syntax such as <code>label:important</code>, <code>from:boss@example.com</code>, or <code>newer_than:2d</code>. Messages matching any filter will be merged into one list.</p>' +
+      '        <div class="widget-config-results widget-config-results--stacked">' +
+      '          <div class="widget-config-inline" ng-repeat="filter in $ctrl.widgetConfig.emailFilters track by $index">' +
+      '            <input class="form-control" type="text" ng-model="$ctrl.widgetConfig.emailFilters[$index]" placeholder="in:inbox" />' +
+      '            <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.removeEmailFilter($index)" ng-disabled="$ctrl.widgetConfig.emailFilters.length === 1">Remove</button>' +
+      '          </div>' +
+      '        </div>' +
+      '        <button type="button" class="btn btn-outline-light btn-sm mt-2" ng-click="$ctrl.addEmailFilter()">Add filter</button>' +
+      '      </div>' +
+      '      <label class="form-check mt-3" ng-if="$ctrl.widgetConfig.widget.type === \'tasks\'">' +
+      '        <input class="form-check-input" type="checkbox" ng-model="$ctrl.widgetConfig.showUndatedTasks" />' +
+      '        <span class="form-check-label">Show tasks without a due date</span>' +
+      '      </label>' +
       '      <p class="widget-config-selected" ng-if="$ctrl.widgetConfig.selectedCity">Selected city: <strong>{{ $ctrl.getSelectedCityDisplayName($ctrl.widgetConfig.selectedCity) }}</strong></p>' +
       '      <p class="widget-config-selected" ng-if="$ctrl.widgetSupportsConnections() && $ctrl.getSelectedConnection()">Selected connection: <strong>{{ $ctrl.getSelectedConnection().name }}</strong></p>' +
       '      <label class="form-check mt-3">' +
@@ -147,7 +177,7 @@
       '        <button type="button" class="btn btn-outline-danger me-auto" ng-if="$ctrl.widgetConfig.widget" ng-click="$ctrl.removeWidget()">Remove widget</button>' +
       '        <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeWidgetConfigModal()">Cancel</button>' +
       '        <button type="button" class="btn btn-primary" ng-if="$ctrl.widgetConfig.widget.type === \'weather\'" ng-disabled="!$ctrl.widgetConfig.selectedCity" ng-click="$ctrl.saveWidgetConfig()">Save</button>' +
-      '        <button type="button" class="btn btn-primary" ng-if="$ctrl.widgetSupportsConnections()" ng-disabled="!$ctrl.widgetConfig.selectedConnectionId" ng-click="$ctrl.saveWidgetConfig()">Save</button>' +
+      '        <button type="button" class="btn btn-primary" ng-if="$ctrl.widgetSupportsConnections()" ng-disabled="!$ctrl.widgetConfig.selectedConnectionId || ($ctrl.widgetConfig.widget.type === \'email\' && !$ctrl.hasValidEmailFilters())" ng-click="$ctrl.saveWidgetConfig()">Save</button>' +
       '        <button type="button" class="btn btn-primary" ng-if="$ctrl.widgetConfig.widget.type !== \'weather\' && !$ctrl.widgetSupportsConnections()" ng-click="$ctrl.saveWidgetConfig()">Save</button>' +
       '      </div>' +
       '    </div>' +
@@ -158,6 +188,7 @@
       '      <h2 class="modal-title">New connection</h2>' +
       '      <p class="modal-copy" ng-if="$ctrl.connectionModal.provider === \'todoist\'">Create a Todoist connection by entering its API key.</p>' +
       '      <p class="modal-copy" ng-if="$ctrl.connectionModal.provider === \'google-calendar\'">Connect Google Calendar with OAuth so private calendars can be read securely.</p>' +
+      '      <p class="modal-copy" ng-if="$ctrl.connectionModal.provider === \'gmail\'">Connect Gmail with OAuth so private messages can be read securely.</p>' +
       '      <p class="modal-copy" ng-if="$ctrl.connectionModal.provider === \'openai\'">Create an OpenAI connection with an API key, model, and optional base URL.</p>' +
       '      <form ng-submit="$ctrl.saveNewConnection()" ng-if="$ctrl.connectionModal.provider === \'todoist\'">' +
         '        <label class="form-label" for="connectionApiKey">Todoist API Key</label>' +
@@ -172,6 +203,13 @@
       '        <div class="modal-actions">' +
       '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeCreateConnectionModal()">Cancel</button>' +
       '          <button type="button" class="btn btn-primary" ng-click="$ctrl.startGoogleCalendarOAuth()">Continue with Google</button>' +
+      '        </div>' +
+      '      </div>' +
+      '      <div ng-if="$ctrl.connectionModal.provider === \'gmail\'">' +
+      '        <p class="widget-config-helper">You will be redirected to Google, then returned here after access is granted.</p>' +
+      '        <div class="modal-actions">' +
+      '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.closeCreateConnectionModal()">Cancel</button>' +
+      '          <button type="button" class="btn btn-primary" ng-click="$ctrl.startGmailOAuth()">Continue with Google</button>' +
       '        </div>' +
       '      </div>' +
       '      <form ng-submit="$ctrl.saveNewConnection()" ng-if="$ctrl.connectionModal.provider === \'openai\'">' +
@@ -194,7 +232,7 @@
       '        <div>' +
       '          <div class="eyebrow">Widget Library</div>' +
       '          <h2 class="modal-title mb-2">Add a widget</h2>' +
-      '          <p class="modal-copy mb-0">Weather, news, tasks, calendar, and xkcd are ready to place. More widgets can slot into this same library later.</p>' +
+      '          <p class="modal-copy mb-0">Weather, news, tasks, calendar, email, and xkcd are ready to place. More widgets can slot into this same library later.</p>' +
       '        </div>' +
       '        <button type="button" class="btn btn-outline-secondary icon-button" ng-click="$ctrl.closeWidgetPanel()" aria-label="Close widget panel"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>' +
       '      </div>' +
@@ -239,6 +277,7 @@
     $ctrl.isGeneratingAudioBriefing = false;
     $ctrl.isAudioPlaying = false;
     $ctrl.isAudioLoading = false;
+    $ctrl.isAudioBriefingScriptModalOpen = false;
 
     $ctrl.$onInit = function onInit() {
       bindUiWatchers();
@@ -397,6 +436,8 @@
         includeInBriefing: widget.includeInBriefing,
         availableConnections: [],
         selectedConnectionId: widget.config && widget.config.connectionId ? widget.config.connectionId : '',
+        showUndatedTasks: widget.type === 'tasks' ? widget.config.showUndatedTasks !== false : true,
+        emailFilters: widget.type === 'email' ? getEmailFilters(widget.config) : ['in:inbox'],
         isLoadingConnections: false,
         isSearching: false,
         hasSearched: false
@@ -445,6 +486,9 @@
     $ctrl.getSelectedConnection = getSelectedConnection;
     $ctrl.widgetSupportsConnections = widgetSupportsConnections;
     $ctrl.canSaveConnection = canSaveConnection;
+    $ctrl.addEmailFilter = addEmailFilter;
+    $ctrl.removeEmailFilter = removeEmailFilter;
+    $ctrl.hasValidEmailFilters = hasValidEmailFilters;
 
     $ctrl.saveWidgetConfig = function saveWidgetConfig() {
       var widget = $ctrl.widgetConfig.widget;
@@ -472,6 +516,10 @@
 
       if (widgetSupportsConnections(widget.type)) {
         if (!$ctrl.widgetConfig.selectedConnectionId) {
+          return;
+        }
+
+        if (widget.type === 'email' && !hasValidEmailFilters()) {
           return;
         }
 
@@ -525,6 +573,11 @@
         return;
       }
 
+      if ($ctrl.connectionModal.provider === 'gmail') {
+        $ctrl.startGmailOAuth();
+        return;
+      }
+
       $ctrl.connectionModal.isSaving = true;
 
       ConnectionService.create({
@@ -554,6 +607,21 @@
       ConnectionService.startGoogleCalendarOAuth($window.location.href).catch(function handleGoogleOAuthStartError(error) {
         ConnectionService.saveWidgetOAuthContext(null);
         NotificationService.error(getErrorMessage(error, 'Unable to start Google Calendar connection right now.'), 'Unable to start Google connection');
+      });
+    };
+
+    $ctrl.startGmailOAuth = function startGmailOAuth() {
+      if ($ctrl.widgetConfig.widget) {
+        ConnectionService.saveWidgetOAuthContext({
+          dashboardId: $ctrl.activeDashboard ? $ctrl.activeDashboard.id : '',
+          widgetId: $ctrl.widgetConfig.widget.id,
+          widgetType: $ctrl.widgetConfig.widget.type
+        });
+      }
+
+      ConnectionService.startGmailOAuth($window.location.href).catch(function handleGmailOAuthStartError(error) {
+        ConnectionService.saveWidgetOAuthContext(null);
+        NotificationService.error(getErrorMessage(error, 'Unable to start Gmail connection right now.'), 'Unable to start Gmail connection');
       });
     };
 
@@ -644,6 +712,22 @@
       return !!($ctrl.audioBriefing && $ctrl.audioBriefing.audio && $ctrl.audioBriefing.status === 'READY' && !$ctrl.isAudioLoading);
     };
 
+    $ctrl.canViewAudioBriefingScript = function canViewAudioBriefingScript() {
+      return !!($ctrl.audioBriefing && $ctrl.audioBriefing.scriptText);
+    };
+
+    $ctrl.openAudioBriefingScriptModal = function openAudioBriefingScriptModal() {
+      if (!$ctrl.canViewAudioBriefingScript()) {
+        return;
+      }
+
+      $ctrl.isAudioBriefingScriptModalOpen = true;
+    };
+
+    $ctrl.closeAudioBriefingScriptModal = function closeAudioBriefingScriptModal() {
+      $ctrl.isAudioBriefingScriptModalOpen = false;
+    };
+
     $ctrl.toggleAudioPlayback = function toggleAudioPlayback() {
       if (!$ctrl.canPlayAudioBriefing()) {
         return;
@@ -728,7 +812,23 @@
         return '';
       }
 
-      return Math.max(1, Math.round(seconds / 60)) + ' min';
+      if (seconds < 60) {
+        return Math.round(seconds) + ' sec';
+      }
+
+      return Math.floor(seconds / 60) + 'm ' + String(Math.round(seconds % 60)).padStart(2, '0') + 's';
+    };
+
+    $ctrl.getAudioBriefingDurationSeconds = function getAudioBriefingDurationSeconds() {
+      if (!$ctrl.audioBriefing) {
+        return null;
+      }
+
+      if ($ctrl.audioBriefing.audio && $ctrl.audioBriefing.audio.durationSeconds) {
+        return $ctrl.audioBriefing.audio.durationSeconds;
+      }
+
+      return $ctrl.audioBriefing.estimatedDurationSeconds || null;
     };
 
     $ctrl.formatTimestamp = function formatTimestamp(value) {
@@ -886,6 +986,8 @@
         includeInBriefing: false,
         availableConnections: [],
         selectedConnectionId: '',
+        showUndatedTasks: true,
+        emailFilters: ['in:inbox'],
         isLoadingConnections: false,
         isSearching: false,
         hasSearched: false
@@ -920,7 +1022,7 @@
     function restoreWidgetOAuthFlowIfPresent() {
       var context = ConnectionService.getWidgetOAuthContext();
 
-      if (!pendingWidgetOAuthResult || !pendingWidgetOAuthResult.connectionId || pendingWidgetOAuthResult.provider !== 'google-calendar') {
+      if (!pendingWidgetOAuthResult || !pendingWidgetOAuthResult.connectionId || !pendingWidgetOAuthResult.provider) {
         return $q.resolve();
       }
 
@@ -952,13 +1054,13 @@
 
         if (!selectedConnection) {
           ConnectionService.clearWidgetOAuthContext();
-          NotificationService.error('The Google Calendar connection was created, but it could not be loaded into the widget automatically.', 'Connection restore failed');
+          NotificationService.error('The new connection was created, but it could not be loaded into the widget automatically.', 'Connection restore failed');
           return;
         }
 
         if (!currentWidget) {
           ConnectionService.clearWidgetOAuthContext();
-          NotificationService.error('The Google Calendar connection was created, but the calendar widget could not be found to stage it automatically.', 'Connection restore failed');
+          NotificationService.error('The new connection was created, but the widget could not be found to stage it automatically.', 'Connection restore failed');
           return;
         }
 
@@ -966,10 +1068,10 @@
         applyConnectionWidgetPreview(currentWidget, selectedConnection);
         $ctrl.widgets = currentWidgets;
         ConnectionService.clearWidgetOAuthContext();
-        NotificationService.success('Google Calendar connected and staged on the widget. Click Save Dashboard to persist it.', 'Connection added');
+        NotificationService.success(selectedConnection.name + ' connected and staged on the widget. Click Save Dashboard to persist it.', 'Connection added');
       }).catch(function handleRestoreOAuthWidgetError(error) {
         ConnectionService.clearWidgetOAuthContext();
-        NotificationService.error(getErrorMessage(error, 'The Google Calendar connection was created, but it could not be staged on the widget automatically.'), 'Connection restore failed');
+        NotificationService.error(getErrorMessage(error, 'The new connection was created, but it could not be staged on the widget automatically.'), 'Connection restore failed');
       });
     }
 
@@ -1045,6 +1147,8 @@
     }
 
     function applyTasksWidgetPreview(widget, connection) {
+      var groups;
+
       if (!connection) {
         return;
       }
@@ -1052,33 +1156,39 @@
       widget.config.connectionId = connection.id;
       widget.config.connectionName = connection.name;
       widget.config.provider = connection.type;
+      widget.config.showUndatedTasks = $ctrl.widgetConfig.showUndatedTasks !== false;
+      groups = [
+        {
+          label: 'Due Today',
+          items: [
+            { title: 'Reply to insurance email', meta: 'today' },
+            { title: 'Confirm dinner reservation', meta: 'today' }
+          ]
+        },
+        {
+          label: 'Due Tomorrow',
+          items: [
+            { title: 'Draft project update', meta: 'tomorrow' },
+            { title: 'Buy birthday card', meta: 'tomorrow' }
+          ]
+        }
+      ];
+
+      if (widget.config.showUndatedTasks) {
+        groups.push({
+          label: 'No Due Date',
+          items: [
+            { title: 'Declutter camera roll', meta: '' },
+            { title: 'Research standing desk options', meta: '' }
+          ]
+        });
+      }
+
       widget.data = {
         provider: connection.type,
         connectionLabel: connection.name,
         emptyMessage: 'Live tasks will appear after you save the dashboard.',
-        groups: [
-          {
-            label: 'Due Today',
-            items: [
-              { title: 'Reply to insurance email', meta: 'today' },
-              { title: 'Confirm dinner reservation', meta: 'today' }
-            ]
-          },
-          {
-            label: 'Due Tomorrow',
-            items: [
-              { title: 'Draft project update', meta: 'tomorrow' },
-              { title: 'Buy birthday card', meta: 'tomorrow' }
-            ]
-          },
-          {
-            label: 'No Due Date',
-            items: [
-              { title: 'Declutter camera roll', meta: '' },
-              { title: 'Research standing desk options', meta: '' }
-            ]
-          }
-        ]
+        groups: groups
       };
     }
 
@@ -1115,6 +1225,51 @@
       };
     }
 
+    function applyEmailWidgetPreview(widget, connection) {
+      var filters;
+
+      if (!connection) {
+        return;
+      }
+
+      filters = getEmailFilters({
+        filters: $ctrl.widgetConfig.emailFilters
+      });
+      widget.config.connectionId = connection.id;
+      widget.config.connectionName = connection.name;
+      widget.config.provider = connection.type;
+      widget.config.filters = filters;
+      widget.data = {
+        provider: connection.type,
+        connectionLabel: connection.name,
+        filters: filters,
+        emptyMessage: 'Live messages will appear after you save the dashboard.',
+        messages: [
+          {
+            id: 'email-1',
+            subject: 'Project kickoff agenda',
+            from: 'Alex Morgan <alex@example.com>',
+            receivedAt: '2026-03-26T07:45:00.000Z',
+            isUnread: true
+          },
+          {
+            id: 'email-2',
+            subject: 'Travel confirmation for next week',
+            from: 'Airline Updates <updates@example.com>',
+            receivedAt: '2026-03-26T06:10:00.000Z',
+            isUnread: false
+          },
+          {
+            id: 'email-3',
+            subject: 'Design review notes',
+            from: 'Priya Shah <priya@example.com>',
+            receivedAt: '2026-03-25T20:20:00.000Z',
+            isUnread: true
+          }
+        ]
+      };
+    }
+
     function applyNewsWidgetPreview(widget, connection) {
       if (!connection) {
         return;
@@ -1140,6 +1295,11 @@
 
       if (widget.type === 'calendar') {
         applyCalendarWidgetPreview(widget, connection);
+        return;
+      }
+
+      if (widget.type === 'email') {
+        applyEmailWidgetPreview(widget, connection);
         return;
       }
 
@@ -1208,6 +1368,10 @@
         return 'Configure Calendar';
       }
 
+      if ($ctrl.widgetConfig.widget.type === 'email') {
+        return 'Configure Email';
+      }
+
       if ($ctrl.widgetConfig.widget.type === 'news') {
         return 'Configure News Widget';
       }
@@ -1222,7 +1386,7 @@
     function widgetSupportsConnections(widgetType) {
       var type = widgetType || ($ctrl.widgetConfig.widget && $ctrl.widgetConfig.widget.type);
 
-      return type === 'tasks' || type === 'calendar';
+      return type === 'tasks' || type === 'calendar' || type === 'email';
     }
 
     function getConnectionProviderForWidgetType(widgetType) {
@@ -1234,11 +1398,15 @@
         return 'google-calendar';
       }
 
+      if (widgetType === 'email') {
+        return 'gmail';
+      }
+
       return '';
     }
 
     function canSaveConnection() {
-      if ($ctrl.connectionModal.provider === 'google-calendar') {
+      if ($ctrl.connectionModal.provider === 'google-calendar' || $ctrl.connectionModal.provider === 'gmail') {
         return true;
       }
 
@@ -1265,6 +1433,35 @@
       }
 
       return credentials;
+    }
+
+    function addEmailFilter() {
+      $ctrl.widgetConfig.emailFilters = $ctrl.widgetConfig.emailFilters || [];
+      $ctrl.widgetConfig.emailFilters.push('');
+    }
+
+    function removeEmailFilter(index) {
+      if (!$ctrl.widgetConfig.emailFilters || $ctrl.widgetConfig.emailFilters.length <= 1) {
+        return;
+      }
+
+      $ctrl.widgetConfig.emailFilters.splice(index, 1);
+    }
+
+    function hasValidEmailFilters() {
+      return getEmailFilters({
+        filters: $ctrl.widgetConfig.emailFilters
+      }).length > 0;
+    }
+
+    function getEmailFilters(config) {
+      var filters = Array.isArray(config && config.filters) ? config.filters : [];
+
+      filters = filters.map(function mapFilter(filter) {
+        return typeof filter === 'string' ? filter.trim() : '';
+      }).filter(Boolean);
+
+      return filters.length ? filters : ['in:inbox'];
     }
 
     function attachAudioElement() {

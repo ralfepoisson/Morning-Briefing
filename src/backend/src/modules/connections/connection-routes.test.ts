@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import { registerConnectionRoutes } from './connection-routes.js';
 import type { ConnectionResponse } from './connection-types.js';
+import type { GmailOAuthClient } from './gmail-oauth-client.js';
 import type { GoogleCalendarOAuthClient } from './google-calendar-oauth-client.js';
 
 test('GET /api/v1/connections returns available connections', async function () {
@@ -530,6 +531,148 @@ test('GET /api/v1/connections/google-calendar/oauth/callback redirects back safe
   }
 });
 
+test('POST /api/v1/connections/gmail/oauth/start returns a Google authorization url', async function () {
+  const app = Fastify();
+  let capturedState = '';
+
+  await registerConnectionRoutes(app, {
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
+        };
+      }
+    },
+    connectionService: {
+      async listForTenant() {
+        throw new Error('not used');
+      },
+      async create() {
+        throw new Error('not used');
+      },
+      async update() {
+        throw new Error('not used');
+      }
+    },
+    googleCalendarOAuthClient: createGoogleCalendarOAuthClientStub(),
+    gmailOAuthClient: {
+      ...createGmailOAuthClientStub(),
+      createAuthorizationUrl(state) {
+        capturedState = JSON.stringify(state);
+        return 'https://accounts.google.com/o/oauth2/v2/auth?state=gmail-signed';
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/connections/gmail/oauth/start',
+      payload: {
+        returnTo: 'https://briefing.ralfepoisson.com/#/',
+        connectionId: 'connection-gmail-1'
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json(), {
+      authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=gmail-signed'
+    });
+    assert.match(capturedState, /connection-gmail-1/);
+    assert.match(capturedState, /tenant-1/);
+  } finally {
+    await app.close();
+  }
+});
+
+test('GET /api/v1/connections/gmail/oauth/callback creates a connection and redirects back', async function () {
+  const app = Fastify();
+  let created = false;
+
+  await registerConnectionRoutes(app, {
+    defaultUserService: {
+      async getDefaultUser() {
+        throw new Error('callback should rely on OAuth state');
+      }
+    },
+    connectionService: {
+      async listForTenant() {
+        throw new Error('not used');
+      },
+      async create(input) {
+        created = true;
+        assert.equal(input.tenantId, 'tenant-1');
+        assert.equal(input.type, 'gmail');
+        assert.equal(input.credentials.refreshToken, 'refresh-token');
+        assert.equal(input.credentials.accountEmail, 'ralf@example.com');
+
+        return {
+          id: 'connection-gmail-2',
+          type: 'gmail',
+          name: 'ralf@example.com',
+          status: 'ACTIVE',
+          authType: 'OAUTH',
+          config: {
+            accountEmail: 'ralf@example.com'
+          },
+          createdAt: '2026-03-19T08:00:00.000Z',
+          updatedAt: '2026-03-19T08:00:00.000Z'
+        };
+      },
+      async update() {
+        throw new Error('not used');
+      }
+    },
+    googleCalendarOAuthClient: createGoogleCalendarOAuthClientStub(),
+    gmailOAuthClient: {
+      ...createGmailOAuthClientStub(),
+      verifyState() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          returnTo: 'http://127.0.0.1:8080/#/',
+          issuedAt: Date.now()
+        };
+      },
+      async exchangeAuthorizationCode(code) {
+        assert.equal(code, 'auth-code');
+
+        return {
+          accessToken: 'access-token',
+          refreshToken: 'refresh-token',
+          expiresAt: '2026-03-20T10:00:00.000Z',
+          scope: 'https://www.googleapis.com/auth/gmail.readonly',
+          tokenType: 'Bearer'
+        };
+      },
+      async getAccount(accessToken) {
+        assert.equal(accessToken, 'access-token');
+
+        return {
+          accountEmail: 'ralf@example.com',
+          accountLabel: 'ralf@example.com'
+        };
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/connections/gmail/oauth/callback?code=auth-code&state=signed-state'
+    });
+
+    assert.equal(response.statusCode, 302);
+    assert.equal(response.headers.location, 'http://127.0.0.1:8080/#/?oauthConnectionId=connection-gmail-2&oauthProvider=gmail');
+    assert.equal(created, true);
+  } finally {
+    await app.close();
+  }
+});
+
 test('PATCH /api/v1/connections/:connectionId updates a Todoist connection', async function () {
   const app = Fastify();
 
@@ -604,6 +747,29 @@ function createGoogleCalendarOAuthClientStub(): Pick<
       throw new Error('not used');
     },
     async getPrimaryCalendar() {
+      throw new Error('not used');
+    },
+    normalizeReturnTo(value) {
+      return value || 'http://127.0.0.1:8080/#/';
+    },
+    verifyState() {
+      throw new Error('not used');
+    }
+  };
+}
+
+function createGmailOAuthClientStub(): Pick<
+  GmailOAuthClient,
+  'createAuthorizationUrl' | 'exchangeAuthorizationCode' | 'getAccount' | 'normalizeReturnTo' | 'verifyState'
+> {
+  return {
+    createAuthorizationUrl() {
+      return 'https://accounts.google.com/o/oauth2/v2/auth';
+    },
+    async exchangeAuthorizationCode() {
+      throw new Error('not used');
+    },
+    async getAccount() {
       throw new Error('not used');
     },
     normalizeReturnTo(value) {

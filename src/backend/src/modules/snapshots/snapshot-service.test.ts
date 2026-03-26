@@ -1,6 +1,8 @@
 import type { GoogleCalendarOAuthClient } from '../connections/google-calendar-oauth-client.js';
 import { listApplicationLogs, resetApplicationLogs } from '../admin/application-log-store.js';
 import type { RssFeedRepository } from '../rss-feeds/rss-feed-repository.js';
+import type { GmailOAuthClient } from '../connections/gmail-oauth-client.js';
+import type { GmailClient } from './gmail-client.js';
 import type { GoogleCalendarClient } from './google-calendar-client.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -90,6 +92,8 @@ test('SnapshotService generates and persists a weather snapshot for the dashboar
     todoistTaskClient,
     unusedGoogleCalendarClient(),
     unusedGoogleCalendarOAuthClient(),
+    unusedGmailClient(),
+    unusedGmailOAuthClient(),
     unusedRssFeedClient(),
     unusedOpenAiNewsSummarizer()
   );
@@ -168,6 +172,8 @@ test('SnapshotService returns a failed weather widget snapshot when location con
     todoistTaskClient,
     unusedGoogleCalendarClient(),
     unusedGoogleCalendarOAuthClient(),
+    unusedGmailClient(),
+    unusedGmailOAuthClient(),
     unusedRssFeedClient(),
     unusedOpenAiNewsSummarizer()
   );
@@ -287,6 +293,8 @@ test('SnapshotService generates a Todoist task snapshot for the dashboard', asyn
     todoistTaskClient,
     unusedGoogleCalendarClient(),
     unusedGoogleCalendarOAuthClient(),
+    unusedGmailClient(),
+    unusedGmailOAuthClient(),
     unusedRssFeedClient(),
     unusedOpenAiNewsSummarizer()
   );
@@ -336,6 +344,149 @@ test('SnapshotService generates a Todoist task snapshot for the dashboard', asyn
             id: 'task-3',
             title: 'Research standing desk options',
             meta: '',
+            isRecurring: false,
+            url: ''
+          }
+        ]
+      }
+    ],
+    emptyMessage: ''
+  });
+});
+
+test('SnapshotService can hide undated Todoist tasks when the widget disables them', async function () {
+  const today = formatDateKey(new Date());
+  const tomorrow = formatDateKey(addDays(new Date(), 1));
+  const repository = new InMemorySnapshotRepository({
+    id: 'dash-1',
+    tenantId: 'tenant-1',
+    ownerUserId: 'user-1',
+    name: 'Morning Focus',
+    description: 'Seed dashboard',
+    widgets: [
+      {
+        id: 'widget-2',
+        tenantId: 'tenant-1',
+        dashboardId: 'dash-1',
+        ownerUserId: 'user-1',
+        type: 'tasks',
+        title: 'Task List',
+        x: 0,
+        y: 0,
+        width: 360,
+        height: 360,
+        minWidth: 360,
+        minHeight: 260,
+        isVisible: true,
+        sortOrder: 2,
+        refreshMode: 'SNAPSHOT',
+        version: 1,
+        config: {
+          connectionId: 'connection-1',
+          connectionName: 'Todoist',
+          provider: 'todoist',
+          showUndatedTasks: false
+        },
+        configHash: 'hash-tasks',
+        data: {},
+        connections: [
+          {
+            id: 'connection-1',
+            usageRole: 'tasks',
+            connector: {
+              id: 'connection-1',
+              type: 'todoist',
+              name: 'Todoist',
+              status: 'ACTIVE',
+              authType: 'API_KEY',
+              baseUrl: null,
+              config: {
+                apiKey: 'secret-token'
+              },
+              lastSyncAt: null,
+              createdAt: new Date('2026-03-19T07:00:00.000Z'),
+              updatedAt: new Date('2026-03-19T07:00:00.000Z')
+            }
+          }
+        ],
+        createdAt: new Date('2026-03-19T07:00:00.000Z'),
+        updatedAt: new Date('2026-03-19T07:00:00.000Z')
+      }
+    ]
+  });
+  const todoistTaskClient: TodoistTaskClient = {
+    async listTasks() {
+      return [
+        {
+          id: 'task-1',
+          content: 'Reply to insurance email',
+          due: {
+            date: today,
+            string: 'today',
+            isRecurring: false
+          }
+        },
+        {
+          id: 'task-2',
+          content: 'Buy birthday card',
+          due: {
+            date: tomorrow,
+            string: 'tomorrow',
+            isRecurring: false
+          }
+        },
+        {
+          id: 'task-3',
+          content: 'Research standing desk options',
+          due: null
+        }
+      ];
+    }
+  };
+  const service = new SnapshotService(
+    repository,
+    unusedRssFeedRepository(),
+    unusedWeatherClient(),
+    todoistTaskClient,
+    unusedGoogleCalendarClient(),
+    unusedGoogleCalendarOAuthClient(),
+    unusedGmailClient(),
+    unusedGmailOAuthClient(),
+    unusedRssFeedClient(),
+    unusedOpenAiNewsSummarizer()
+  );
+
+  const snapshot = await service.getLatestForDashboard('dash-1', {
+    tenantId: 'tenant-1',
+    userId: 'user-1',
+    displayName: 'Ralfe',
+    timezone: 'Europe/Paris'
+  });
+
+  assert.ok(snapshot);
+  assert.deepEqual(snapshot && snapshot.widgets[0].content, {
+    provider: 'todoist',
+    connectionLabel: 'Todoist',
+    groups: [
+      {
+        label: 'Due Today',
+        items: [
+          {
+            id: 'task-1',
+            title: 'Reply to insurance email',
+            meta: 'today',
+            isRecurring: false,
+            url: ''
+          }
+        ]
+      },
+      {
+        label: 'Due Tomorrow',
+        items: [
+          {
+            id: 'task-2',
+            title: 'Buy birthday card',
+            meta: 'tomorrow',
             isRecurring: false,
             url: ''
           }
@@ -436,6 +587,8 @@ test('SnapshotService generates a news snapshot from RSS feeds and the tenant Op
     unusedTodoistClient(),
     unusedGoogleCalendarClient(),
     unusedGoogleCalendarOAuthClient(),
+    unusedGmailClient(),
+    unusedGmailOAuthClient(),
     {
       async fetchFeed(url) {
         assert.equal(url, 'https://example.com/rss.xml');
@@ -521,6 +674,8 @@ test('SnapshotService excludes previously considered news articles from a new da
     unusedTodoistClient(),
     unusedGoogleCalendarClient(),
     unusedGoogleCalendarOAuthClient(),
+    unusedGmailClient(),
+    unusedGmailOAuthClient(),
     {
       async fetchFeed() {
         return {
@@ -610,6 +765,8 @@ test('SnapshotService reuses the same considered news article pool within a day'
     unusedTodoistClient(),
     unusedGoogleCalendarClient(),
     unusedGoogleCalendarOAuthClient(),
+    unusedGmailClient(),
+    unusedGmailOAuthClient(),
     {
       async fetchFeed() {
         throw new Error('RSS feeds should not be fetched when today\'s article pool is already locked.');
@@ -700,6 +857,8 @@ test('SnapshotService generates an xkcd snapshot for the dashboard', async funct
     unusedTodoistClient(),
     unusedGoogleCalendarClient(),
     unusedGoogleCalendarOAuthClient(),
+    unusedGmailClient(),
+    unusedGmailOAuthClient(),
     unusedRssFeedClient(),
     unusedOpenAiNewsSummarizer(),
     {
@@ -780,6 +939,8 @@ test('SnapshotService returns a failed xkcd snapshot when the upstream request f
     unusedTodoistClient(),
     unusedGoogleCalendarClient(),
     unusedGoogleCalendarOAuthClient(),
+    unusedGmailClient(),
+    unusedGmailOAuthClient(),
     unusedRssFeedClient(),
     unusedOpenAiNewsSummarizer(),
     {
@@ -1088,6 +1249,165 @@ test('SnapshotService logs Google Calendar snapshot failures for troubleshooting
   resetApplicationLogs();
 });
 
+test('SnapshotService generates a Gmail email snapshot for the dashboard', async function () {
+  const repository = new InMemorySnapshotRepository({
+    id: 'dash-1',
+    tenantId: 'tenant-1',
+    ownerUserId: 'user-1',
+    name: 'Morning Focus',
+    description: 'Seed dashboard',
+    widgets: [
+      {
+        id: 'widget-email-1',
+        tenantId: 'tenant-1',
+        dashboardId: 'dash-1',
+        ownerUserId: 'user-1',
+        type: 'email',
+        title: 'Recent Email',
+        x: 0,
+        y: 0,
+        width: 420,
+        height: 360,
+        minWidth: 360,
+        minHeight: 260,
+        isVisible: true,
+        sortOrder: 4,
+        refreshMode: 'SNAPSHOT',
+        version: 1,
+        config: {
+          connectionId: 'connection-gmail-1',
+          connectionName: 'Gmail',
+          provider: 'gmail',
+          filters: ['label:important', 'from:boss@example.com']
+        },
+        configHash: 'hash-email',
+        data: {},
+        connections: [
+          {
+            id: 'connection-gmail-1',
+            usageRole: 'email',
+            connector: {
+              id: 'connection-gmail-1',
+              type: 'gmail',
+              name: 'Gmail',
+              status: 'ACTIVE',
+              authType: 'OAUTH',
+              baseUrl: null,
+              config: {
+                accessToken: '',
+                refreshToken: 'gmail-refresh-token',
+                expiresAt: '2026-03-19T07:00:00.000Z',
+                accountEmail: 'ralf@example.com',
+                accountLabel: 'ralf@example.com'
+              },
+              lastSyncAt: null,
+              createdAt: new Date('2026-03-19T07:00:00.000Z'),
+              updatedAt: new Date('2026-03-19T07:00:00.000Z')
+            }
+          }
+        ],
+        createdAt: new Date('2026-03-19T07:00:00.000Z'),
+        updatedAt: new Date('2026-03-19T07:00:00.000Z')
+      }
+    ]
+  });
+  const gmailClient: GmailClient = {
+    async listMessages(accessToken, filters) {
+      assert.equal(accessToken, 'gmail-refreshed-token');
+      assert.deepEqual(filters, ['label:important', 'from:boss@example.com']);
+
+      return [
+        {
+          id: 'message-1',
+          threadId: 'thread-1',
+          subject: 'Urgent review',
+          from: 'Boss <boss@example.com>',
+          snippet: 'Please review this before 10.',
+          receivedAt: '2026-03-26T08:15:00.000Z',
+          isUnread: true,
+          matchedFilters: ['label:important', 'from:boss@example.com'],
+          webUrl: 'https://mail.google.com/mail/u/0/#inbox/message-1'
+        },
+        {
+          id: 'message-2',
+          threadId: 'thread-2',
+          subject: 'Travel receipt',
+          from: 'Travel Desk <travel@example.com>',
+          snippet: 'Receipt attached.',
+          receivedAt: '2026-03-26T06:00:00.000Z',
+          isUnread: false,
+          matchedFilters: ['label:important'],
+          webUrl: 'https://mail.google.com/mail/u/0/#inbox/message-2'
+        }
+      ];
+    }
+  };
+  const service = new SnapshotService(
+    repository,
+    unusedRssFeedRepository(),
+    unusedWeatherClient(),
+    unusedTodoistClient(),
+    unusedGoogleCalendarClient(),
+    unusedGoogleCalendarOAuthClient(),
+    gmailClient,
+    {
+      async refreshAccessToken(refreshToken) {
+        assert.equal(refreshToken, 'gmail-refresh-token');
+
+        return {
+          accessToken: 'gmail-refreshed-token',
+          expiresAt: '2026-03-27T12:00:00.000Z',
+          scope: 'https://www.googleapis.com/auth/gmail.readonly',
+          tokenType: 'Bearer'
+        };
+      }
+    },
+    unusedRssFeedClient(),
+    unusedOpenAiNewsSummarizer()
+  );
+
+  const snapshot = await service.getLatestForDashboard('dash-1', {
+    tenantId: 'tenant-1',
+    userId: 'user-1',
+    displayName: 'Ralfe',
+    timezone: 'Europe/Paris'
+  });
+
+  assert.ok(snapshot);
+  assert.equal(snapshot && snapshot.generationStatus, 'READY');
+  assert.equal(snapshot && snapshot.widgets[0].widgetType, 'email');
+  assert.deepEqual(snapshot && snapshot.widgets[0].content, {
+    provider: 'gmail',
+    connectionLabel: 'Gmail',
+    filters: ['label:important', 'from:boss@example.com'],
+    messages: [
+      {
+        id: 'message-1',
+        threadId: 'thread-1',
+        subject: 'Urgent review',
+        from: 'Boss <boss@example.com>',
+        snippet: 'Please review this before 10.',
+        receivedAt: '2026-03-26T08:15:00.000Z',
+        isUnread: true,
+        matchedFilters: ['label:important', 'from:boss@example.com'],
+        url: 'https://mail.google.com/mail/u/0/#inbox/message-1'
+      },
+      {
+        id: 'message-2',
+        threadId: 'thread-2',
+        subject: 'Travel receipt',
+        from: 'Travel Desk <travel@example.com>',
+        snippet: 'Receipt attached.',
+        receivedAt: '2026-03-26T06:00:00.000Z',
+        isUnread: false,
+        matchedFilters: ['label:important'],
+        url: 'https://mail.google.com/mail/u/0/#inbox/message-2'
+      }
+    ],
+    emptyMessage: ''
+  });
+});
+
 test('SnapshotService skips stale widget generation messages', async function () {
   const repository = new InMemorySnapshotRepository({
     id: 'dash-1',
@@ -1109,6 +1429,8 @@ test('SnapshotService skips stale widget generation messages', async function ()
     unusedTodoistClient(),
     unusedGoogleCalendarClient(),
     unusedGoogleCalendarOAuthClient(),
+    unusedGmailClient(),
+    unusedGmailOAuthClient(),
     unusedRssFeedClient(),
     unusedOpenAiNewsSummarizer()
   );
@@ -1160,6 +1482,8 @@ test('SnapshotService returns the latest persisted dashboard snapshot without re
     unusedTodoistClient(),
     unusedGoogleCalendarClient(),
     unusedGoogleCalendarOAuthClient(),
+    unusedGmailClient(),
+    unusedGmailOAuthClient(),
     unusedRssFeedClient(),
     unusedOpenAiNewsSummarizer()
   );
@@ -1298,6 +1622,22 @@ function unusedGoogleCalendarClient(): GoogleCalendarClient {
 }
 
 function unusedGoogleCalendarOAuthClient(): Pick<GoogleCalendarOAuthClient, 'refreshAccessToken'> {
+  return {
+    async refreshAccessToken() {
+      throw new Error('not used');
+    }
+  };
+}
+
+function unusedGmailClient(): GmailClient {
+  return {
+    async listMessages() {
+      throw new Error('not used');
+    }
+  };
+}
+
+function unusedGmailOAuthClient(): Pick<GmailOAuthClient, 'refreshAccessToken'> {
   return {
     async refreshAccessToken() {
       throw new Error('not used');

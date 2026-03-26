@@ -170,6 +170,36 @@ function buildSection(widget, snapshot) {
             }
         };
     }
+    if (widget.type === 'email') {
+        const messages = Array.isArray(content.messages)
+            ? content.messages.map(function mapMessage(item) {
+                const record = asObject(item);
+                return {
+                    subject: readString(record.subject),
+                    from: readString(record.from),
+                    receivedAt: readString(record.receivedAt),
+                    isUnread: readBoolean(record.isUnread)
+                };
+            }).filter(function filterMessage(item) {
+                return item.subject || item.from;
+            })
+            : [];
+        if (!messages.length) {
+            return null;
+        }
+        return {
+            widgetId: widget.id,
+            widgetType: widget.type,
+            title: widget.title,
+            importance: 'medium',
+            content: {
+                unreadCount: messages.filter(function filterUnread(message) {
+                    return message.isUnread;
+                }).length,
+                recentMessages: messages.slice(0, 5)
+            }
+        };
+    }
     if (widget.type === 'news') {
         const categories = Array.isArray(content.categories) ? content.categories.map(function mapCategory(category) {
             const record = asObject(category);

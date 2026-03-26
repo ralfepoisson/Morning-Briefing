@@ -291,6 +291,14 @@ resources:
                   Resource:
                     - !GetAtt SnapshotQueue.Arn
                     - !GetAtt SnapshotDeadLetterQueue.Arn
+          - PolicyName: ${self:custom.namePrefix}-polly
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - polly:SynthesizeSpeech
+                  Resource: "*"
 
     DatabasePasswordSecret:
       Type: AWS::SecretsManager::Secret

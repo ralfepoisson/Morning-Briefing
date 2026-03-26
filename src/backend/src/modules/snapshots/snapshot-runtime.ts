@@ -1,8 +1,10 @@
 import { createDashboardBriefingJobProcessor } from '../dashboard-briefings/dashboard-briefing-runtime.js';
+import { getGmailOAuthClientFromEnvironment } from '../connections/gmail-oauth-client.js';
 import { getGoogleCalendarOAuthClientFromEnvironment } from '../connections/google-calendar-oauth-client.js';
 import { PrismaRssFeedRepository } from '../rss-feeds/prisma-rss-feed-repository.js';
 import { PrismaTenantAiConfigurationRepository } from '../tenant-ai-configuration/prisma-tenant-ai-configuration-repository.js';
 import { TenantAiConfigurationService } from '../tenant-ai-configuration/tenant-ai-configuration-service.js';
+import { GmailClientImpl } from './gmail-client.js';
 import { GoogleCalendarClientImpl } from './google-calendar-client.js';
 import { OpenAiNewsSummarizer } from './openai-news-summarizer.js';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
@@ -23,11 +25,22 @@ import { XkcdClientImpl } from './xkcd-client.js';
 export function createSnapshotService(): SnapshotService {
   const prisma = getPrismaClient();
   let googleCalendarOAuthClient;
+  let gmailOAuthClient;
 
   try {
     googleCalendarOAuthClient = getGoogleCalendarOAuthClientFromEnvironment();
   } catch {
     googleCalendarOAuthClient = {
+      async refreshAccessToken() {
+        throw new Error('Google OAuth is not configured.');
+      }
+    };
+  }
+
+  try {
+    gmailOAuthClient = getGmailOAuthClientFromEnvironment();
+  } catch {
+    gmailOAuthClient = {
       async refreshAccessToken() {
         throw new Error('Google OAuth is not configured.');
       }
@@ -41,6 +54,8 @@ export function createSnapshotService(): SnapshotService {
     new TodoistTaskClientImpl(),
     new GoogleCalendarClientImpl(),
     googleCalendarOAuthClient,
+    new GmailClientImpl(),
+    gmailOAuthClient,
     new HttpRssFeedClient(),
     new OpenAiNewsSummarizer(),
     new XkcdClientImpl(),

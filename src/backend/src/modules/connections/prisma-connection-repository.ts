@@ -135,6 +135,10 @@ function buildConnectionName(type: string): string {
     return 'Google Calendar';
   }
 
+  if (type === 'gmail') {
+    return 'Gmail';
+  }
+
   if (type === 'openai') {
     return 'OpenAI';
   }
@@ -148,6 +152,12 @@ function getConnectionAuthType(type: string, credentials: Record<string, unknown
   }
 
   if (type === 'google-calendar') {
+    return typeof credentials.refreshToken === 'string' && credentials.refreshToken.trim()
+      ? 'OAUTH'
+      : 'API_KEY';
+  }
+
+  if (type === 'gmail') {
     return typeof credentials.refreshToken === 'string' && credentials.refreshToken.trim()
       ? 'OAUTH'
       : 'API_KEY';

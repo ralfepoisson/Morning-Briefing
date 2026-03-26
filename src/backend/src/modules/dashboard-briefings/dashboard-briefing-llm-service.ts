@@ -53,7 +53,7 @@ export class DashboardBriefingLlmService {
           provider: this.provider.providerName,
           modelName: this.provider.modelName,
           estimatedDurationSeconds: parsed.estimatedDurationSeconds,
-          sectionCount: parsed.sections.length
+          scriptCharacterCount: parsed.fullScript.length
         }
       });
 
@@ -97,19 +97,9 @@ export class StubDashboardBriefingLlmProvider implements DashboardBriefingLlmPro
   readonly modelName = 'stub-template';
 
   async generateScript(input: DashboardBriefingInput): Promise<string> {
-    return JSON.stringify({
-      title: `${input.dashboardName} Audio Briefing`,
-      estimatedDurationSeconds: Math.min(Math.max(input.targetDurationSeconds, 45), 90),
-      sections: input.sections.map(function mapSection(section) {
-        return {
-          name: section.title,
-          script: `Here is your ${section.title.toLowerCase()}.`
-        };
-      }),
-      fullScript: input.sections.map(function mapSection(section) {
-        return `Here is your ${section.title.toLowerCase()}.`;
-      }).join(' ')
-    });
+    return input.sections.map(function mapSection(section) {
+      return `Here is your ${section.title.toLowerCase()}.`;
+    }).join(' ');
   }
 }
 

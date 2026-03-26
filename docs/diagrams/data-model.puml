@@ -249,7 +249,7 @@ end note
 
 note bottom of Connector
 Tenant-level integration configuration,
-for example weather, calendar, RSS, or news.
+for example weather, calendar, email, RSS, or news.
 Secrets stay outside Postgres and are
 referenced through secret_ref.
 end note

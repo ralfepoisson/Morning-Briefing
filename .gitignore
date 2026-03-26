@@ -10,3 +10,6 @@ src/web/node_modules/
 
 cicd/export_credentials.sh
 cicd/serverless/.serverless/
+
+# Generated audio briefing artifacts
+src/backend/data/audio-briefings/

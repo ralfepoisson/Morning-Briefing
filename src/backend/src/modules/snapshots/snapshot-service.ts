@@ -1,9 +1,11 @@
+import type { GmailOAuthClient } from '../connections/gmail-oauth-client.js';
 import type { GoogleCalendarOAuthClient } from '../connections/google-calendar-oauth-client.js';
 import { logApplicationEvent } from '../admin/application-logger.js';
 import type { DefaultUserContext } from '../default-user/default-user-service.js';
 import type { RssFeedRepository } from '../rss-feeds/rss-feed-repository.js';
 import type { TenantAiConfigurationService } from '../tenant-ai-configuration/tenant-ai-configuration-service.js';
 import type { DashboardWidgetRecord } from '../widgets/widget-types.js';
+import type { GmailClient, GmailMessage } from './gmail-client.js';
 import type { GoogleCalendarClient, GoogleCalendarEvent } from './google-calendar-client.js';
 import type { OpenAiNewsSummarizer } from './openai-news-summarizer.js';
 import type { WeatherClient } from './open-meteo-weather-client.js';
@@ -26,6 +28,16 @@ export class SnapshotService {
     private readonly todoistTaskClient: TodoistTaskClient,
     private readonly googleCalendarClient: GoogleCalendarClient,
     private readonly googleCalendarOAuthClient: Pick<GoogleCalendarOAuthClient, 'refreshAccessToken'>,
+    private readonly gmailClient: GmailClient = {
+      async listMessages() {
+        throw new Error('Gmail is not configured.');
+      }
+    },
+    private readonly gmailOAuthClient: Pick<GmailOAuthClient, 'refreshAccessToken'> = {
+      async refreshAccessToken() {
+        throw new Error('Gmail is not configured.');
+      }
+    },
     private readonly rssFeedClient: Pick<RssFeedClient, 'fetchFeed'>,
     private readonly openAiNewsSummarizer: Pick<OpenAiNewsSummarizer, 'summarize'>,
     private readonly xkcdClient: Pick<XkcdClient, 'getLatestComic'> = new XkcdClientImpl(),
@@ -213,6 +225,10 @@ export class SnapshotService {
 
     if (widget.type === 'calendar') {
       return this.buildCalendarWidgetSnapshot(widget, generatedAt);
+    }
+
+    if (widget.type === 'email') {
+      return this.buildEmailWidgetSnapshot(widget, generatedAt);
     }
 
     if (widget.type === 'tasks') {
@@ -672,7 +688,12 @@ export class SnapshotService {
         widgetType: widget.type,
         title: widget.title,
         status: 'READY',
-        content: buildTaskSnapshotContent(tasks, generatedAt, connector.connector.name),
+        content: buildTaskSnapshotContent(
+          tasks,
+          generatedAt,
+          connector.connector.name,
+          shouldShowUndatedTasks(widget.config)
+        ),
         errorMessage: null,
         generatedAt: generatedAt
       };
@@ -828,6 +849,142 @@ export class SnapshotService {
       };
     }
   }
+
+  private async buildEmailWidgetSnapshot(widget: DashboardWidgetRecord, generatedAt: Date): Promise<DashboardSnapshotWidgetRecord> {
+    const connector = widget.connections.find(function findConnector(item) {
+      return item.usageRole === 'email';
+    });
+    const filters = getEmailFilters(widget.config);
+
+    if (!connector) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          provider: 'gmail',
+          connectionLabel: 'Not connected',
+          filters,
+          messages: [],
+          emptyMessage: 'Choose a Gmail connection in edit mode to configure this widget.'
+        },
+        errorMessage: 'Email widget is missing a configured connection.',
+        generatedAt
+      };
+    }
+
+    if (connector.connector.type !== 'gmail') {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          provider: connector.connector.type,
+          connectionLabel: connector.connector.name,
+          filters,
+          messages: [],
+          emptyMessage: 'The selected email provider is not supported yet.'
+        },
+        errorMessage: 'Email widget is configured with an unsupported provider.',
+        generatedAt
+      };
+    }
+
+    const accessToken = getOAuthAccessToken(connector.connector.config);
+    const refreshToken = getOAuthRefreshToken(connector.connector.config);
+    const accountEmail = getGmailAccountEmail(connector.connector.config);
+
+    if (connector.connector.authType !== 'OAUTH') {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          provider: 'gmail',
+          connectionLabel: connector.connector.name,
+          filters,
+          messages: [],
+          emptyMessage: 'This Gmail connection needs OAuth access before it can load private messages.'
+        },
+        errorMessage: 'Gmail connection is using an unsupported authentication mode.',
+        generatedAt
+      };
+    }
+
+    if (!refreshToken) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          provider: 'gmail',
+          connectionLabel: connector.connector.name,
+          filters,
+          messages: [],
+          emptyMessage: 'The selected Gmail connection is missing its refresh token.'
+        },
+        errorMessage: 'Gmail connection is missing a refresh token.',
+        generatedAt
+      };
+    }
+
+    if (!accountEmail) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          provider: 'gmail',
+          connectionLabel: connector.connector.name,
+          filters,
+          messages: [],
+          emptyMessage: 'The selected Gmail connection is missing its account email.'
+        },
+        errorMessage: 'Gmail connection is missing an account email.',
+        generatedAt
+      };
+    }
+
+    try {
+      const token = accessToken && !isTokenExpired(connector.connector.config)
+        ? {
+            accessToken
+          }
+        : await this.gmailOAuthClient.refreshAccessToken(refreshToken);
+      const messages = await this.gmailClient.listMessages(token.accessToken, filters);
+
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'READY',
+        content: buildEmailSnapshotContent(messages, connector.connector.name, filters),
+        errorMessage: null,
+        generatedAt
+      };
+    } catch (error) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          provider: 'gmail',
+          connectionLabel: connector.connector.name,
+          filters,
+          messages: [],
+          emptyMessage: 'Gmail could not be reached. Please check the connection and try again.'
+        },
+        errorMessage: error instanceof Error ? error.message : 'Gmail snapshot generation failed.',
+        generatedAt
+      };
+    }
+  }
 }
 
 function getWeatherLocation(config: Record<string, unknown>): {
@@ -926,6 +1083,19 @@ function buildSummary(widgets: DashboardSnapshotWidgetRecord[]): string {
       : 'No Google Calendar appointments are scheduled for today.';
   }
 
+  const emailWidget = widgets.find(function findEmailWidget(widget) {
+    return widget.widgetType === 'email' && widget.status === 'READY';
+  });
+
+  if (emailWidget) {
+    const emailCount = countEmailMessages(emailWidget.content.messages);
+    const unreadCount = countUnreadEmailMessages(emailWidget.content.messages);
+
+    return emailCount
+      ? `${emailCount} email messages loaded from Gmail, ${unreadCount} unread.`
+      : 'No Gmail messages matched the configured filters.';
+  }
+
   const xkcdWidget = widgets.find(function findXkcdWidget(widget) {
     return widget.widgetType === 'xkcd' && widget.status === 'READY';
   });
@@ -976,6 +1146,10 @@ function getGoogleCalendarId(config: Record<string, unknown>): string {
 }
 
 function getGoogleCalendarAccessToken(config: Record<string, unknown>): string {
+  return getOAuthAccessToken(config);
+}
+
+function getOAuthAccessToken(config: Record<string, unknown>): string {
   if (typeof config.accessToken === 'string' && config.accessToken.trim()) {
     return config.accessToken.trim();
   }
@@ -984,8 +1158,20 @@ function getGoogleCalendarAccessToken(config: Record<string, unknown>): string {
 }
 
 function getGoogleCalendarRefreshToken(config: Record<string, unknown>): string {
+  return getOAuthRefreshToken(config);
+}
+
+function getOAuthRefreshToken(config: Record<string, unknown>): string {
   if (typeof config.refreshToken === 'string' && config.refreshToken.trim()) {
     return config.refreshToken.trim();
+  }
+
+  return '';
+}
+
+function getGmailAccountEmail(config: Record<string, unknown>): string {
+  if (typeof config.accountEmail === 'string' && config.accountEmail.trim()) {
+    return config.accountEmail.trim();
   }
 
   return '';
@@ -1015,7 +1201,12 @@ function isTokenExpired(config: Record<string, unknown>): boolean {
   return Date.parse(config.expiresAt) <= Date.now() + 60_000;
 }
 
-function buildTaskSnapshotContent(tasks: TodoistTask[], generatedAt: Date, connectionName: string): Record<string, unknown> {
+function buildTaskSnapshotContent(
+  tasks: TodoistTask[],
+  generatedAt: Date,
+  connectionName: string,
+  includeUndatedItems: boolean
+): Record<string, unknown> {
   const today = formatDateKey(generatedAt);
   const tomorrow = formatDateKey(addDays(generatedAt, 1));
   const todayItems: Array<Record<string, unknown>> = [];
@@ -1043,18 +1234,12 @@ function buildTaskSnapshotContent(tasks: TodoistTask[], generatedAt: Date, conne
   return {
     provider: 'todoist',
     connectionLabel: connectionName,
-    groups: [
-      { label: 'Due Today', items: todayItems },
-      { label: 'Due Tomorrow', items: tomorrowItems },
-      { label: 'No Due Date', items: undatedItems }
-    ],
-    emptyMessage: countTaskItems([
-      { items: todayItems },
-      { items: tomorrowItems },
-      { items: undatedItems }
-    ])
+    groups: buildTaskGroups(todayItems, tomorrowItems, undatedItems, includeUndatedItems),
+    emptyMessage: countTaskItems(buildTaskGroups(todayItems, tomorrowItems, undatedItems, includeUndatedItems))
       ? ''
-      : 'No incomplete tasks are due today, tomorrow, or without a due date.'
+      : includeUndatedItems
+        ? 'No incomplete tasks are due today, tomorrow, or without a due date.'
+        : 'No incomplete tasks are due today or tomorrow.'
   };
 }
 
@@ -1089,6 +1274,30 @@ function buildCalendarSnapshotContent(events: GoogleCalendarEvent[], connectionN
   };
 }
 
+function buildEmailSnapshotContent(messages: GmailMessage[], connectionName: string, filters: string[]): Record<string, unknown> {
+  return {
+    provider: 'gmail',
+    connectionLabel: connectionName,
+    filters,
+    messages: messages.slice(0, 25).map(function mapMessage(message) {
+      return {
+        id: message.id,
+        threadId: message.threadId,
+        subject: message.subject,
+        from: message.from,
+        snippet: message.snippet,
+        receivedAt: message.receivedAt,
+        isUnread: message.isUnread,
+        matchedFilters: message.matchedFilters,
+        url: message.webUrl
+      };
+    }),
+    emptyMessage: messages.length
+      ? ''
+      : 'No messages matched the configured filters.'
+  };
+}
+
 function buildTaskMeta(task: TodoistTask): string {
   const parts: string[] = [];
 
@@ -1117,12 +1326,62 @@ function countTaskItems(groups: unknown): number {
   }, 0);
 }
 
+function shouldShowUndatedTasks(config: Record<string, unknown>): boolean {
+  return config.showUndatedTasks !== false;
+}
+
+function getEmailFilters(config: Record<string, unknown>): string[] {
+  if (!Array.isArray(config.filters)) {
+    return ['in:inbox'];
+  }
+
+  const filters = config.filters.filter(function filterValue(value) {
+    return typeof value === 'string' && value.trim();
+  }).map(function mapValue(value) {
+    return (value as string).trim();
+  });
+
+  return filters.length ? filters : ['in:inbox'];
+}
+
+function buildTaskGroups(
+  todayItems: Array<Record<string, unknown>>,
+  tomorrowItems: Array<Record<string, unknown>>,
+  undatedItems: Array<Record<string, unknown>>,
+  includeUndatedItems: boolean
+): Array<{ label: string; items: Array<Record<string, unknown>> }> {
+  const groups: Array<{ label: string; items: Array<Record<string, unknown>> }> = [
+    { label: 'Due Today', items: todayItems },
+    { label: 'Due Tomorrow', items: tomorrowItems }
+  ];
+
+  if (includeUndatedItems) {
+    groups.push({ label: 'No Due Date', items: undatedItems });
+  }
+
+  return groups;
+}
+
 function countCalendarAppointments(appointments: unknown): number {
   if (!Array.isArray(appointments)) {
     return 0;
   }
 
   return appointments.length;
+}
+
+function countEmailMessages(messages: unknown): number {
+  return Array.isArray(messages) ? messages.length : 0;
+}
+
+function countUnreadEmailMessages(messages: unknown): number {
+  if (!Array.isArray(messages)) {
+    return 0;
+  }
+
+  return messages.filter(function filterUnread(message) {
+    return !!(message && typeof message === 'object' && (message as { isUnread?: unknown }).isUnread);
+  }).length;
 }
 
 function addDays(date: Date, days: number): Date {

@@ -116,7 +116,8 @@ export class AwsPollyDashboardBriefingTtsProvider {
             });
             const response = await client.send(new SynthesizeSpeechCommand({
                 Engine: 'neural',
-                OutputFormat: 'mp3',
+                OutputFormat: 'pcm',
+                SampleRate: '16000',
                 Text: input.script,
                 TextType: 'text',
                 VoiceId: voiceId
@@ -124,11 +125,11 @@ export class AwsPollyDashboardBriefingTtsProvider {
             if (!response.AudioStream) {
                 throw new Error('AWS Polly did not return audio content.');
             }
-            const audio = Buffer.from(await response.AudioStream.transformToByteArray());
+            const pcmAudio = Buffer.from(await response.AudioStream.transformToByteArray());
             return {
-                audio,
-                mimeType: 'audio/mpeg',
-                durationSeconds: null
+                audio: buildWavFromPcm16Mono(pcmAudio, 16000),
+                mimeType: 'audio/wav',
+                durationSeconds: calculatePcmDurationSeconds(pcmAudio, 16000, 16, 1)
             };
         }
         catch (error) {
@@ -185,6 +186,35 @@ function buildAudibleStubWav(durationSeconds) {
         buffer.writeInt16LE(sampleValue, 44 + frameIndex * bytesPerSample);
     }
     return buffer;
+}
+export function buildWavFromPcm16Mono(pcmAudio, sampleRate) {
+    const channelCount = 1;
+    const bitsPerSample = 16;
+    const bytesPerSample = bitsPerSample / 8;
+    const dataSize = pcmAudio.byteLength;
+    const buffer = Buffer.alloc(44 + dataSize);
+    buffer.write('RIFF', 0);
+    buffer.writeUInt32LE(36 + dataSize, 4);
+    buffer.write('WAVE', 8);
+    buffer.write('fmt ', 12);
+    buffer.writeUInt32LE(16, 16);
+    buffer.writeUInt16LE(1, 20);
+    buffer.writeUInt16LE(channelCount, 22);
+    buffer.writeUInt32LE(sampleRate, 24);
+    buffer.writeUInt32LE(sampleRate * channelCount * bytesPerSample, 28);
+    buffer.writeUInt16LE(channelCount * bytesPerSample, 32);
+    buffer.writeUInt16LE(bitsPerSample, 34);
+    buffer.write('data', 36);
+    buffer.writeUInt32LE(dataSize, 40);
+    pcmAudio.copy(buffer, 44);
+    return buffer;
+}
+export function calculatePcmDurationSeconds(pcmAudio, sampleRate, bitsPerSample, channelCount) {
+    const bytesPerSecond = sampleRate * channelCount * (bitsPerSample / 8);
+    if (!bytesPerSecond) {
+        return 0;
+    }
+    return Math.max(1, Math.round(pcmAudio.byteLength / bytesPerSecond));
 }
 function getExtensionForMimeType(mimeType) {
     if (mimeType === 'audio/mpeg') {

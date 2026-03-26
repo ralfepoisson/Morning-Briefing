@@ -3,90 +3,43 @@ export const DASHBOARD_BRIEFING_PROMPT_VERSION = 'dashboard-briefing-v1';
 export class DashboardBriefingPromptService {
     buildPrompt(input) {
         return {
-            developer: 'You write spoken dashboard audio briefings. Return valid JSON only with this exact shape: ' +
-                '{"title":"string","estimatedDurationSeconds":75,"sections":[{"name":"string","script":"string"}],"fullScript":"string"}. ' +
+            developer: 'You write spoken dashboard audio briefings. Return only the final spoken script as plain text. ' +
                 'Use only the provided structured input. Do not invent facts, times, locations, or summaries. ' +
-                'Skip empty sections, keep delivery natural and concise, avoid robotic repetition, and stay within the target duration.',
+                'Skip empty sections, keep delivery natural and concise, avoid robotic repetition, and stay within the target duration. ' +
+                'Do not wrap the response in JSON, markdown, labels, or commentary.',
             user: stableStringify(input)
         };
     }
     parseModelOutput(content, fallbackInput) {
-        const parsed = JSON.parse(extractJsonObject(content));
-        const sections = Array.isArray(parsed.sections)
-            ? parsed.sections
-                .map(normalizeSection)
-                .filter(function filterSection(section) {
-                return !!section;
-            })
-            : [];
-        const title = typeof parsed.title === 'string' && parsed.title.trim()
-            ? parsed.title.trim()
-            : `${fallbackInput.dashboardName} Audio Briefing`;
-        const fullScript = typeof parsed.fullScript === 'string' && parsed.fullScript.trim()
-            ? parsed.fullScript.trim()
-            : sections.map(function joinSection(section) {
-                return section.script;
-            }).join(' ').trim();
-        const estimatedDurationSeconds = normalizeDuration(parsed.estimatedDurationSeconds, fullScript, fallbackInput.targetDurationSeconds);
-        if (!sections.length || !fullScript) {
-            throw new Error('Dashboard briefing LLM returned an empty script.');
-        }
+        const fullScript = normalizeScriptText(content);
+        const estimatedDurationSeconds = normalizeDuration(fullScript, fallbackInput.targetDurationSeconds);
         return {
-            title,
+            title: `${fallbackInput.dashboardName} Audio Briefing`,
             estimatedDurationSeconds,
-            sections,
             fullScript
         };
     }
     buildFallbackScript(input) {
-        const sections = input.sections.map(function mapSection(section) {
-            return {
-                name: toTitleCase(section.widgetType),
-                script: buildFallbackSectionScript(section)
-            };
-        }).filter(function filterSection(section) {
-            return !!section.script;
-        });
-        const fullScript = sections.map(function joinSection(section) {
-            return section.script;
-        }).join(' ').trim();
+        const fullScript = input.sections.map(function mapSection(section) {
+            return buildFallbackSectionScript(section);
+        }).filter(Boolean).join(' ').trim();
         return {
             title: `${input.dashboardName} Audio Briefing`,
-            estimatedDurationSeconds: normalizeDuration(undefined, fullScript, input.targetDurationSeconds),
-            sections,
+            estimatedDurationSeconds: normalizeDuration(fullScript, input.targetDurationSeconds),
             fullScript
         };
     }
 }
-function normalizeSection(section) {
-    if (!section || typeof section !== 'object') {
-        return null;
-    }
-    const candidate = section;
-    const name = typeof candidate.name === 'string' ? candidate.name.trim() : '';
-    const script = typeof candidate.script === 'string' ? candidate.script.trim() : '';
-    if (!name || !script) {
-        return null;
-    }
-    return {
-        name,
-        script
-    };
-}
-function extractJsonObject(content) {
-    const start = content.indexOf('{');
-    const end = content.lastIndexOf('}');
-    if (start === -1 || end === -1 || end <= start) {
-        throw new Error('Dashboard briefing LLM did not return valid JSON.');
-    }
-    return content.slice(start, end + 1);
-}
-function normalizeDuration(value, script, targetDurationSeconds) {
-    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-        return Math.round(value);
-    }
+function normalizeDuration(script, targetDurationSeconds) {
     const estimatedFromWords = Math.round(Math.max(30, script.split(/\s+/).filter(Boolean).length / 2.4));
     return Math.min(Math.max(estimatedFromWords, 30), Math.max(30, targetDurationSeconds));
+}
+function normalizeScriptText(content) {
+    const script = content.trim();
+    if (!script) {
+        throw new Error('Dashboard briefing LLM returned an empty script.');
+    }
+    return script;
 }
 function buildFallbackSectionScript(section) {
     if (section.widgetType === 'weather') {
@@ -115,6 +68,20 @@ function buildFallbackSectionScript(section) {
             return typeof item.title === 'string' && item.title.trim() ? item.title.trim() : 'an untitled task';
         }).join(', ')}.`;
     }
+    if (section.widgetType === 'email') {
+        const recentMessages = Array.isArray(section.content.recentMessages)
+            ? section.content.recentMessages
+            : [];
+        const unreadCount = typeof section.content.unreadCount === 'number' ? section.content.unreadCount : 0;
+        if (!recentMessages.length) {
+            return 'Email: there are no recent messages highlighted right now.';
+        }
+        return `Email: ${unreadCount} unread, including ${recentMessages.slice(0, 3).map(function mapItem(item) {
+            const subject = typeof item.subject === 'string' && item.subject.trim() ? item.subject.trim() : 'No subject';
+            const from = typeof item.from === 'string' && item.from.trim() ? item.from.trim() : 'unknown sender';
+            return `${subject} from ${from}`;
+        }).join(', ')}.`;
+    }
     if (section.widgetType === 'news') {
         const headlines = Array.isArray(section.content.headlines) ? section.content.headlines : [];
         if (!headlines.length) {
@@ -128,7 +95,4 @@ function buildFallbackSectionScript(section) {
 }
 function readString(value, fallback) {
     return typeof value === 'string' && value.trim() ? value.trim() : fallback;
-}
-function toTitleCase(value) {
-    return value.charAt(0).toUpperCase() + value.slice(1);
 }
