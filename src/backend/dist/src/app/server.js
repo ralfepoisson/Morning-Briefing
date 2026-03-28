@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { buildApp } from './build-app.js';
 import { logApplicationEvent } from '../modules/admin/application-logger.js';
+import { isLocalDevSchedulerEnabled, startLocalDevScheduler } from '../modules/scheduling/local-dev-scheduler.js';
 const port = Number(process.env.PORT || 3000);
 const host = process.env.HOST || '127.0.0.1';
 async function start() {
@@ -20,6 +21,9 @@ async function start() {
                 port
             }
         });
+        if (isLocalDevSchedulerEnabled()) {
+            startLocalDevScheduler();
+        }
     }
     catch (error) {
         logApplicationEvent({

@@ -5,6 +5,7 @@ export type PublishDashboardAudioBriefingJobInput = {
   tenantId: string;
   ownerUserId: string;
   ownerDisplayName: string;
+  ownerPhoneticName: string | null;
   ownerTimezone: string;
   ownerLocale: string;
   ownerEmail: string;

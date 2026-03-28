@@ -45,13 +45,15 @@ test('DashboardBriefingJobProcessor regenerates audio as the dashboard owner', a
       tenantId: 'tenant-1',
       userId: 'user-1',
       displayName: 'Ralfe',
+      phoneticName: 'Ralf',
       timezone: 'Europe/Paris',
       locale: 'en-GB',
       email: 'ralfe@example.com',
       isAdmin: false
     },
     options: {
-      force: true
+      force: true,
+      jobId: 'job-1'
     }
   });
 });
@@ -64,6 +66,7 @@ function createMessage() {
     tenantId: 'tenant-1',
     ownerUserId: 'user-1',
     ownerDisplayName: 'Ralfe',
+    ownerPhoneticName: 'Ralf',
     ownerTimezone: 'Europe/Paris',
     ownerLocale: 'en-GB',
     ownerEmail: 'ralfe@example.com',

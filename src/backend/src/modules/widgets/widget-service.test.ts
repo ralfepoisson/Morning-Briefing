@@ -15,7 +15,8 @@ test('WidgetService lists widgets for a dashboard', async function () {
       id: 'widget-1',
       dashboardId: 'dash-1',
       ownerUserId: 'user-1',
-      type: 'weather'
+      type: 'weather',
+      isGenerating: true
     })
   ]);
   const service = new WidgetService(repository);
@@ -25,6 +26,7 @@ test('WidgetService lists widgets for a dashboard', async function () {
   assert.equal(widgets.length, 1);
   assert.equal(widgets[0].type, 'weather');
   assert.equal(widgets[0].dashboardId, 'dash-1');
+  assert.equal(widgets[0].isGenerating, true);
 });
 
 test('WidgetService creates a widget', async function () {
@@ -45,6 +47,31 @@ test('WidgetService creates a widget', async function () {
   assert.equal(publisher.items.length, 1);
   assert.equal(publisher.items[0].widgetId, 'widget-1');
   assert.equal(publisher.items[0].triggerSource, 'config_updated');
+});
+
+test('WidgetService uses the request owner as a fallback when a created widget omits ownerUserId', async function () {
+  const repository = new InMemoryWidgetRepository([]);
+  const publisher = new InMemorySnapshotJobPublisher();
+  repository.createOverride = async function createOverride(input) {
+    return createWidgetRecord({
+      id: 'widget-1',
+      tenantId: 'tenant-1',
+      dashboardId: input.dashboardId,
+      ownerUserId: '',
+      type: input.type
+    });
+  };
+  const service = new WidgetService(repository, publisher);
+
+  await service.create({
+    dashboardId: 'dash-1',
+    ownerUserId: 'user-1',
+    type: 'natgeo-daily-photo',
+    timezone: 'Europe/Paris'
+  });
+
+  assert.equal(publisher.items.length, 1);
+  assert.equal(publisher.items[0].userId, 'user-1');
 });
 
 test('WidgetService updates widget layout', async function () {
@@ -139,6 +166,8 @@ test('WidgetService archives a widget through the repository', async function ()
 });
 
 class InMemoryWidgetRepository implements WidgetRepository {
+  public createOverride: ((input: CreateDashboardWidgetInput) => Promise<DashboardWidgetRecord>) | null = null;
+
   constructor(private readonly items: DashboardWidgetRecord[]) {}
 
   async listForDashboard(dashboardId: string, ownerUserId: string): Promise<DashboardWidgetRecord[]> {
@@ -148,6 +177,10 @@ class InMemoryWidgetRepository implements WidgetRepository {
   }
 
   async create(input: CreateDashboardWidgetInput): Promise<DashboardWidgetRecord> {
+    if (this.createOverride) {
+      return this.createOverride(input);
+    }
+
     const widget = createWidgetRecord({
       id: `widget-${this.items.length + 1}`,
       dashboardId: input.dashboardId,
@@ -237,12 +270,18 @@ function createWidgetRecord(overrides: Partial<DashboardWidgetRecord>): Dashboar
     minWidth: overrides.minWidth || 320,
     minHeight: overrides.minHeight || 260,
     isVisible: overrides.isVisible !== false,
+    isGenerating: overrides.isGenerating === true,
     sortOrder: overrides.sortOrder || 1,
     refreshMode: overrides.refreshMode || 'SNAPSHOT',
     version: overrides.version || 1,
     config: overrides.config || {},
     configHash: overrides.configHash || JSON.stringify(overrides.config || {}),
     data: overrides.data || {},
+    includeInBriefingDefault: overrides.includeInBriefingDefault !== false,
+    includeInBriefingOverride: 'includeInBriefingOverride' in overrides
+      ? (overrides.includeInBriefingOverride === undefined ? null : overrides.includeInBriefingOverride)
+      : null,
+    includeInBriefing: overrides.includeInBriefing !== false,
     connections: overrides.connections || [],
     createdAt: overrides.createdAt || new Date('2026-03-19T07:00:00.000Z'),
     updatedAt: overrides.updatedAt || new Date('2026-03-19T07:00:00.000Z')

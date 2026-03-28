@@ -140,8 +140,16 @@
           widget.title = 'Today on Calendar';
         }
 
+        if (widget.type === 'email') {
+          widget.title = 'Email';
+        }
+
         if (widget.type === 'xkcd') {
           widget.title = 'Latest xkcd';
+        }
+
+        if (widget.type === 'natgeo-daily-photo') {
+          widget.title = 'NatGeo Daily Photo';
         }
       });
 
@@ -181,12 +189,16 @@
         details: widgetPayload.data && widgetPayload.data.details,
         dateLabel: widgetPayload.data && widgetPayload.data.dateLabel,
         appointments: widgetPayload.data && widgetPayload.data.appointments,
+        filters: widgetPayload.data && widgetPayload.data.filters,
+        messages: widgetPayload.data && widgetPayload.data.messages,
         groups: widgetPayload.data && widgetPayload.data.groups,
         comicId: widgetPayload.data && widgetPayload.data.comicId,
         altText: widgetPayload.data && widgetPayload.data.altText,
         imageUrl: widgetPayload.data && widgetPayload.data.imageUrl,
         permalink: widgetPayload.data && widgetPayload.data.permalink,
         publishedAt: widgetPayload.data && widgetPayload.data.publishedAt,
+        description: widgetPayload.data && widgetPayload.data.description,
+        credit: widgetPayload.data && widgetPayload.data.credit,
         isLoading: widgetPayload.isLoading !== undefined ? widgetPayload.isLoading : true
       });
     }

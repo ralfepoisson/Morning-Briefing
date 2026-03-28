@@ -22,6 +22,7 @@ import type { RssFeedClient } from './rss-feed-client.js';
 import type { TodoistTaskClient } from './todoist-task-client.js';
 import type { GenerateWidgetSnapshotRequested } from './snapshot-job-types.js';
 import type { XkcdClient } from './xkcd-client.js';
+import type { NatGeoDailyPhotoClient } from './natgeo-daily-photo-client.js';
 
 test('SnapshotService generates and persists a weather snapshot for the dashboard', async function () {
   const repository = new InMemorySnapshotRepository({
@@ -971,6 +972,171 @@ test('SnapshotService returns a failed xkcd snapshot when the upstream request f
     permalink: 'https://xkcd.com/',
     publishedAt: '',
     emptyMessage: 'The latest xkcd comic could not be loaded right now. Please try again.'
+  });
+  assert.equal(logs.length, 1);
+  assert.equal(logs[0].event, 'widget_snapshot_failed');
+  resetApplicationLogs();
+});
+
+test('SnapshotService generates a NatGeo Daily Photo snapshot for the dashboard', async function () {
+  const repository = new InMemorySnapshotRepository({
+    id: 'dash-1',
+    tenantId: 'tenant-1',
+    ownerUserId: 'user-1',
+    name: 'Morning Focus',
+    description: 'Seed dashboard',
+    widgets: [
+      {
+        id: 'widget-natgeo',
+        tenantId: 'tenant-1',
+        dashboardId: 'dash-1',
+        ownerUserId: 'user-1',
+        type: 'natgeo-daily-photo',
+        title: 'NatGeo Daily Photo',
+        x: 0,
+        y: 0,
+        width: 420,
+        height: 420,
+        minWidth: 360,
+        minHeight: 320,
+        isVisible: true,
+        sortOrder: 1,
+        refreshMode: 'SNAPSHOT',
+        version: 1,
+        config: {},
+        configHash: 'hash-natgeo',
+        data: {},
+        connections: [],
+        createdAt: new Date('2026-03-19T07:00:00.000Z'),
+        updatedAt: new Date('2026-03-19T07:00:00.000Z')
+      }
+    ]
+  });
+  const service = new SnapshotService(
+    repository,
+    unusedRssFeedRepository(),
+    unusedWeatherClient(),
+    unusedTodoistClient(),
+    unusedGoogleCalendarClient(),
+    unusedGoogleCalendarOAuthClient(),
+    unusedGmailClient(),
+    unusedGmailOAuthClient(),
+    unusedRssFeedClient(),
+    unusedOpenAiNewsSummarizer(),
+    undefined,
+    undefined,
+    {
+      async getDailyPhoto() {
+        return {
+          title: 'Kyoto in Bloom',
+          description: 'Passersby walk over a bridge framed by cherry blossoms in full bloom in Arashiyama, Kyoto.',
+          imageUrl: 'https://i.natgeofe.com/n/ed73dbf1-1675-4a96-ba31-91f2f1f71649/-19-MM9908__220401_000403.jpg',
+          altText: 'People walking over a bridge in front of blooming pink cherry blossoms.',
+          permalink: 'https://www.nationalgeographic.com/photo-of-the-day/media-spotlight/cherry-blossoms-kyoto-japan',
+          credit: 'Rinko Kawauchi, National Geographic Image Collection'
+        };
+      }
+    }
+  );
+
+  const snapshot = await service.getLatestForDashboard('dash-1', {
+    tenantId: 'tenant-1',
+    userId: 'user-1',
+    displayName: 'Ralfe',
+    timezone: 'Europe/Paris'
+  });
+
+  assert.ok(snapshot);
+  assert.equal(snapshot && snapshot.generationStatus, 'READY');
+  assert.equal(snapshot && snapshot.summary.headline, 'NatGeo Daily Photo: Kyoto in Bloom.');
+  assert.deepEqual(snapshot && snapshot.widgets[0].content, {
+    title: 'Kyoto in Bloom',
+    description: 'Passersby walk over a bridge framed by cherry blossoms in full bloom in Arashiyama, Kyoto.',
+    imageUrl: 'https://i.natgeofe.com/n/ed73dbf1-1675-4a96-ba31-91f2f1f71649/-19-MM9908__220401_000403.jpg',
+    altText: 'People walking over a bridge in front of blooming pink cherry blossoms.',
+    permalink: 'https://www.nationalgeographic.com/photo-of-the-day/media-spotlight/cherry-blossoms-kyoto-japan',
+    credit: 'Rinko Kawauchi, National Geographic Image Collection',
+    emptyMessage: ''
+  });
+});
+
+test('SnapshotService returns a failed NatGeo Daily Photo snapshot when the upstream request fails', async function () {
+  resetApplicationLogs();
+
+  const repository = new InMemorySnapshotRepository({
+    id: 'dash-1',
+    tenantId: 'tenant-1',
+    ownerUserId: 'user-1',
+    name: 'Morning Focus',
+    description: 'Seed dashboard',
+    widgets: [
+      {
+        id: 'widget-natgeo',
+        tenantId: 'tenant-1',
+        dashboardId: 'dash-1',
+        ownerUserId: 'user-1',
+        type: 'natgeo-daily-photo',
+        title: 'NatGeo Daily Photo',
+        x: 0,
+        y: 0,
+        width: 420,
+        height: 420,
+        minWidth: 360,
+        minHeight: 320,
+        isVisible: true,
+        sortOrder: 1,
+        refreshMode: 'SNAPSHOT',
+        version: 1,
+        config: {},
+        configHash: 'hash-natgeo',
+        data: {},
+        connections: [],
+        createdAt: new Date('2026-03-19T07:00:00.000Z'),
+        updatedAt: new Date('2026-03-19T07:00:00.000Z')
+      }
+    ]
+  });
+  const service = new SnapshotService(
+    repository,
+    unusedRssFeedRepository(),
+    unusedWeatherClient(),
+    unusedTodoistClient(),
+    unusedGoogleCalendarClient(),
+    unusedGoogleCalendarOAuthClient(),
+    unusedGmailClient(),
+    unusedGmailOAuthClient(),
+    unusedRssFeedClient(),
+    unusedOpenAiNewsSummarizer(),
+    undefined,
+    undefined,
+    {
+      async getDailyPhoto() {
+        throw new Error('NatGeo Daily Photo request failed with status 503.');
+      }
+    }
+  );
+
+  const snapshot = await service.getLatestForDashboard('dash-1', {
+    tenantId: 'tenant-1',
+    userId: 'user-1',
+    displayName: 'Ralfe',
+    timezone: 'Europe/Paris'
+  });
+  const logs = listApplicationLogs({
+    levels: ['warn', 'error']
+  });
+
+  assert.ok(snapshot);
+  assert.equal(snapshot && snapshot.generationStatus, 'FAILED');
+  assert.equal(snapshot && snapshot.widgets[0].errorMessage, 'NatGeo Daily Photo request failed with status 503.');
+  assert.deepEqual(snapshot && snapshot.widgets[0].content, {
+    title: 'NatGeo Daily Photo unavailable',
+    description: 'The latest National Geographic Photo of the Day could not be loaded right now.',
+    imageUrl: '',
+    altText: 'The latest National Geographic Photo of the Day could not be loaded right now.',
+    permalink: 'https://www.nationalgeographic.com/photo-of-the-day/',
+    credit: '',
+    emptyMessage: 'The latest National Geographic Photo of the Day could not be loaded right now. Please try again.'
   });
   assert.equal(logs.length, 1);
   assert.equal(logs[0].event, 'widget_snapshot_failed');

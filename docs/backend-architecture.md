@@ -78,6 +78,8 @@ The UI should communicate with the backend only through REST over HTTP/JSON. No 
 - `POST /api/v1/connections`
 - `PATCH /api/v1/connections/:connectionId`
 - `POST /api/v1/connectors/:connectorId/sync`
+- `GET /api/v1/users/me`
+- `PATCH /api/v1/users/me`
 
 ## How The Current UI Maps To The Backend
 
@@ -89,6 +91,7 @@ The existing AngularJS UI already implies a few important backend requirements:
 - Widget type definitions remain code-owned in the application layer, while widget instance configuration belongs in the database.
 - Widget display content should come from snapshot data or connector-backed reads, not be mixed into widget configuration rows.
 - Connector management needs both creation from task-widget flows and a dedicated page for later credential edits.
+- User profile management needs persisted preferences that survive future auth-token refreshes, including delivery-channel settings for generated audio briefings and uploaded profile imagery.
 
 That last point is the main reason to keep both `dashboard_widget.config_json` and `widget_snapshot.content_json`. One stores configuration; the other stores rendered content for a specific briefing run.
 
@@ -201,6 +204,7 @@ This model keeps the dashboard editor fast and independent from the timing of da
 The codebase now uses an AWS-managed, serverless-first generation pipeline:
 
 - widget configuration changes enqueue `GenerateWidgetSnapshotRequested` messages to SQS Standard
+- admin widget operations can queue one widget or all eligible widgets for manual snapshot regeneration through the same job pipeline
 - admin dashboard audio regeneration enqueues `GenerateDashboardAudioBriefingRequested` messages to the same queue
 - EventBridge Scheduler is intended to trigger a nightly enqueue function that lists eligible widgets and enqueues one message per widget
 - Lambda is the initial worker runtime, but the consumer logic is written as a transport-agnostic processor so it can move to ECS/Fargate later
@@ -226,7 +230,8 @@ Audio Briefing extends the existing snapshot architecture at the dashboard level
 4. A tenant-scoped OpenAI configuration is loaded from admin-managed configuration.
 5. OpenAI generates a structured JSON script contract.
 6. AWS Polly converts the full script into audio and stores the generated file.
-7. The dashboard UI fetches the latest saved briefing metadata and plays the stored audio artifact.
+7. A delivery orchestration step fan-outs the saved audio to any enabled user channels, starting with Telegram.
+8. The dashboard UI fetches the latest saved briefing metadata and plays the stored audio artifact.
 
 ### Design rules
 
@@ -236,9 +241,12 @@ Audio Briefing extends the existing snapshot architecture at the dashboard level
   - per-widget instance overrides persisted on `dashboard_widgets`
 - Briefing preferences are dashboard-scoped and stored separately from widget configuration.
 - Tenant-scoped AI configuration is stored separately from both widget configuration and briefing preferences.
+- User delivery preferences are stored on the user profile so channel choices follow the person rather than a single dashboard.
+- User avatars are stored directly on the user profile as base64 image data so the current UI can upload without adding a separate media service yet.
 - Manual regeneration belongs to admin tooling or scheduled jobs, not the end-user dashboard.
 - Manual audio regeneration is queue-backed so the HTTP request only enqueues work and the worker performs the heavy generation.
 - Cache reuse is based on a source hash built from the included widget snapshot identities and the current dashboard briefing preferences.
+- Delivery-channel failures should not invalidate an otherwise successful audio generation; they are logged separately and can be retried independently later.
 
 ## Connectors And Secrets
 
@@ -302,6 +310,9 @@ Recommended approach:
 ## Implemented So Far
 
 - `GET /api/v1/me` resolves a temporary default local user named `Ralfe`
+- `GET /api/v1/users/me` returns the persisted current-user profile, including avatar data and audio delivery preferences
+- `PATCH /api/v1/users/me` updates the persisted current-user profile, including Telegram delivery settings
+- Dashboard audio briefing generation now personalizes the opening greeting from the persisted user profile, preferring phonetic name over first name
 - `GET /api/v1/dashboards` lists that user's dashboards
 - `POST /api/v1/dashboards` creates dashboards for that user
 - `PATCH /api/v1/dashboards/:dashboardId` updates dashboard metadata
@@ -312,7 +323,9 @@ Recommended approach:
 
 Reference-city imports are designed around the GeoNames `cities5000` open dataset so weather configuration stays independent of any single weather provider.
 
-Widget definitions remain code-owned rather than database-owned. The backend currently uses a server-side widget definition catalog to validate widget types, choose default layout values, and provide mock content until snapshot-backed content is introduced.
+Widget definitions remain code-owned rather than database-owned. The backend currently uses a server-side widget definition catalog to validate widget types, choose default layout values, and provide explicit empty or configuration-required states while snapshot-backed content is pending.
+
+The current-user bootstrap path now preserves saved profile fields such as display name, timezone, avatar URL, and Telegram delivery preferences instead of overwriting them on every sign-in.
 
 ## Related Diagrams
 

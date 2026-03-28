@@ -83,7 +83,20 @@ export class PrismaWidgetRepository {
                     includeInBriefingOverride: null
                 }
             });
-            return mapDashboardWidgetRecord(widget);
+            return this.prisma.dashboardWidget.findFirstOrThrow({
+                where: {
+                    id: widget.id,
+                    archivedAt: null
+                },
+                include: {
+                    dashboard: true,
+                    connectors: {
+                        include: {
+                            connector: true
+                        }
+                    }
+                }
+            }).then(mapDashboardWidgetRecord);
         }
         catch (error) {
             if (!isMissingBriefingSchemaError(error)) {
@@ -109,6 +122,11 @@ export class PrismaWidgetRepository {
             });
             return mapDashboardWidgetRecord({
                 ...widget,
+                tenantId: dashboard.tenantId,
+                dashboard: {
+                    ownerUserId: dashboard.ownerUserId
+                },
+                connectors: [],
                 includeInBriefingOverride: null
             });
         }

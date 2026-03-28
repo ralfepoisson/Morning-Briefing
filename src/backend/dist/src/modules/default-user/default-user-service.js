@@ -68,10 +68,11 @@ export class DefaultUserService {
         return {
             tenantId,
             userId,
-            displayName,
-            timezone,
-            locale,
-            email,
+            displayName: user.displayName,
+            phoneticName: typeof user.phoneticName === 'string' && user.phoneticName.trim() ? user.phoneticName.trim() : null,
+            timezone: user.timezone,
+            locale: user.locale,
+            email: user.email,
             isAdmin: user.isAdmin
         };
     }
@@ -101,6 +102,7 @@ export class DefaultUserService {
             tenantId: tenant.id,
             userId: user.id,
             displayName: user.displayName,
+            phoneticName: typeof user.phoneticName === 'string' && user.phoneticName.trim() ? user.phoneticName.trim() : null,
             timezone: user.timezone,
             locale: user.locale,
             email: user.email,
@@ -130,10 +132,10 @@ export class DefaultUserService {
                 },
                 data: {
                     tenantId: input.tenantId,
-                    email: input.email,
-                    displayName: input.displayName,
-                    timezone: input.timezone,
-                    locale: input.locale,
+                    email: existingUser.email,
+                    displayName: existingUser.displayName,
+                    timezone: existingUser.timezone,
+                    locale: existingUser.locale,
                     isAdmin: shouldGrantBootstrapAdminAccess ? true : existingUser.isAdmin,
                     isActive: true
                 }

@@ -20,9 +20,12 @@ export class DashboardBriefingPromptService {
         };
     }
     buildFallbackScript(input) {
-        const fullScript = input.sections.map(function mapSection(section) {
-            return buildFallbackSectionScript(section);
-        }).filter(Boolean).join(' ').trim();
+        const fullScript = [
+            buildGreeting(input.listener),
+            ...input.sections.map(function mapSection(section) {
+                return buildFallbackSectionScript(section);
+            })
+        ].filter(Boolean).join(' ').trim();
         return {
             title: `${input.dashboardName} Audio Briefing`,
             estimatedDurationSeconds: normalizeDuration(fullScript, input.targetDurationSeconds),
@@ -40,6 +43,13 @@ function normalizeScriptText(content) {
         throw new Error('Dashboard briefing LLM returned an empty script.');
     }
     return script;
+}
+function buildGreeting(listener) {
+    const name = readStringOrNull(listener.phoneticName) || readStringOrNull(listener.firstName);
+    if (name) {
+        return `Hi there ${name}.`;
+    }
+    return 'Hi there.';
 }
 function buildFallbackSectionScript(section) {
     if (section.widgetType === 'weather') {
@@ -95,4 +105,7 @@ function buildFallbackSectionScript(section) {
 }
 function readString(value, fallback) {
     return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+}
+function readStringOrNull(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
 }

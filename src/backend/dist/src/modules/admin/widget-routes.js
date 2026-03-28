@@ -77,6 +77,126 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
             items: widgets.map(mapAdminWidgetRecord)
         };
     });
+    app.post('/api/v1/admin/widgets/regenerate-all-snapshots', async function handleRegenerateAllWidgetSnapshots(request, reply) {
+        const body = request.body;
+        if (!dependencies.snapshotJobPublisher) {
+            reply.code(503);
+            return {
+                message: 'Snapshot regeneration is currently unavailable.'
+            };
+        }
+        const user = await dependencies.defaultUserService.getDefaultUser(request);
+        if (!user.isAdmin) {
+            reply.code(403);
+            return {
+                message: 'Admin access is required.'
+            };
+        }
+        const widgets = await dependencies.prisma.dashboardWidget.findMany({
+            where: {
+                tenantId: user.tenantId,
+                archivedAt: null,
+                configHash: {
+                    not: null
+                },
+                refreshMode: {
+                    not: 'LIVE'
+                },
+                dashboard: {
+                    archivedAt: null
+                }
+            },
+            select: {
+                id: true,
+                tenantId: true,
+                dashboardId: true,
+                widgetType: true,
+                title: true,
+                isGenerating: true,
+                refreshMode: true,
+                version: true,
+                configHash: true,
+                dashboard: {
+                    select: {
+                        id: true,
+                        ownerUserId: true
+                    }
+                }
+            },
+            orderBy: [
+                {
+                    dashboard: {
+                        name: 'asc'
+                    }
+                },
+                {
+                    sortOrder: 'asc'
+                },
+                {
+                    createdAt: 'asc'
+                }
+            ]
+        });
+        const bypassDuplicateCheck = body?.bypassDuplicateCheck === true;
+        const results = [];
+        for (const widget of widgets) {
+            results.push(await regenerateWidgetSnapshot({
+                widget,
+                userId: user.userId,
+                timezone: user.timezone || 'UTC',
+                requestId: request.id,
+                bypassDuplicateCheck,
+                dependencies
+            }));
+        }
+        const queuedCount = results.filter(function countQueued(result) {
+            return result.status === 'queued';
+        }).length;
+        const generatedCount = results.filter(function countGenerated(result) {
+            return result.status === 'generated';
+        }).length;
+        const latestRequestedAt = results.reduce(function findLatest(current, result) {
+            if (!result.requestedAt) {
+                return current;
+            }
+            if (!current || result.requestedAt > current) {
+                return result.requestedAt;
+            }
+            return current;
+        }, null);
+        const firstError = results.find(function findError(result) {
+            return result.errorMessage;
+        });
+        if (queuedCount === results.length) {
+            reply.code(202);
+            return {
+                status: 'queued',
+                totalEligible: results.length,
+                requestedAt: latestRequestedAt,
+                snapshotDate: results[0] ? results[0].snapshotDate : formatSnapshotDateForTimezone(new Date(), user.timezone || 'UTC')
+            };
+        }
+        if (generatedCount === results.length) {
+            reply.code(200);
+            return {
+                status: 'generated',
+                mode: 'direct',
+                message: firstError ? firstError.errorMessage : 'Snapshot queue unavailable. Generated directly instead.',
+                totalEligible: results.length,
+                snapshotDate: results[0] ? results[0].snapshotDate : formatSnapshotDateForTimezone(new Date(), user.timezone || 'UTC')
+            };
+        }
+        reply.code(200);
+        return {
+            status: 'mixed',
+            totalEligible: results.length,
+            queuedCount,
+            generatedCount,
+            requestedAt: latestRequestedAt,
+            snapshotDate: results[0] ? results[0].snapshotDate : formatSnapshotDateForTimezone(new Date(), user.timezone || 'UTC'),
+            message: firstError ? firstError.errorMessage : null
+        };
+    });
     app.post('/api/v1/admin/widgets/:widgetId/regenerate-snapshot', async function handleRegenerateWidgetSnapshot(request, reply) {
         const params = request.params;
         const body = request.body;
@@ -145,96 +265,119 @@ export async function registerAdminWidgetRoutes(app, dependencies = createAdminW
             };
         }
         const snapshotDate = formatSnapshotDateForTimezone(new Date(), user.timezone || 'UTC');
-        const requestedAt = new Date();
         const bypassDuplicateCheck = body?.bypassDuplicateCheck === true;
-        const jobInput = {
-            widgetId: widget.id,
-            dashboardId: widget.dashboardId,
-            tenantId: widget.tenantId,
+        const result = await regenerateWidgetSnapshot({
+            widget,
             userId: user.userId,
-            widgetConfigVersion: widget.version,
-            widgetConfigHash: widget.configHash,
-            snapshotDate,
-            triggerSource: 'manual_refresh',
+            timezone: user.timezone || 'UTC',
+            requestId: request.id,
             bypassDuplicateCheck,
-            correlationId: request.id,
-            causationId: request.id,
-            requestedAt
-        };
-        try {
-            await dependencies.prisma.dashboardWidget.update({
-                where: {
-                    id: widget.id
-                },
-                data: {
-                    isGenerating: true
-                }
-            });
-            const published = await dependencies.snapshotJobPublisher.publishGenerateWidgetSnapshot(jobInput);
+            dependencies,
+            snapshotDate
+        });
+        if (result.status === 'queued') {
             reply.code(202);
             return {
                 status: 'queued',
                 job: {
                     widgetId: widget.id,
-                    snapshotDate: published.snapshotDate,
-                    triggerSource: published.triggerSource,
-                    bypassDuplicateCheck: published.bypassDuplicateCheck,
-                    requestedAt: published.requestedAt
-                }
-            };
-        }
-        catch (error) {
-            try {
-                await dependencies.snapshotService.generateForWidget({
-                    schemaVersion: 1,
-                    jobId: 'manual-refresh-' + widget.id + '-' + snapshotDate,
-                    idempotencyKey: buildSnapshotJobIdempotencyKey({
-                        widgetId: widget.id,
-                        snapshotDate,
-                        widgetConfigHash: widget.configHash,
-                        triggerSource: 'manual_refresh',
-                        requestedAt,
-                        bypassDuplicateCheck
-                    }),
-                    widgetId: widget.id,
-                    dashboardId: widget.dashboardId,
-                    tenantId: widget.tenantId,
-                    userId: user.userId,
-                    widgetConfigVersion: widget.version,
-                    widgetConfigHash: widget.configHash,
-                    snapshotDate,
-                    snapshotPeriod: 'day',
+                    snapshotDate: result.snapshotDate,
                     triggerSource: 'manual_refresh',
                     bypassDuplicateCheck,
-                    correlationId: request.id,
-                    causationId: request.id,
-                    requestedAt: requestedAt.toISOString()
-                });
-            }
-            finally {
-                await dependencies.prisma.dashboardWidget.update({
-                    where: {
-                        id: widget.id
-                    },
-                    data: {
-                        isGenerating: false
-                    }
-                });
-            }
-            reply.code(200);
-            return {
-                status: 'generated',
-                mode: 'direct',
-                message: error instanceof Error ? error.message : 'Snapshot queue unavailable. Generated directly instead.',
-                job: {
-                    widgetId: widget.id,
-                    snapshotDate,
-                    triggerSource: 'manual_refresh',
-                    bypassDuplicateCheck
+                    requestedAt: result.requestedAt
                 }
             };
         }
+        reply.code(200);
+        return {
+            status: 'generated',
+            mode: 'direct',
+            message: result.errorMessage || 'Snapshot queue unavailable. Generated directly instead.',
+            job: {
+                widgetId: widget.id,
+                snapshotDate: result.snapshotDate,
+                triggerSource: 'manual_refresh',
+                bypassDuplicateCheck
+            }
+        };
     });
+}
+async function regenerateWidgetSnapshot(input) {
+    const snapshotDate = input.snapshotDate || formatSnapshotDateForTimezone(new Date(), input.timezone);
+    const requestedAt = new Date();
+    await input.dependencies.prisma.dashboardWidget.update({
+        where: {
+            id: input.widget.id
+        },
+        data: {
+            isGenerating: true
+        }
+    });
+    try {
+        const published = await input.dependencies.snapshotJobPublisher.publishGenerateWidgetSnapshot({
+            widgetId: input.widget.id,
+            dashboardId: input.widget.dashboardId,
+            tenantId: input.widget.tenantId,
+            userId: input.userId,
+            widgetConfigVersion: input.widget.version,
+            widgetConfigHash: input.widget.configHash,
+            snapshotDate,
+            triggerSource: 'manual_refresh',
+            bypassDuplicateCheck: input.bypassDuplicateCheck,
+            correlationId: input.requestId,
+            causationId: input.requestId,
+            requestedAt
+        });
+        return {
+            status: 'queued',
+            snapshotDate: published.snapshotDate,
+            requestedAt: published.requestedAt
+        };
+    }
+    catch (error) {
+        try {
+            await input.dependencies.snapshotService.generateForWidget({
+                schemaVersion: 1,
+                jobId: 'manual-refresh-' + input.widget.id + '-' + snapshotDate,
+                idempotencyKey: buildSnapshotJobIdempotencyKey({
+                    widgetId: input.widget.id,
+                    snapshotDate,
+                    widgetConfigHash: input.widget.configHash,
+                    triggerSource: 'manual_refresh',
+                    requestedAt,
+                    bypassDuplicateCheck: input.bypassDuplicateCheck
+                }),
+                widgetId: input.widget.id,
+                dashboardId: input.widget.dashboardId,
+                tenantId: input.widget.tenantId,
+                userId: input.userId,
+                widgetConfigVersion: input.widget.version,
+                widgetConfigHash: input.widget.configHash,
+                snapshotDate,
+                snapshotPeriod: 'day',
+                triggerSource: 'manual_refresh',
+                bypassDuplicateCheck: input.bypassDuplicateCheck,
+                correlationId: input.requestId,
+                causationId: input.requestId,
+                requestedAt: requestedAt.toISOString()
+            });
+        }
+        finally {
+            await input.dependencies.prisma.dashboardWidget.update({
+                where: {
+                    id: input.widget.id
+                },
+                data: {
+                    isGenerating: false
+                }
+            });
+        }
+        return {
+            status: 'generated',
+            snapshotDate,
+            errorMessage: error instanceof Error ? error.message : 'Snapshot queue unavailable. Generated directly instead.'
+        };
+    }
 }
 function createAdminWidgetRouteDependencies() {
     const prisma = getPrismaClient();

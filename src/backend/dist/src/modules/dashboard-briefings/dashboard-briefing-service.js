@@ -7,11 +7,13 @@ export class DashboardBriefingService {
     aggregationService;
     llmService;
     ttsService;
-    constructor(repository, aggregationService, llmService, ttsService) {
+    deliveryService;
+    constructor(repository, aggregationService, llmService, ttsService, deliveryService) {
         this.repository = repository;
         this.aggregationService = aggregationService;
         this.llmService = llmService;
         this.ttsService = ttsService;
+        this.deliveryService = deliveryService;
     }
     async getPreferences(dashboardId, user) {
         const dashboard = await this.repository.findDashboardAggregationContext(dashboardId, user.userId);
@@ -226,6 +228,28 @@ export class DashboardBriefingService {
                     sourceSnapshotHash: aggregation.sourceSnapshotHash
                 }
             });
+            try {
+                await this.deliveryService.deliverGeneratedAudio({
+                    user,
+                    briefing: toBriefingResponse(updated),
+                    audio: updated.audio ? toAudioResponse(updated.audio) : null,
+                    storagePath: this.ttsService.resolveStoragePath(audio.storageKey)
+                });
+            }
+            catch (deliveryError) {
+                logApplicationEvent({
+                    level: 'warn',
+                    scope: 'dashboard-briefing',
+                    event: 'dashboard_briefing_delivery_failed',
+                    message: deliveryError instanceof Error ? deliveryError.message : 'Dashboard briefing delivery failed.',
+                    context: {
+                        dashboardId,
+                        briefingId: created.id,
+                        ownerUserId: user.userId,
+                        ...toLogErrorContext(deliveryError)
+                    }
+                });
+            }
             return {
                 briefing: toBriefingResponse(updated),
                 reused: false

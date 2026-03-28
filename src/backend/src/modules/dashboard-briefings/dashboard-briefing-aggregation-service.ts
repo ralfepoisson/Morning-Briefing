@@ -71,6 +71,10 @@ export class DashboardBriefingAggregationService {
       language: preferences.language,
       tone: preferences.tone,
       targetDurationSeconds: preferences.targetDurationSeconds,
+      listener: {
+        phoneticName: normalizeOptionalString(user.phoneticName),
+        firstName: extractFirstName(user.displayName)
+      },
       sections
     };
 
@@ -336,6 +340,21 @@ function createAggregationHash(
       };
     })
   })).digest('hex');
+}
+
+function normalizeOptionalString(value: string | null | undefined): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function extractFirstName(displayName: string): string | null {
+  const normalized = normalizeOptionalString(displayName);
+
+  if (!normalized) {
+    return null;
+  }
+
+  const parts = normalized.split(/\s+/).filter(Boolean);
+  return parts.length ? parts[0] : null;
 }
 
 function readString(value: unknown, fallback = ''): string {

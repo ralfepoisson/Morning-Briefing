@@ -3,6 +3,7 @@ import { constants as fsConstants } from 'node:fs';
 import { logApplicationEvent, toLogErrorContext } from '../admin/application-logger.js';
 import type { DefaultUserContext } from '../default-user/default-user-service.js';
 import { DashboardBriefingAggregationService } from './dashboard-briefing-aggregation-service.js';
+import type { DashboardBriefingDeliveryService } from './dashboard-briefing-delivery-service.js';
 import { DASHBOARD_BRIEFING_PROMPT_VERSION } from './dashboard-briefing-prompt-service.js';
 import type {
   DashboardBriefingAudioResponse,
@@ -20,7 +21,8 @@ export class DashboardBriefingService {
     private readonly repository: DashboardBriefingRepository,
     private readonly aggregationService: DashboardBriefingAggregationService,
     private readonly llmService: DashboardBriefingLlmService,
-    private readonly ttsService: DashboardBriefingTtsService
+    private readonly ttsService: DashboardBriefingTtsService,
+    private readonly deliveryService: Pick<DashboardBriefingDeliveryService, 'deliverGeneratedAudio'>
   ) {}
 
   async getPreferences(dashboardId: string, user: DefaultUserContext): Promise<DashboardBriefingPreferenceResponse | null> {
@@ -90,6 +92,7 @@ export class DashboardBriefingService {
     user: DefaultUserContext,
     options: {
       force?: boolean;
+      jobId?: string;
     } = {}
   ): Promise<DashboardBriefingGenerationResult | null> {
     logApplicationEvent({
@@ -97,12 +100,13 @@ export class DashboardBriefingService {
       scope: 'dashboard-briefing',
       event: 'dashboard_briefing_generation_requested',
       message: 'Dashboard briefing generation requested.',
-      context: {
-        dashboardId,
-        ownerUserId: user.userId,
-        force: !!options.force
-      }
-    });
+        context: {
+          dashboardId,
+          ownerUserId: user.userId,
+          force: !!options.force,
+          jobId: options.jobId || null
+        }
+      });
     const preferences = await this.repository.findPreference(dashboardId, user.userId) || buildDefaultPreference(dashboardId, user);
 
     if (!preferences.enabled) {
@@ -161,7 +165,8 @@ export class DashboardBriefingService {
         context: {
           dashboardId,
           ownerUserId: user.userId,
-          sourceSnapshotHash: aggregation.sourceSnapshotHash
+          sourceSnapshotHash: aggregation.sourceSnapshotHash,
+          jobId: options.jobId || null
         }
       });
     }
@@ -194,7 +199,8 @@ export class DashboardBriefingService {
           ownerUserId: user.userId,
           briefingId: created.id,
           modelName: this.llmService.getModelName(),
-          sourceSnapshotHash: aggregation.sourceSnapshotHash
+          sourceSnapshotHash: aggregation.sourceSnapshotHash,
+          jobId: options.jobId || null
         }
       });
 
@@ -209,7 +215,8 @@ export class DashboardBriefingService {
           ownerUserId: user.userId,
           briefingId: created.id,
           estimatedDurationSeconds: script.estimatedDurationSeconds,
-          scriptCharacterCount: script.fullScript.length
+          scriptCharacterCount: script.fullScript.length,
+          jobId: options.jobId || null
         }
       });
       const audio = await this.ttsService.generateAndStore({
@@ -239,7 +246,8 @@ export class DashboardBriefingService {
           briefingId: created.id,
           provider: audio.provider,
           voiceName: audio.voiceName,
-          storageKey: audio.storageKey
+          storageKey: audio.storageKey,
+          jobId: options.jobId || null
         }
       });
       const updated = await this.repository.updateBriefing({
@@ -273,9 +281,36 @@ export class DashboardBriefingService {
           dashboardId,
           briefingId: created.id,
           widgetTypes: aggregation.includedWidgetTypes,
-          sourceSnapshotHash: aggregation.sourceSnapshotHash
+          sourceSnapshotHash: aggregation.sourceSnapshotHash,
+          jobId: options.jobId || null
         }
       });
+
+      try {
+        await this.deliveryService.deliverGeneratedAudio({
+          user,
+          briefing: toBriefingResponse(updated),
+          audio: updated.audio ? toAudioResponse(updated.audio) : null,
+          storagePath: this.ttsService.resolveStoragePath(audio.storageKey),
+          deliveryContext: {
+            jobId: options.jobId || null
+          }
+        });
+      } catch (deliveryError) {
+        logApplicationEvent({
+          level: 'warn',
+          scope: 'dashboard-briefing',
+          event: 'dashboard_briefing_delivery_failed',
+          message: deliveryError instanceof Error ? deliveryError.message : 'Dashboard briefing delivery failed.',
+          context: {
+            dashboardId,
+            briefingId: created.id,
+            ownerUserId: user.userId,
+            jobId: options.jobId || null,
+            ...toLogErrorContext(deliveryError)
+          }
+        });
+      }
 
       return {
         briefing: toBriefingResponse(updated),
@@ -306,6 +341,7 @@ export class DashboardBriefingService {
           briefingId: created ? created.id : null,
           widgetTypes: aggregation.includedWidgetTypes,
           sourceSnapshotHash: aggregation.sourceSnapshotHash,
+          jobId: options.jobId || null,
           ...toLogErrorContext(error)
         }
       });

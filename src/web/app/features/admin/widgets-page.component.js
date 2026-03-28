@@ -10,10 +10,20 @@
       '      <h1 class="stage-title stage-title--compact">Widgets</h1>' +
       '      <p class="stage-copy stage-copy--compact mb-0">Review every widget, see its latest snapshot result, and manually queue a fresh snapshot when needed.</p>' +
       '    </div>' +
-      '    <button type="button" class="btn btn-outline-light connectors-refresh-button" ng-click="$ctrl.refresh()" ng-disabled="$ctrl.isLoading">' +
-      '      <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>' +
-      '      <span>Refresh</span>' +
-      '    </button>' +
+      '    <div class="message-broker-hero__actions">' +
+      '      <button type="button" class="btn btn-outline-light connectors-refresh-button" ng-click="$ctrl.refresh()" ng-disabled="$ctrl.isLoading || $ctrl.isRegeneratingAll">' +
+      '        <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>' +
+      '        <span>Refresh</span>' +
+      '      </button>' +
+      '      <button type="button" class="btn btn-outline-light connectors-refresh-button" ng-if="!$ctrl.isRegeneratingAll" ng-click="$ctrl.regenerateAll()" ng-disabled="$ctrl.isLoading || !$ctrl.hasBulkRegenerationCandidates()">' +
+      '        <i class="fa-solid fa-layer-group" aria-hidden="true"></i>' +
+      '        <span>Regenerate All</span>' +
+      '      </button>' +
+      '      <span class="widgets-admin-table__loading" ng-if="$ctrl.isRegeneratingAll" aria-live="polite">' +
+      '        <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>' +
+      '        <span>Queueing all...</span>' +
+      '      </span>' +
+      '    </div>' +
       '  </div>' +
       '  <div class="message-broker-summary" ng-if="$ctrl.data">' +
       '    <article class="message-broker-card">' +
@@ -117,6 +127,7 @@
 
     $ctrl.data = null;
     $ctrl.isLoading = false;
+    $ctrl.isRegeneratingAll = false;
     $ctrl.regeneratingById = {};
     $ctrl.snapshotModal = buildSnapshotModalState();
 
@@ -133,7 +144,7 @@
     };
 
     $ctrl.regenerate = function regenerate(widget) {
-      if (!widget || !widget.id || $ctrl.isRegenerating(widget.id)) {
+      if (!widget || !widget.id || $ctrl.isRegeneratingAll || $ctrl.isRegenerating(widget.id)) {
         return;
       }
 
@@ -149,8 +160,34 @@
       });
     };
 
+    $ctrl.regenerateAll = function regenerateAll() {
+      if ($ctrl.isRegeneratingAll || !$ctrl.hasBulkRegenerationCandidates()) {
+        return;
+      }
+
+      $ctrl.isRegeneratingAll = true;
+
+      return AdminWidgetService.regenerateAllSnapshots().then(function handleQueued(result) {
+        var totalEligible = result && typeof result.totalEligible === 'number'
+          ? result.totalEligible
+          : countBulkRegenerationCandidates();
+
+        NotificationService.success(
+          (totalEligible === 1
+            ? 'Snapshot regeneration was queued for 1 widget.'
+            : 'Snapshot regeneration was queued for ' + totalEligible + ' widgets.'),
+          'Snapshots queued'
+        );
+        return loadWidgets();
+      }).catch(function handleError(error) {
+        NotificationService.error(getErrorMessage(error, 'Bulk widget snapshot regeneration is currently unavailable.'), 'Snapshots failed');
+      }).finally(function clearPending() {
+        $ctrl.isRegeneratingAll = false;
+      });
+    };
+
     $ctrl.isRegenerating = function isRegenerating(widgetId) {
-      return !!$ctrl.regeneratingById[widgetId] || hasPersistedGeneration(widgetId);
+      return !!$ctrl.regeneratingById[widgetId] || hasPersistedGeneration(widgetId) || ($ctrl.isRegeneratingAll && isBulkRegenerationCandidate(widgetId));
     };
 
     $ctrl.isQueuedRegeneration = function isQueuedRegeneration(widgetId) {
@@ -159,6 +196,10 @@
 
     $ctrl.hasSnapshotContent = function hasSnapshotContent(widget) {
       return !!(widget && widget.latestSnapshotContent !== null && widget.latestSnapshotContent !== undefined);
+    };
+
+    $ctrl.hasBulkRegenerationCandidates = function hasBulkRegenerationCandidates() {
+      return countBulkRegenerationCandidates() > 0;
     };
 
     $ctrl.openSnapshotModal = function openSnapshotModal(widget) {
@@ -256,6 +297,18 @@
       return !!(($ctrl.data && $ctrl.data.items) || []).find(function findWidget(item) {
         return item.id === widgetId && item.isGenerating;
       });
+    }
+
+    function isBulkRegenerationCandidate(widgetId) {
+      return !!(($ctrl.data && $ctrl.data.items) || []).find(function findWidget(item) {
+        return item.id === widgetId && item.refreshMode !== 'LIVE';
+      });
+    }
+
+    function countBulkRegenerationCandidates() {
+      return (($ctrl.data && $ctrl.data.items) || []).filter(function filterWidget(item) {
+        return item.refreshMode !== 'LIVE';
+      }).length;
     }
   }
 

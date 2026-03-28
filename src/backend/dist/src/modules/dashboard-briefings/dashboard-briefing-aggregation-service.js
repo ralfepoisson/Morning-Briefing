@@ -47,6 +47,10 @@ export class DashboardBriefingAggregationService {
             language: preferences.language,
             tone: preferences.tone,
             targetDurationSeconds: preferences.targetDurationSeconds,
+            listener: {
+                phoneticName: normalizeOptionalString(user.phoneticName),
+                firstName: extractFirstName(user.displayName)
+            },
             sections
         };
         logApplicationEvent({
@@ -268,6 +272,17 @@ function createAggregationHash(dashboardId, preferences, widgets) {
             };
         })
     })).digest('hex');
+}
+function normalizeOptionalString(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+function extractFirstName(displayName) {
+    const normalized = normalizeOptionalString(displayName);
+    if (!normalized) {
+        return null;
+    }
+    const parts = normalized.split(/\s+/).filter(Boolean);
+    return parts.length ? parts[0] : null;
 }
 function readString(value, fallback = '') {
     return typeof value === 'string' && value.trim() ? value.trim() : fallback;

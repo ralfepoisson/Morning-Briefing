@@ -9,14 +9,30 @@ Morning Briefing does not sign users in directly with Cognito.
 Instead:
 
 1. The SPA redirects unauthenticated users to the central Life2 auth UI.
-2. The auth service authenticates the user with Cognito.
-3. The auth service exchanges the Cognito token for a Life2 JWT.
-4. The auth service redirects back to the SPA callback route with that Life2 JWT.
-5. The SPA validates the JWT payload, stores it in `localStorage`, and restores the authenticated session.
-6. The SPA adds the JWT to backend API requests as `Authorization: Bearer <token>`.
-7. The backend validates the JWT for protected API requests and derives the current app user from it.
+2. The SPA includes the public `applicationId` plus a `redirect` callback URL in that browser navigation.
+3. The auth service uses `applicationId` to resolve app branding and validate the callback target.
+4. The auth service authenticates the user with Cognito.
+5. The auth service exchanges the Cognito token for a Life2 JWT.
+6. The auth service redirects back to the SPA callback route with that Life2 JWT.
+7. The SPA validates the JWT payload, stores it in `localStorage`, and restores the authenticated session.
+8. The SPA adds the JWT to backend API requests as `Authorization: Bearer <token>`.
+9. The backend validates the JWT for protected API requests and derives the current app user from it.
 
 ## Required Redirect Contract
+
+Browser-facing sign-in must use a public application identifier in the URL. The SPA now sends users to:
+
+```text
+https://<auth-service-host>/signIn?applicationId=<public_application_id>&redirect=<encoded_callback_url>
+```
+
+Example local redirect:
+
+```text
+http://localhost:63431/signIn?applicationId=morning-briefing-web&redirect=http%3A%2F%2Flocalhost%3A8080%2F%23%2Fauth%2Fcallback
+```
+
+Do not rely on a browser redirect carrying an `Application-Token` HTTP header. Normal browser navigation cannot provide that custom header reliably.
 
 Use a dedicated SPA callback route:
 
@@ -85,6 +101,7 @@ Supported settings:
 
 - `apiBaseUrl`
 - `authServiceSignInUrl`
+- `authServiceApplicationId`
 - `authServiceSignOutUrl`
 - `appBaseUrl`
 
@@ -94,6 +111,7 @@ Local development defaults currently use:
 window.__MORNING_BRIEFING_CONFIG__ = Object.assign({
   apiBaseUrl: window.location.protocol + '//' + morningBriefingApiHost + ':3000/api/v1',
   authServiceSignInUrl: 'http://localhost:63431/signIn',
+  authServiceApplicationId: 'morning-briefing-web',
   authServiceSignOutUrl: 'http://localhost:63431/logout',
   appBaseUrl: window.location.origin + '/'
 }, window.__MORNING_BRIEFING_CONFIG__ || {});
@@ -110,6 +128,8 @@ That default is emitted from:
 - [`cicd/ci/build-frontend.sh`](/Users/ralfe/Dev/Morning-Briefing/cicd/ci/build-frontend.sh)
 
 and can still be overridden with `FRONTEND_AUTH_SERVICE_SIGN_IN_URL`.
+
+The public browser-flow application identifier is emitted from the same build step through `FRONTEND_AUTH_SERVICE_APPLICATION_ID`.
 
 ### Callback route
 
@@ -299,13 +319,13 @@ Current examples include:
 The SPA sends users to the central auth UI using:
 
 ```text
-{AUTH_SERVICE_SIGN_IN_URL}?redirect={APP_BASE_URL}/#/auth/callback
+{AUTH_SERVICE_SIGN_IN_URL}?applicationId={PUBLIC_APPLICATION_ID}&redirect={APP_BASE_URL}/#/auth/callback
 ```
 
 Example local redirect:
 
 ```text
-http://localhost:63431/signIn?redirect=http%3A%2F%2Flocalhost%3A8080%2F%23%2Fauth%2Fcallback
+http://localhost:63431/signIn?applicationId=morning-briefing-web&redirect=http%3A%2F%2Flocalhost%3A8080%2F%23%2Fauth%2Fcallback
 ```
 
 The auth service must then redirect back to:
@@ -353,6 +373,21 @@ Cause:
 Fix:
 
 - make sure the final redirect returns the exchanged Life2 JWT
+
+### 1a. Browser flow depended on a custom application header
+
+Symptom:
+
+- the auth page cannot determine branding or rejects the request during normal browser navigation
+
+Cause:
+
+- the source app assumed it could attach `Application-Token` as a custom header during `window.location` redirects
+
+Fix:
+
+- use `applicationId` in the browser URL instead
+- keep any secret application token for non-browser backend/admin flows only
 
 ### 2. Root callback URL mixed with hash routing
 
@@ -417,17 +452,19 @@ Use this checklist when integrating the Life2 auth service into another SPA proj
 
 1. Add a dedicated SPA callback route: `/#/auth/callback`.
 2. Redirect unauthenticated users to the central auth UI.
-3. Pass `redirect={appBaseUrl}/#/auth/callback`.
-4. Ensure the auth service returns the exchanged Life2 JWT, not the raw Cognito token.
-5. Ensure the JWT includes user/account identity claims plus `exp`.
-6. Capture and store the token before the SPA router boots.
-7. Store the token in `localStorage`.
-8. On initial app load, restore the token from `localStorage` and reject expired sessions.
-9. Attach the token as `Authorization: Bearer <jwt>` on every protected backend API request.
-10. Validate the token again on the backend for every protected API request.
-11. Redirect authenticated users away from public auth routes such as `#/signed-out`.
-12. Surface the last auth error during rollout/debugging.
-13. Configure signature verification with `LIFE2_JWT_SECRET` or `LIFE2_JWT_PUBLIC_KEY`.
+3. Pass `applicationId={publicApplicationId}` in the browser URL.
+4. Pass `redirect={appBaseUrl}/#/auth/callback`.
+5. Do not depend on `Application-Token` headers for browser redirects.
+6. Ensure the auth service returns the exchanged Life2 JWT, not the raw Cognito token.
+7. Ensure the JWT includes user/account identity claims plus `exp`.
+8. Capture and store the token before the SPA router boots.
+9. Store the token in `localStorage`.
+10. On initial app load, restore the token from `localStorage` and reject expired sessions.
+11. Attach the token as `Authorization: Bearer <jwt>` on every protected backend API request.
+12. Validate the token again on the backend for every protected API request.
+13. Redirect authenticated users away from public auth routes such as `#/signed-out`.
+14. Surface the last auth error during rollout/debugging.
+15. Configure signature verification with `LIFE2_JWT_SECRET` or `LIFE2_JWT_PUBLIC_KEY`.
 
 ## Files To Reuse As Reference
 
@@ -456,6 +493,7 @@ Build/runtime config:
 If you are integrating the Life2 auth service into another SPA project, the highest-signal guidance is:
 
 - use `/#/auth/callback`
+- use `applicationId` in the auth-service browser URL
 - require a Life2 JWT with explicit user/account claims
 - capture the token before the SPA router boots
 - store it in `localStorage`

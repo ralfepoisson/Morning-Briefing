@@ -20,6 +20,8 @@ custom:
   googleOauthClientSecret: ${param:googleOauthClientSecret, ''}
   googleOauthRedirectUri: ${param:googleOauthRedirectUri, 'https://${self:custom.frontendDomainName}/api/v1/connections/google-calendar/oauth/callback'}
   googleOauthStateSecret: ${param:googleOauthStateSecret, ''}
+  telegramBotToken: ${param:telegramBotToken, ''}
+  telegramApiBaseUrl: ${param:telegramApiBaseUrl, 'https://api.telegram.org'}
   frontendDesiredCount: ${param:frontendDesiredCount, 1}
   backendDesiredCount: ${param:backendDesiredCount, 1}
   workerDesiredCount: ${param:workerDesiredCount, 1}
@@ -512,6 +514,10 @@ resources:
                 Value: ${self:custom.googleOauthClientId}
               - Name: GOOGLE_OAUTH_REDIRECT_URI
                 Value: ${self:custom.googleOauthRedirectUri}
+              - Name: TELEGRAM_BOT_TOKEN
+                Value: ${self:custom.telegramBotToken}
+              - Name: TELEGRAM_API_BASE_URL
+                Value: ${self:custom.telegramApiBaseUrl}
             Secrets:
               - Name: DB_PASSWORD
                 ValueFrom: !Ref DatabasePasswordSecret
@@ -579,6 +585,10 @@ resources:
                 Value: '5'
               - Name: SNAPSHOT_WORKER_POLL_INTERVAL_MS
                 Value: '1000'
+              - Name: TELEGRAM_BOT_TOKEN
+                Value: ${self:custom.telegramBotToken}
+              - Name: TELEGRAM_API_BASE_URL
+                Value: ${self:custom.telegramApiBaseUrl}
             Secrets:
               - Name: DB_PASSWORD
                 ValueFrom: !Ref DatabasePasswordSecret

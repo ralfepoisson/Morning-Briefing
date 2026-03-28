@@ -137,10 +137,15 @@ model AppUser {
   tenantId     String             @map("tenant_id") @db.Uuid
   email        String
   displayName  String             @map("display_name")
+  phoneticName String?            @map("phonetic_name")
+  avatarDataUrl String?           @map("avatar_data_url")
+  avatarUrl    String?            @map("avatar_url")
   timezone     String
   locale       String
   isAdmin      Boolean            @default(false) @map("is_admin")
   isActive     Boolean            @default(true) @map("is_active")
+  telegramChatId String?          @map("telegram_chat_id")
+  telegramDeliveryEnabled Boolean @default(false) @map("telegram_delivery_enabled")
   createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
   tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)

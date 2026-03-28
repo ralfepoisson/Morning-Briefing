@@ -30,6 +30,7 @@ export class PrismaDashboardBriefingRepository implements DashboardBriefingRepos
             select: {
               id: true,
               displayName: true,
+              phoneticName: true,
               timezone: true,
               locale: true,
               email: true,
@@ -76,6 +77,7 @@ export class PrismaDashboardBriefingRepository implements DashboardBriefingRepos
             select: {
               id: true,
               displayName: true,
+              phoneticName: true,
               timezone: true,
               locale: true,
               email: true,

@@ -184,6 +184,76 @@ test('POST /api/v1/dashboards/:dashboardId/widgets creates an xkcd widget', asyn
   }
 });
 
+test('POST /api/v1/dashboards/:dashboardId/widgets creates a NatGeo Daily Photo widget', async function () {
+  const app = Fastify();
+
+  await registerWidgetRoutes(app, {
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris'
+        };
+      }
+    },
+    widgetService: {
+      async listForDashboard() {
+        throw new Error('not used');
+      },
+      async create(input) {
+        assert.equal(input.dashboardId, 'dash-1');
+        assert.equal(input.ownerUserId, 'user-1');
+        assert.equal(input.type, 'natgeo-daily-photo');
+        assert.equal(input.timezone, 'Europe/Paris');
+
+        return createWidgetResponse({
+          id: 'widget-natgeo',
+          dashboardId: 'dash-1',
+          type: 'natgeo-daily-photo',
+          title: 'NatGeo Daily Photo',
+          width: 420,
+          height: 420,
+          minWidth: 360,
+          minHeight: 320,
+          data: {
+            title: 'NatGeo Daily Photo',
+            description: 'The latest National Geographic Photo of the Day will appear here after the snapshot refresh completes.',
+            imageUrl: '',
+            altText: 'National Geographic Photo of the Day placeholder',
+            permalink: 'https://www.nationalgeographic.com/photo-of-the-day/',
+            credit: '',
+            emptyMessage: 'The latest National Geographic Photo of the Day will load automatically after the snapshot refresh completes.'
+          }
+        });
+      },
+      async update() {
+        throw new Error('not used');
+      },
+      async archive() {
+        throw new Error('not used');
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/dashboards/dash-1/widgets',
+      payload: {
+        type: 'natgeo-daily-photo'
+      }
+    });
+
+    assert.equal(response.statusCode, 201);
+    assert.equal(response.json().type, 'natgeo-daily-photo');
+    assert.equal(response.json().title, 'NatGeo Daily Photo');
+  } finally {
+    await app.close();
+  }
+});
+
 test('POST /api/v1/dashboards/:dashboardId/widgets creates an email widget', async function () {
   const app = Fastify();
 
@@ -438,6 +508,7 @@ function createWidgetResponse(overrides: Partial<DashboardWidgetResponse>): Dash
     minWidth: overrides.minWidth || 320,
     minHeight: overrides.minHeight || 260,
     isVisible: overrides.isVisible !== false,
+    isGenerating: overrides.isGenerating === true,
     sortOrder: overrides.sortOrder || 1,
     config: overrides.config || {},
     data: overrides.data || {},

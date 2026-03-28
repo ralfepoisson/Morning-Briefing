@@ -83,6 +83,7 @@ test('DashboardBriefingAggregationService builds structured input from eligible 
     tenantId: 'tenant-1',
     userId: 'user-1',
     displayName: 'Ralfe',
+    phoneticName: 'Ralf',
     timezone: 'Europe/Paris',
     locale: 'en-GB',
     email: 'ralfe@example.com',
@@ -102,6 +103,10 @@ test('DashboardBriefingAggregationService builds structured input from eligible 
   });
 
   assert.ok(result);
+  assert.deepEqual(result.input.listener, {
+    phoneticName: 'Ralf',
+    firstName: 'Ralfe'
+  });
   assert.equal(result.input.sections.length, 2);
   assert.deepEqual(result.includedWidgetTypes, ['weather', 'tasks']);
   assert.equal(result.input.sections[0].widgetType, 'weather');

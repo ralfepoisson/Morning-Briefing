@@ -69,7 +69,11 @@
       '        <button type="button" class="theme-toggle__button" ng-class="{active: $ctrl.ui.theme === \'dark\'}" ng-click="$ctrl.setTheme(\'dark\')">Dark</button>' +
       '      </div>' +
       '      <div class="top-nav-session" ng-if="$ctrl.auth.session">' +
-      '        <span class="top-nav-session__label">{{$ctrl.auth.session.displayName}}</span>' +
+      '        <button type="button" class="top-nav-profile-trigger" ng-class="{\'top-nav-profile-trigger--active\': $ctrl.isActiveRoute(\'/profile\')}" ng-click="$ctrl.openProfile()">' +
+      '          <span class="top-nav-profile-trigger__avatar" ng-if="$ctrl.getAvatarUrl()"><img ng-src="{{$ctrl.getAvatarUrl()}}" alt="" /></span>' +
+      '          <span class="top-nav-profile-trigger__avatar top-nav-profile-trigger__avatar--fallback" ng-if="!$ctrl.getAvatarUrl()">{{$ctrl.getAvatarInitials()}}</span>' +
+      '          <span class="top-nav-session__label">{{$ctrl.getDisplayName()}}</span>' +
+      '        </button>' +
       '        <button type="button" class="btn btn-sm btn-outline-secondary" ng-click="$ctrl.signOut()">Sign out</button>' +
       '      </div>' +
       '    </div>' +
@@ -170,6 +174,30 @@
       refreshAuthState();
     };
 
+    $ctrl.openProfile = function openProfile() {
+      $ctrl.isDashboardMenuOpen = false;
+      $ctrl.isAdminMenuOpen = false;
+      $location.path('/profile');
+    };
+
+    $ctrl.getDisplayName = function getDisplayName() {
+      var currentUser = CurrentUserService.getCurrentUser();
+
+      return currentUser && currentUser.displayName
+        ? currentUser.displayName
+        : ($ctrl.auth.session && $ctrl.auth.session.displayName ? $ctrl.auth.session.displayName : 'Profile');
+    };
+
+    $ctrl.getAvatarUrl = function getAvatarUrl() {
+      var currentUser = CurrentUserService.getCurrentUser();
+
+      return currentUser && currentUser.avatarDataUrl ? currentUser.avatarDataUrl : '';
+    };
+
+    $ctrl.getAvatarInitials = function getAvatarInitials() {
+      return getInitials($ctrl.getDisplayName());
+    };
+
     function applyTheme(theme) {
       $document[0].body.classList.remove('theme-dark', 'theme-light');
       $document[0].body.classList.add('theme-' + theme);
@@ -226,5 +254,16 @@
     function loadCurrentUser(force) {
       CurrentUserService.load(force).catch(function ignoreCurrentUserError() {});
     }
+  }
+
+  function getInitials(value) {
+    return (value || '')
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(function toInitial(part) {
+        return part.charAt(0).toUpperCase();
+      })
+      .join('') || 'MB';
   }
 })();

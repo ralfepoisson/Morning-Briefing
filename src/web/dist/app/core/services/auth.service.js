@@ -69,7 +69,7 @@
 
       LocalStorageService.set(RETURN_PATH_KEY, targetPath);
 
-      if (!AuthConfig.signInUrl) {
+      if (!AuthConfig.signInUrl || !AuthConfig.applicationId) {
         NotificationService.error('Authentication is not configured yet for this environment.');
         $location.path('/signed-out');
         return;
@@ -196,6 +196,8 @@
 
     function buildSignInUrl() {
       var signInUrl = new URL(AuthConfig.signInUrl, $window.location.origin);
+      signInUrl.searchParams.delete('applicationToken');
+      signInUrl.searchParams.set('applicationId', AuthConfig.applicationId);
       signInUrl.searchParams.set('redirect', buildCallbackUrl());
       return signInUrl.toString();
     }

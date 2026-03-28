@@ -37,10 +37,10 @@
           height: options.height || 420,
           config: options.config || {},
           data: {
-            headline: data.headline || 'Top stories from your RSS feeds.',
+            headline: data.headline || '',
             markdown: data.markdown || '',
             categories: data.categories || [],
-            emptyMessage: data.emptyMessage || 'Add RSS feeds on the RSS Feeds page to start generating news summaries.'
+            emptyMessage: data.emptyMessage || 'News is still loading or unavailable. Add RSS feeds or refresh after the snapshot completes.'
           }
         };
       }

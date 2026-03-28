@@ -365,3 +365,281 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot falls back to dir
     await app.close();
   }
 });
+
+test('POST /api/v1/admin/widgets/regenerate-all-snapshots enqueues manual refreshes for all snapshot-backed widgets', async function () {
+  const app = Fastify();
+  const widgetUpdates = [];
+  const publishedInputs = [];
+  const expectedSnapshotDate = formatSnapshotDateForTimezone(new Date(), 'Europe/Paris');
+
+  await registerAdminWidgetRoutes(app, {
+    prisma: {
+      dashboardWidget: {
+        findMany: async function findMany(input) {
+          if (input && input.select) {
+            return [
+              {
+                id: 'widget-1',
+                tenantId: 'tenant-1',
+                dashboardId: 'dash-1',
+                widgetType: 'weather',
+                title: 'Weather Outlook',
+                refreshMode: 'SNAPSHOT',
+                version: 4,
+                configHash: 'hash-1',
+                dashboard: {
+                  id: 'dash-1',
+                  ownerUserId: 'user-1'
+                }
+              },
+              {
+                id: 'widget-2',
+                tenantId: 'tenant-1',
+                dashboardId: 'dash-2',
+                widgetType: 'news',
+                title: 'News Briefing',
+                refreshMode: 'HYBRID',
+                version: 6,
+                configHash: 'hash-2',
+                dashboard: {
+                  id: 'dash-2',
+                  ownerUserId: 'user-2'
+                }
+              }
+            ];
+          }
+
+          return [];
+        },
+        update: async function update(input) {
+          widgetUpdates.push(input);
+          return {};
+        },
+        findFirst: async function findFirst() {
+          return null;
+        }
+      }
+    } as never,
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'admin-user',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris',
+          locale: 'en-GB',
+          email: 'ralfe@example.com',
+          isAdmin: true
+        };
+      }
+    },
+    snapshotJobPublisher: {
+      async publishGenerateWidgetSnapshot(input) {
+        publishedInputs.push(input);
+
+        return {
+          schemaVersion: 1,
+          jobId: 'job-' + input.widgetId,
+          idempotencyKey: 'idempotency-' + input.widgetId,
+          widgetId: input.widgetId,
+          dashboardId: input.dashboardId,
+          tenantId: input.tenantId,
+          userId: input.userId,
+          widgetConfigVersion: input.widgetConfigVersion,
+          widgetConfigHash: input.widgetConfigHash,
+          snapshotDate: input.snapshotDate,
+          snapshotPeriod: 'day',
+          triggerSource: input.triggerSource,
+          bypassDuplicateCheck: input.bypassDuplicateCheck === true,
+          correlationId: input.correlationId || null,
+          causationId: input.causationId || null,
+          requestedAt: '2026-03-20T07:30:00.000Z'
+        };
+      }
+    },
+    snapshotService: {
+      async generateForWidget() {
+        throw new Error('not used');
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/widgets/regenerate-all-snapshots',
+      payload: {
+        bypassDuplicateCheck: true
+      }
+    });
+
+    assert.equal(response.statusCode, 202);
+    assert.equal(widgetUpdates.length, 2);
+    assert.deepEqual(widgetUpdates.map(function mapUpdate(item) {
+      return (item as { where: { id: string }; data: { isGenerating: boolean } }).where.id;
+    }), ['widget-1', 'widget-2']);
+    assert.deepEqual(publishedInputs.map(function mapPublished(input) {
+      return {
+        widgetId: input.widgetId,
+        triggerSource: input.triggerSource,
+        bypassDuplicateCheck: input.bypassDuplicateCheck,
+        snapshotDate: input.snapshotDate
+      };
+    }), [
+      {
+        widgetId: 'widget-1',
+        triggerSource: 'manual_refresh',
+        bypassDuplicateCheck: true,
+        snapshotDate: expectedSnapshotDate
+      },
+      {
+        widgetId: 'widget-2',
+        triggerSource: 'manual_refresh',
+        bypassDuplicateCheck: true,
+        snapshotDate: expectedSnapshotDate
+      }
+    ]);
+    assert.deepEqual(response.json(), {
+      status: 'queued',
+      totalEligible: 2,
+      requestedAt: '2026-03-20T07:30:00.000Z',
+      snapshotDate: expectedSnapshotDate
+    });
+  } finally {
+    await app.close();
+  }
+});
+
+test('POST /api/v1/admin/widgets/regenerate-all-snapshots falls back to direct generation when queue publishing fails', async function () {
+  const app = Fastify();
+  const widgetUpdates = [];
+  const generatedInputs = [];
+  const expectedSnapshotDate = formatSnapshotDateForTimezone(new Date(), 'Europe/Paris');
+
+  await registerAdminWidgetRoutes(app, {
+    prisma: {
+      dashboardWidget: {
+        findMany: async function findMany(input) {
+          if (input && input.select) {
+            return [
+              {
+                id: 'widget-1',
+                tenantId: 'tenant-1',
+                dashboardId: 'dash-1',
+                widgetType: 'weather',
+                title: 'Weather Outlook',
+                refreshMode: 'SNAPSHOT',
+                version: 4,
+                configHash: 'hash-1',
+                dashboard: {
+                  id: 'dash-1',
+                  ownerUserId: 'user-1'
+                }
+              },
+              {
+                id: 'widget-2',
+                tenantId: 'tenant-1',
+                dashboardId: 'dash-2',
+                widgetType: 'news',
+                title: 'News Briefing',
+                refreshMode: 'HYBRID',
+                version: 6,
+                configHash: 'hash-2',
+                dashboard: {
+                  id: 'dash-2',
+                  ownerUserId: 'user-2'
+                }
+              }
+            ];
+          }
+
+          return [];
+        },
+        update: async function update(input) {
+          widgetUpdates.push(input);
+          return {};
+        },
+        findFirst: async function findFirst() {
+          return null;
+        }
+      }
+    } as never,
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'admin-user',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris',
+          locale: 'en-GB',
+          email: 'ralfe@example.com',
+          isAdmin: true
+        };
+      }
+    },
+    snapshotJobPublisher: {
+      async publishGenerateWidgetSnapshot() {
+        throw new Error('connect ECONNREFUSED 127.0.0.1:4566');
+      }
+    },
+    snapshotService: {
+      async generateForWidget(input) {
+        generatedInputs.push(input);
+
+        return {
+          status: 'generated'
+        };
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/widgets/regenerate-all-snapshots',
+      payload: {
+        bypassDuplicateCheck: true
+      }
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(widgetUpdates.map(function mapUpdate(item) {
+      return {
+        id: (item as { where: { id: string } }).where.id,
+        isGenerating: (item as { data: { isGenerating: boolean } }).data.isGenerating
+      };
+    }), [
+      { id: 'widget-1', isGenerating: true },
+      { id: 'widget-1', isGenerating: false },
+      { id: 'widget-2', isGenerating: true },
+      { id: 'widget-2', isGenerating: false }
+    ]);
+    assert.deepEqual(generatedInputs.map(function mapGenerated(input) {
+      return {
+        widgetId: input.widgetId,
+        triggerSource: input.triggerSource,
+        snapshotDate: input.snapshotDate
+      };
+    }), [
+      {
+        widgetId: 'widget-1',
+        triggerSource: 'manual_refresh',
+        snapshotDate: expectedSnapshotDate
+      },
+      {
+        widgetId: 'widget-2',
+        triggerSource: 'manual_refresh',
+        snapshotDate: expectedSnapshotDate
+      }
+    ]);
+    assert.deepEqual(response.json(), {
+      status: 'generated',
+      mode: 'direct',
+      message: 'connect ECONNREFUSED 127.0.0.1:4566',
+      totalEligible: 2,
+      snapshotDate: expectedSnapshotDate
+    });
+  } finally {
+    await app.close();
+  }
+});

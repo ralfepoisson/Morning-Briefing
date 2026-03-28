@@ -5,6 +5,7 @@ import { getSnapshotQueueConfig } from '../snapshots/snapshot-queue-config.js';
 import { PrismaTenantAiConfigurationRepository } from '../tenant-ai-configuration/prisma-tenant-ai-configuration-repository.js';
 import { TenantAiConfigurationService } from '../tenant-ai-configuration/tenant-ai-configuration-service.js';
 import { DashboardBriefingAggregationService } from './dashboard-briefing-aggregation-service.js';
+import { CompositeDashboardBriefingDeliveryService, TelegramDashboardBriefingDeliveryChannel } from './dashboard-briefing-delivery-service.js';
 import { DashboardBriefingJobProcessor } from './dashboard-briefing-job-processor.js';
 import { DashboardBriefingLlmService, StubDashboardBriefingLlmProvider, TenantConfiguredOpenAiDashboardBriefingLlmProvider } from './dashboard-briefing-llm-service.js';
 import { DashboardBriefingPromptService } from './dashboard-briefing-prompt-service.js';
@@ -18,7 +19,12 @@ export function createDashboardBriefingService() {
     const repository = new PrismaDashboardBriefingRepository(prisma);
     const promptService = new DashboardBriefingPromptService();
     const tenantAiConfigurationService = new TenantAiConfigurationService(new PrismaTenantAiConfigurationRepository(prisma));
-    return new DashboardBriefingService(repository, new DashboardBriefingAggregationService(repository), new DashboardBriefingLlmService(createLlmProvider(tenantAiConfigurationService), promptService), new DashboardBriefingTtsService(createTtsProvider(), getAudioStorageDirectory()));
+    return new DashboardBriefingService(repository, new DashboardBriefingAggregationService(repository), new DashboardBriefingLlmService(createLlmProvider(tenantAiConfigurationService), promptService), new DashboardBriefingTtsService(createTtsProvider(), getAudioStorageDirectory()), new CompositeDashboardBriefingDeliveryService([
+        new TelegramDashboardBriefingDeliveryChannel(prisma, {
+            botToken: process.env.TELEGRAM_BOT_TOKEN,
+            apiBaseUrl: process.env.TELEGRAM_API_BASE_URL
+        })
+    ]));
 }
 export function createDashboardBriefingJobPublisherFromEnvironment() {
     const config = getSnapshotQueueConfig();

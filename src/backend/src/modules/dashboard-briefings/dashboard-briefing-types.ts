@@ -103,6 +103,10 @@ export type DashboardBriefingInput = {
   language: string;
   tone: string;
   targetDurationSeconds: number;
+  listener: {
+    phoneticName: string | null;
+    firstName: string | null;
+  };
   sections: DashboardBriefingSectionInput[];
 };
 

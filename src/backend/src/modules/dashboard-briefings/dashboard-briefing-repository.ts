@@ -42,6 +42,7 @@ export interface DashboardBriefingRepository extends DashboardBriefingAggregatio
     owner: {
       id: string;
       displayName: string;
+      phoneticName: string | null;
       timezone: string;
       locale: string;
       email: string;

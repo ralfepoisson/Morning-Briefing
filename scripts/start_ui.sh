@@ -1,4 +1,8 @@
 #!/bin/bash
 
-cd ../src/web
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+cd "$SCRIPT_DIR/../src/web"
 npm start

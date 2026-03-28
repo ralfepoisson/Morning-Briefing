@@ -24,6 +24,30 @@ const widgetDefinitions = [
         }
     },
     {
+        type: 'natgeo-daily-photo',
+        name: 'NatGeo Daily Photo',
+        title: 'NatGeo Daily Photo',
+        description: 'National Geographic Photo of the Day with its lead caption sentence',
+        briefingDefaultIncluded: false,
+        defaultSize: { width: 420, height: 420 },
+        minSize: { width: 360, height: 320 },
+        refreshMode: 'SNAPSHOT',
+        createDefaultConfig: function createDefaultConfig() {
+            return {};
+        },
+        createMockData: function createMockData() {
+            return {
+                title: 'NatGeo Daily Photo',
+                description: 'The latest National Geographic Photo of the Day will appear here after the snapshot refresh completes.',
+                imageUrl: '',
+                altText: 'National Geographic Photo of the Day placeholder',
+                permalink: 'https://www.nationalgeographic.com/photo-of-the-day/',
+                credit: '',
+                emptyMessage: 'The latest National Geographic Photo of the Day will load automatically after the snapshot refresh completes.'
+            };
+        }
+    },
+    {
         type: 'news',
         name: 'News',
         title: 'News Briefing',
@@ -48,7 +72,7 @@ const widgetDefinitions = [
         type: 'weather',
         name: 'Weather',
         title: 'Weather Outlook',
-        description: 'Mocked daily forecast',
+        description: 'Daily forecast from the configured weather source',
         briefingDefaultIncluded: true,
         defaultSize: { width: 360, height: 360 },
         minSize: { width: 360, height: 360 },
@@ -59,20 +83,14 @@ const widgetDefinitions = [
         createMockData: function createMockData(config) {
             const location = getWeatherLocationLabel(config);
             return {
-                location: location || 'Select a city',
-                temperature: '18°',
-                condition: 'Partly sunny',
-                highLow: 'H: 20°  L: 11°',
+                location: location || '',
+                temperature: '',
+                condition: '',
+                highLow: '',
                 summary: location
-                    ? 'Mock data for the MVP. This widget will later hydrate from a briefing snapshot.'
+                    ? 'Weather data is still loading or unavailable. Refresh after the snapshot completes.'
                     : 'Choose a city in edit mode to configure this widget.',
-                details: location
-                    ? [
-                        { label: 'Feels like', value: '17°' },
-                        { label: 'Rain', value: '10%' },
-                        { label: 'UV', value: 'Moderate' }
-                    ]
-                    : []
+                details: []
             };
         }
     },
@@ -92,26 +110,19 @@ const widgetDefinitions = [
             const connectionLabel = getCalendarConnectionLabel(config);
             return {
                 provider: 'google-calendar',
-                connectionLabel: connectionLabel || 'Not connected',
+                connectionLabel,
                 dateLabel: 'Today',
                 emptyMessage: connectionLabel
-                    ? 'Live appointments will appear after you save the dashboard.'
+                    ? 'Calendar events are still loading or unavailable. Refresh after the snapshot completes.'
                     : 'Choose a Google Calendar connection in edit mode to configure this widget.',
-                appointments: connectionLabel
-                    ? [
-                        { time: '09:00', title: 'Stand-up', location: 'Teams' },
-                        { time: '10:30', title: 'Deep work block', location: 'Home office' },
-                        { time: '13:00', title: 'Client review', location: 'WeWork Meeting Room' },
-                        { time: '19:00', title: 'Dinner reservation', location: 'Le Petit Marchand' }
-                    ]
-                    : []
+                appointments: []
             };
         }
     },
     {
         type: 'email',
         name: 'Email',
-        title: 'Recent Email',
+        title: 'Email',
         description: 'Messages from your mail filters',
         briefingDefaultIncluded: true,
         defaultSize: { width: 420, height: 360 },
@@ -127,36 +138,12 @@ const widgetDefinitions = [
             const filters = getEmailFilters(config);
             return {
                 provider: 'gmail',
-                connectionLabel: connectionLabel || 'Not connected',
+                connectionLabel,
                 filters,
                 emptyMessage: connectionLabel
-                    ? 'Live messages will appear after you save the dashboard.'
+                    ? 'Email messages are still loading or unavailable. Refresh after the snapshot completes.'
                     : 'Choose a Gmail connection in edit mode to configure this widget.',
-                messages: connectionLabel
-                    ? [
-                        {
-                            id: 'email-1',
-                            subject: 'Project kickoff agenda',
-                            from: 'Alex Morgan <alex@example.com>',
-                            receivedAt: '2026-03-26T07:45:00.000Z',
-                            isUnread: true
-                        },
-                        {
-                            id: 'email-2',
-                            subject: 'Travel confirmation for next week',
-                            from: 'Airline Updates <updates@example.com>',
-                            receivedAt: '2026-03-26T06:10:00.000Z',
-                            isUnread: false
-                        },
-                        {
-                            id: 'email-3',
-                            subject: 'Design review notes',
-                            from: 'Priya Shah <priya@example.com>',
-                            receivedAt: '2026-03-25T20:20:00.000Z',
-                            isUnread: true
-                        }
-                    ]
-                    : []
+                messages: []
             };
         }
     },
@@ -176,38 +163,13 @@ const widgetDefinitions = [
         },
         createMockData: function createMockData(config) {
             const connectionLabel = getTaskConnectionLabel(config);
-            const groups = [
-                {
-                    label: 'Due Today',
-                    items: [
-                        { title: 'Reply to insurance email' },
-                        { title: 'Confirm dinner reservation' }
-                    ]
-                },
-                {
-                    label: 'Due Tomorrow',
-                    items: [
-                        { title: 'Draft project update' },
-                        { title: 'Buy birthday card' }
-                    ]
-                }
-            ];
-            if (shouldShowUndatedTasks(config)) {
-                groups.push({
-                    label: 'No Due Date',
-                    items: [
-                        { title: 'Declutter camera roll' },
-                        { title: 'Research standing desk options' }
-                    ]
-                });
-            }
             return {
                 provider: 'todoist',
-                connectionLabel: connectionLabel || 'Not connected',
+                connectionLabel,
                 emptyMessage: connectionLabel
-                    ? 'Live tasks will appear after you save the dashboard.'
+                    ? 'Tasks are still loading or unavailable. Refresh after the snapshot completes.'
                     : 'Choose a Todoist connection in edit mode to configure this widget.',
-                groups: connectionLabel ? groups : []
+                groups: []
             };
         }
     }

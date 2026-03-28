@@ -4,6 +4,26 @@ const TOKEN_KEY = 'morningBriefing.auth.token';
 const SESSION_KEY = 'morningBriefing.auth.session';
 
 test.describe('Life2 auth callback', () => {
+  test('sign-in navigation uses applicationId and redirect query parameters', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.__MORNING_BRIEFING_CONFIG__ = {
+        authServiceSignInUrl: '/signIn?applicationToken=legacy-secret',
+        authServiceApplicationId: 'morning-briefing-web',
+        appBaseUrl: 'http://127.0.0.1:8080/'
+      };
+    });
+
+    await page.goto('/#/signed-out');
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.waitForURL('**/signIn**');
+
+    const signInUrl = new URL(page.url());
+
+    expect(signInUrl.searchParams.get('applicationId')).toBe('morning-briefing-web');
+    expect(signInUrl.searchParams.get('redirect')).toBe('http://127.0.0.1:8080/#/auth/callback');
+    expect(signInUrl.searchParams.get('applicationToken')).toBeNull();
+  });
+
   test('stores a valid Life2 token and completes the callback redirect', async ({ page }) => {
     const token = createToken({
       userid: 'ralfepoisson@gmail.com',

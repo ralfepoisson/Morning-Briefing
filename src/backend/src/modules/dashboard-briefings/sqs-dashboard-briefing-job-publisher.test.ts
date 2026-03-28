@@ -17,6 +17,7 @@ test('SqsDashboardBriefingJobPublisher sends the expected dashboard audio comman
     tenantId: 'tenant-1',
     ownerUserId: 'user-1',
     ownerDisplayName: 'Ralfe',
+    ownerPhoneticName: 'Ralf',
     ownerTimezone: 'Europe/Paris',
     ownerLocale: 'en-GB',
     ownerEmail: 'ralfe@example.com',
@@ -35,6 +36,7 @@ test('SqsDashboardBriefingJobPublisher sends the expected dashboard audio comman
   assert.equal(body.type, 'GenerateDashboardAudioBriefingRequested');
   assert.equal(body.payload.dashboardId, 'dash-1');
   assert.equal(body.payload.ownerUserId, 'user-1');
+  assert.equal(body.payload.ownerPhoneticName, 'Ralf');
   assert.equal(body.payload.force, true);
   assert.equal(body.payload.jobId, payload.jobId);
 });

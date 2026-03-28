@@ -21,8 +21,13 @@ class AppUser {
   tenant_id : UUID
   email : varchar
   display_name : varchar
+  phonetic_name : varchar?
+  avatar_data_url : text?
+  avatar_url : varchar?
   timezone : varchar
   locale : varchar
+  telegram_chat_id : varchar?
+  telegram_delivery_enabled : boolean
   is_active : boolean
   created_at : timestamp
   updated_at : timestamp
@@ -70,6 +75,12 @@ class DashboardWidget {
   created_at : timestamp
   updated_at : timestamp
 }
+
+note right of DashboardWidget
+config_json and widget snapshots also carry
+widget-specific display payloads such as xkcd
+and NatGeo Daily Photo metadata.
+end note
 
 class Connector {
   +connector_id : UUID
@@ -252,6 +263,15 @@ Tenant-level integration configuration,
 for example weather, calendar, email, RSS, or news.
 Secrets stay outside Postgres and are
 referenced through secret_ref.
+end note
+
+note right of AppUser
+Stores persisted profile details and
+delivery preferences that must survive
+auth token refreshes. Telegram is the
+first implemented audio-delivery channel.
+Profile images are currently stored as
+base64 data on the user record.
 end note
 
 note bottom of BriefingSnapshot

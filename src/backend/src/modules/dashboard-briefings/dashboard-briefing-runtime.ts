@@ -5,6 +5,7 @@ import { getSnapshotQueueConfig } from '../snapshots/snapshot-queue-config.js';
 import { PrismaTenantAiConfigurationRepository } from '../tenant-ai-configuration/prisma-tenant-ai-configuration-repository.js';
 import { TenantAiConfigurationService } from '../tenant-ai-configuration/tenant-ai-configuration-service.js';
 import { DashboardBriefingAggregationService } from './dashboard-briefing-aggregation-service.js';
+import { CompositeDashboardBriefingDeliveryService, TelegramDashboardBriefingDeliveryChannel } from './dashboard-briefing-delivery-service.js';
 import { DashboardBriefingJobProcessor } from './dashboard-briefing-job-processor.js';
 import type { DashboardBriefingJobPublisher } from './dashboard-briefing-job-publisher.js';
 import { DashboardBriefingLlmService, StubDashboardBriefingLlmProvider, TenantConfiguredOpenAiDashboardBriefingLlmProvider } from './dashboard-briefing-llm-service.js';
@@ -28,7 +29,13 @@ export function createDashboardBriefingService(): DashboardBriefingService {
     new DashboardBriefingTtsService(
       createTtsProvider(),
       getAudioStorageDirectory()
-    )
+    ),
+    new CompositeDashboardBriefingDeliveryService([
+      new TelegramDashboardBriefingDeliveryChannel(prisma, {
+        botToken: process.env.TELEGRAM_BOT_TOKEN,
+        apiBaseUrl: process.env.TELEGRAM_API_BASE_URL
+      })
+    ])
   );
 }
 

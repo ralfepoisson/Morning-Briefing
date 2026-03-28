@@ -20,6 +20,7 @@ export class PrismaDashboardBriefingRepository {
                         select: {
                             id: true,
                             displayName: true,
+                            phoneticName: true,
                             timezone: true,
                             locale: true,
                             email: true,
@@ -65,6 +66,7 @@ export class PrismaDashboardBriefingRepository {
                         select: {
                             id: true,
                             displayName: true,
+                            phoneticName: true,
                             timezone: true,
                             locale: true,
                             email: true,

@@ -14,6 +14,7 @@ test('ScheduledDashboardBriefingRefreshService enqueues one job per eligible das
           owner: {
             id: 'owner-1',
             displayName: 'Owner One',
+            phoneticName: 'Oh-ner',
             timezone: 'Europe/Paris',
             locale: 'en-GB',
             email: 'owner-1@example.com',
@@ -28,6 +29,7 @@ test('ScheduledDashboardBriefingRefreshService enqueues one job per eligible das
           owner: {
             id: 'owner-2',
             displayName: 'Owner Two',
+            phoneticName: null,
             timezone: 'Europe/London',
             locale: 'en-GB',
             email: 'owner-2@example.com',
@@ -44,6 +46,7 @@ test('ScheduledDashboardBriefingRefreshService enqueues one job per eligible das
           owner: {
             id: 'owner-3',
             displayName: 'Owner Three',
+            phoneticName: null,
             timezone: 'UTC',
             locale: 'en-US',
             email: 'owner-3@example.com',
@@ -72,6 +75,7 @@ test('ScheduledDashboardBriefingRefreshService enqueues one job per eligible das
     tenantId: 'tenant-1',
     ownerUserId: 'owner-1',
     ownerDisplayName: 'Owner One',
+    ownerPhoneticName: 'Oh-ner',
     ownerTimezone: 'Europe/Paris',
     ownerLocale: 'en-GB',
     ownerEmail: 'owner-1@example.com',
@@ -96,6 +100,7 @@ class InMemoryPublisher implements DashboardBriefingJobPublisher {
       tenantId: input.tenantId,
       ownerUserId: input.ownerUserId,
       ownerDisplayName: input.ownerDisplayName,
+      ownerPhoneticName: input.ownerPhoneticName,
       ownerTimezone: input.ownerTimezone,
       ownerLocale: input.ownerLocale,
       ownerEmail: input.ownerEmail,

@@ -17,6 +17,7 @@ export class SqsDashboardBriefingJobPublisher {
             tenantId: input.tenantId,
             ownerUserId: input.ownerUserId,
             ownerDisplayName: input.ownerDisplayName,
+            ownerPhoneticName: input.ownerPhoneticName,
             ownerTimezone: input.ownerTimezone,
             ownerLocale: input.ownerLocale,
             ownerEmail: input.ownerEmail,

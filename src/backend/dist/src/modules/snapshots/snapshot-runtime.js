@@ -20,6 +20,7 @@ import { SqsSnapshotJobPublisher, NoopSnapshotJobPublisher } from './sqs-snapsho
 import { TodoistTaskClientImpl } from './todoist-task-client.js';
 import { NightlyRefreshService } from './nightly-refresh-service.js';
 import { XkcdClientImpl } from './xkcd-client.js';
+import { NatGeoDailyPhotoClientImpl } from './natgeo-daily-photo-client.js';
 export function createSnapshotService() {
     const prisma = getPrismaClient();
     let googleCalendarOAuthClient;
@@ -44,7 +45,7 @@ export function createSnapshotService() {
             }
         };
     }
-    return new SnapshotService(new PrismaSnapshotRepository(prisma), new PrismaRssFeedRepository(prisma), new OpenMeteoWeatherClient(), new TodoistTaskClientImpl(), new GoogleCalendarClientImpl(), googleCalendarOAuthClient, new GmailClientImpl(), gmailOAuthClient, new HttpRssFeedClient(), new OpenAiNewsSummarizer(), new XkcdClientImpl(), new TenantAiConfigurationService(new PrismaTenantAiConfigurationRepository(prisma)));
+    return new SnapshotService(new PrismaSnapshotRepository(prisma), new PrismaRssFeedRepository(prisma), new OpenMeteoWeatherClient(), new TodoistTaskClientImpl(), new GoogleCalendarClientImpl(), googleCalendarOAuthClient, new GmailClientImpl(), gmailOAuthClient, new HttpRssFeedClient(), new OpenAiNewsSummarizer(), new XkcdClientImpl(), new TenantAiConfigurationService(new PrismaTenantAiConfigurationRepository(prisma)), new NatGeoDailyPhotoClientImpl());
 }
 export function createSnapshotJobPublisherFromEnvironment() {
     const config = getSnapshotQueueConfig();

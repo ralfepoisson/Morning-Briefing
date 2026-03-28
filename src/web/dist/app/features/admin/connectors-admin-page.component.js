@@ -78,6 +78,8 @@
       '        <input id="adminOpenAiBaseUrl" class="form-control form-control-lg" type="text" ng-if="$ctrl.selectedConnection.type === \'openai\'" ng-model="$ctrl.form.baseUrl" placeholder="https://api.openai.com" />' +
       '        <label class="form-label mt-3" for="adminCalendarId" ng-if="$ctrl.selectedConnection.type === \'google-calendar\'">Google Calendar ID</label>' +
       '        <input id="adminCalendarId" class="form-control form-control-lg" type="text" ng-if="$ctrl.selectedConnection.type === \'google-calendar\'" ng-model="$ctrl.form.calendarId" placeholder="team@example.com" />' +
+      '        <p class="connectors-panel-copy" ng-if="$ctrl.selectedConnection.type === \'gmail\'">This connection uses OAuth. Reconnect the Google account here if Gmail access needs to be refreshed.</p>' +
+      '        <p class="connectors-panel-copy" ng-if="$ctrl.selectedConnection.type === \'gmail\' && $ctrl.selectedConnection.config && $ctrl.selectedConnection.config.accountEmail">Connected account: <strong>{{$ctrl.selectedConnection.config.accountEmail}}</strong></p>' +
       '        <div class="message-broker-panel mt-4">' +
       '          <div class="connectors-panel-header">' +
       '            <div class="eyebrow">Widget Usage</div>' +
@@ -113,6 +115,7 @@
       '        </div>' +
       '        <div class="modal-actions modal-actions--page">' +
       '          <button type="button" class="btn btn-outline-light" ng-if="$ctrl.selectedConnection.type === \'google-calendar\'" ng-click="$ctrl.reconnectGoogleCalendar()" ng-disabled="$ctrl.isSaving">Reconnect Google</button>' +
+      '          <button type="button" class="btn btn-outline-light" ng-if="$ctrl.selectedConnection.type === \'gmail\'" ng-click="$ctrl.reconnectGmail()" ng-disabled="$ctrl.isSaving">Reconnect Google</button>' +
       '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.resetForm()" ng-disabled="$ctrl.isSaving">Reset</button>' +
       '          <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.isSaving || !$ctrl.form.name">Save changes</button>' +
       '        </div>' +
@@ -175,6 +178,16 @@
 
       ConnectionService.startGoogleCalendarOAuth($window.location.href, $ctrl.selectedConnection.id).catch(function handleReconnectError(error) {
         NotificationService.error(getErrorMessage(error, 'Unable to start Google Calendar reconnection right now.'), 'Unable to reconnect Google Calendar');
+      });
+    };
+
+    $ctrl.reconnectGmail = function reconnectGmail() {
+      if (!$ctrl.selectedConnection || $ctrl.selectedConnection.type !== 'gmail') {
+        return;
+      }
+
+      ConnectionService.startGmailOAuth($window.location.href, $ctrl.selectedConnection.id).catch(function handleReconnectError(error) {
+        NotificationService.error(getErrorMessage(error, 'Unable to start Gmail reconnection right now.'), 'Unable to reconnect Gmail');
       });
     };
 

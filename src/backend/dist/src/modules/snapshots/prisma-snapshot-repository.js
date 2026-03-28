@@ -52,14 +52,6 @@ export class PrismaSnapshotRepository {
                 dashboardId,
                 userId
             },
-            include: {
-                widgetSnapshots: {
-                    orderBy: [
-                        { generatedAt: 'desc' },
-                        { id: 'asc' }
-                    ]
-                }
-            },
             orderBy: [
                 { snapshotDate: 'desc' },
                 { generatedAt: 'desc' }
@@ -68,15 +60,80 @@ export class PrismaSnapshotRepository {
         if (!snapshot) {
             return null;
         }
+        const eligibleWidgets = await this.prisma.dashboardWidget.findMany({
+            where: {
+                dashboardId,
+                archivedAt: null,
+                isVisible: true,
+                refreshMode: {
+                    in: ['SNAPSHOT', 'HYBRID']
+                }
+            },
+            orderBy: [
+                { sortOrder: 'asc' },
+                { createdAt: 'asc' }
+            ]
+        });
+        const widgetSnapshots = eligibleWidgets.length
+            ? await this.prisma.widgetSnapshot.findMany({
+                where: {
+                    dashboardWidgetId: {
+                        in: eligibleWidgets.map(function mapWidget(widget) {
+                            return widget.id;
+                        })
+                    },
+                    snapshot: {
+                        userId
+                    }
+                },
+                include: {
+                    snapshot: {
+                        select: {
+                            snapshotDate: true
+                        }
+                    }
+                },
+                orderBy: [
+                    {
+                        snapshot: {
+                            snapshotDate: 'desc'
+                        }
+                    },
+                    { generatedAt: 'desc' },
+                    { id: 'asc' }
+                ]
+            })
+            : [];
+        const latestWidgetSnapshots = [];
+        const seenWidgetIds = new Set();
+        for (const widgetSnapshot of widgetSnapshots) {
+            if (seenWidgetIds.has(widgetSnapshot.dashboardWidgetId)) {
+                continue;
+            }
+            seenWidgetIds.add(widgetSnapshot.dashboardWidgetId);
+            latestWidgetSnapshots.push(widgetSnapshot);
+        }
+        const selectedSnapshotDate = latestWidgetSnapshots.reduce(function reduceLatestDate(currentLatest, widgetSnapshot) {
+            return widgetSnapshot.snapshot.snapshotDate > currentLatest
+                ? widgetSnapshot.snapshot.snapshotDate
+                : currentLatest;
+        }, snapshot.snapshotDate);
+        const selectedGeneratedAt = latestWidgetSnapshots.reduce(function reduceLatestGeneratedAt(currentLatest, widgetSnapshot) {
+            return widgetSnapshot.generatedAt > currentLatest
+                ? widgetSnapshot.generatedAt
+                : currentLatest;
+        }, snapshot.generatedAt);
+        const generationStatus = computeDashboardSnapshotStatus(eligibleWidgets, latestWidgetSnapshots);
+        const summary = buildDashboardSummary(latestWidgetSnapshots);
         return {
             id: snapshot.id,
             dashboardId: snapshot.dashboardId,
             userId: snapshot.userId,
-            snapshotDate: snapshot.snapshotDate.toISOString().slice(0, 10),
-            generationStatus: snapshot.generationStatus,
-            summary: asObject(snapshot.summaryJson),
-            generatedAt: snapshot.generatedAt,
-            widgets: snapshot.widgetSnapshots.map(mapWidgetSnapshotRecord)
+            snapshotDate: selectedSnapshotDate.toISOString().slice(0, 10),
+            generationStatus,
+            summary,
+            generatedAt: selectedGeneratedAt,
+            widgets: latestWidgetSnapshots.map(mapWidgetSnapshotRecord)
         };
     }
     async upsertDashboardSnapshot(input) {

@@ -28,7 +28,7 @@ export class WidgetService {
         widgetId: widget.id,
         dashboardId: widget.dashboardId,
         tenantId: widget.tenantId,
-        userId: widget.ownerUserId,
+        userId: widget.ownerUserId || input.ownerUserId,
         widgetConfigVersion: widget.version,
         widgetConfigHash: widget.configHash,
         snapshotDate: formatSnapshotDateForTimezone(new Date(), input.timezone || 'UTC'),
@@ -49,7 +49,7 @@ export class WidgetService {
         widgetId: widget.id,
         dashboardId: widget.dashboardId,
         tenantId: widget.tenantId,
-        userId: widget.ownerUserId,
+        userId: widget.ownerUserId || input.ownerUserId,
         widgetConfigVersion: widget.version,
         widgetConfigHash: widget.configHash,
         snapshotDate: formatSnapshotDateForTimezone(new Date(), input.timezone || 'UTC'),
@@ -79,6 +79,7 @@ function toResponse(widget: {
   minWidth: number;
   minHeight: number;
   isVisible: boolean;
+  isGenerating: boolean;
   sortOrder: number;
   data: Record<string, unknown>;
   config: Record<string, unknown>;
@@ -100,6 +101,7 @@ function toResponse(widget: {
     minWidth: widget.minWidth,
     minHeight: widget.minHeight,
     isVisible: widget.isVisible,
+    isGenerating: widget.isGenerating,
     sortOrder: widget.sortOrder,
     config: widget.config,
     includeInBriefingDefault: widget.includeInBriefingDefault,

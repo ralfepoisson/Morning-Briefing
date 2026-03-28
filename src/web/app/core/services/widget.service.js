@@ -116,13 +116,15 @@
           })
           : null;
 
-        widget.isLoading = false;
-
         if (!snapshotWidget || !snapshotWidget.content) {
+          widget.isLoading = !!widget.isGenerating;
           return;
         }
 
+        widget.isLoading = snapshotWidget.status === 'PENDING';
+        widget.isGenerating = snapshotWidget.status === 'PENDING';
         widget.data = snapshotWidget.content;
+        widget.errorMessage = snapshotWidget.errorMessage || '';
 
         if (widget.type === 'weather') {
           widget.title = 'Weather Outlook';
@@ -146,6 +148,10 @@
 
         if (widget.type === 'xkcd') {
           widget.title = 'Latest xkcd';
+        }
+
+        if (widget.type === 'natgeo-daily-photo') {
+          widget.title = 'NatGeo Daily Photo';
         }
       });
 
@@ -173,6 +179,7 @@
         includeInBriefingDefault: widgetPayload.includeInBriefingDefault,
         includeInBriefingOverride: widgetPayload.includeInBriefingOverride,
         includeInBriefing: widgetPayload.includeInBriefing,
+        isGenerating: widgetPayload.isGenerating === true,
         data: widgetPayload.data,
         location: widgetPayload.data && widgetPayload.data.location,
         temperature: widgetPayload.data && widgetPayload.data.temperature,
@@ -193,6 +200,8 @@
         imageUrl: widgetPayload.data && widgetPayload.data.imageUrl,
         permalink: widgetPayload.data && widgetPayload.data.permalink,
         publishedAt: widgetPayload.data && widgetPayload.data.publishedAt,
+        description: widgetPayload.data && widgetPayload.data.description,
+        credit: widgetPayload.data && widgetPayload.data.credit,
         isLoading: widgetPayload.isLoading !== undefined ? widgetPayload.isLoading : true
       });
     }

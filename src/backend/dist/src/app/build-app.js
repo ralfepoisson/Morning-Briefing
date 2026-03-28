@@ -67,5 +67,6 @@ function isProtectedApiRoute(url) {
     if (!pathname.startsWith('/api/v1')) {
         return false;
     }
-    return pathname !== '/api/v1/connections/google-calendar/oauth/callback';
+    return pathname !== '/api/v1/connections/google-calendar/oauth/callback'
+        && pathname !== '/api/v1/connections/gmail/oauth/callback';
 }

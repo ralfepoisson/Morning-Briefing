@@ -60,6 +60,9 @@ test('DashboardBriefingService reuses latest ready briefing when source hash is 
       resolveStoragePath(storageKey) {
         return storageKey;
       }
+    },
+    {
+      async deliverGeneratedAudio() {}
     }
   );
 
@@ -146,6 +149,9 @@ test('DashboardBriefingService toggles dashboard generating state around fresh g
       resolveStoragePath(storageKey) {
         return storageKey;
       }
+    },
+    {
+      async deliverGeneratedAudio() {}
     }
   );
 
@@ -155,6 +161,106 @@ test('DashboardBriefingService toggles dashboard generating state around fresh g
     { dashboardId: 'dash-1', ownerUserId: 'user-1', isGenerating: true },
     { dashboardId: 'dash-1', ownerUserId: 'user-1', isGenerating: false }
   ]);
+});
+
+test('DashboardBriefingService delivers generated audio after the briefing is ready', async function () {
+  const calls = {
+    delivered: [] as Array<Record<string, unknown>>
+  };
+  const repository = createRepository();
+  repository.createBriefing = async function createBriefing() {
+    return {
+      ...createBriefingRecord(),
+      status: 'GENERATING'
+    };
+  };
+  repository.createAudio = async function createAudio() {
+    return createBriefingRecord().audio;
+  };
+  repository.updateBriefing = async function updateBriefing() {
+    return createBriefingRecord();
+  };
+  const service = new DashboardBriefingService(
+    repository,
+    {
+      async buildInput() {
+        return {
+          input: {
+            tenantId: 'tenant-1',
+            dashboardId: 'dash-1',
+            dashboardName: 'Morning Briefing',
+            generatedAt: '2026-03-25T06:00:00.000Z',
+            language: 'en-GB',
+            tone: 'calm, concise, professional',
+            targetDurationSeconds: 75,
+            sections: [
+              {
+                widgetId: 'weather-1',
+                widgetType: 'weather',
+                title: 'Weather Outlook',
+                importance: 'high',
+                content: {
+                  summary: 'Sunny'
+                }
+              }
+            ]
+          },
+          sourceSnapshotHash: 'fresh-hash',
+          includedWidgetTypes: ['weather'],
+          skippedWidgets: []
+        };
+      }
+    },
+    {
+      getModelName() {
+        return 'stub-template';
+      },
+      async generateScript() {
+        return {
+          title: 'Morning Briefing',
+          estimatedDurationSeconds: 60,
+          fullScript: 'Sunny today.'
+        };
+      }
+    },
+    {
+      getProviderName() {
+        return 'stub-wave';
+      },
+      async generateAndStore() {
+        return {
+          provider: 'stub-wave',
+          voiceName: 'default',
+          storageKey: 'audio-briefings/briefing-1/audio-1.wav',
+          mimeType: 'audio/wav',
+          durationSeconds: 60,
+          generatedAt: new Date('2026-03-25T06:05:00.000Z')
+        };
+      },
+      resolveStoragePath(storageKey) {
+        return '/tmp/' + storageKey;
+      }
+    },
+    {
+      async deliverGeneratedAudio(input) {
+        calls.delivered.push(input);
+      }
+    }
+  );
+
+  const result = await service.generateBriefing('dash-1', createUser(), { force: true });
+
+  assert.equal(result && result.reused, false);
+  assert.equal(calls.delivered.length, 1);
+  assert.deepEqual(calls.delivered[0], {
+    user: createUser(),
+    briefing: result && result.briefing,
+    audio: result && result.briefing.audio,
+    storagePath: '/tmp/audio-briefings/briefing-1/audio-1.wav',
+    deliveryContext: {
+      jobId: null
+    }
+  });
 });
 
 function createRepository(calls = { generating: [] as Array<{ dashboardId: string; ownerUserId: string; isGenerating: boolean }> }): DashboardBriefingRepository {
@@ -234,6 +340,7 @@ function createUser() {
     tenantId: 'tenant-1',
     userId: 'user-1',
     displayName: 'Ralfe',
+    phoneticName: 'Ralf',
     timezone: 'Europe/Paris',
     locale: 'en-GB',
     email: 'ralfe@example.com',

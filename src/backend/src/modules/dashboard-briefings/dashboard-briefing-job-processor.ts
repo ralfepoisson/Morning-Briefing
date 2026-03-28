@@ -37,13 +37,15 @@ export class DashboardBriefingJobProcessor {
           tenantId: payload.tenantId,
           userId: payload.ownerUserId,
           displayName: payload.ownerDisplayName,
+          phoneticName: payload.ownerPhoneticName,
           timezone: payload.ownerTimezone,
           locale: payload.ownerLocale,
           email: payload.ownerEmail,
           isAdmin: payload.ownerIsAdmin
         },
         {
-          force: payload.force
+          force: payload.force,
+          jobId: payload.jobId
         }
       );
 
@@ -94,6 +96,7 @@ export function parseGenerateDashboardAudioBriefingMessage(body: string): Genera
     typeof payload.tenantId !== 'string' ||
     typeof payload.ownerUserId !== 'string' ||
     typeof payload.ownerDisplayName !== 'string' ||
+    (payload.ownerPhoneticName !== null && typeof payload.ownerPhoneticName !== 'string') ||
     typeof payload.ownerTimezone !== 'string' ||
     typeof payload.ownerLocale !== 'string' ||
     typeof payload.ownerEmail !== 'string' ||

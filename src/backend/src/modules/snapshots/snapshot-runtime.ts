@@ -21,6 +21,7 @@ import { SqsSnapshotJobPublisher, NoopSnapshotJobPublisher } from './sqs-snapsho
 import { TodoistTaskClientImpl } from './todoist-task-client.js';
 import { NightlyRefreshService } from './nightly-refresh-service.js';
 import { XkcdClientImpl } from './xkcd-client.js';
+import { NatGeoDailyPhotoClientImpl } from './natgeo-daily-photo-client.js';
 
 export function createSnapshotService(): SnapshotService {
   const prisma = getPrismaClient();
@@ -59,7 +60,8 @@ export function createSnapshotService(): SnapshotService {
     new HttpRssFeedClient(),
     new OpenAiNewsSummarizer(),
     new XkcdClientImpl(),
-    new TenantAiConfigurationService(new PrismaTenantAiConfigurationRepository(prisma))
+    new TenantAiConfigurationService(new PrismaTenantAiConfigurationRepository(prisma)),
+    new NatGeoDailyPhotoClientImpl()
   );
 }
 

@@ -25,6 +25,7 @@ export class ScheduledDashboardBriefingRefreshService {
                 tenantId: dashboard.tenantId,
                 ownerUserId: dashboard.owner.id,
                 ownerDisplayName: dashboard.owner.displayName,
+                ownerPhoneticName: dashboard.owner.phoneticName,
                 ownerTimezone: dashboard.owner.timezone,
                 ownerLocale: dashboard.owner.locale,
                 ownerEmail: dashboard.owner.email,

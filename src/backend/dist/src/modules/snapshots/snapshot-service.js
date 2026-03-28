@@ -1,5 +1,6 @@
 import { logApplicationEvent } from '../admin/application-logger.js';
 import { XkcdClientImpl } from './xkcd-client.js';
+import { NatGeoDailyPhotoClientImpl } from './natgeo-daily-photo-client.js';
 export class SnapshotService {
     repository;
     rssFeedRepository;
@@ -13,6 +14,7 @@ export class SnapshotService {
     openAiNewsSummarizer;
     xkcdClient;
     tenantAiConfigurationService;
+    natGeoDailyPhotoClient;
     constructor(repository, rssFeedRepository, weatherClient, todoistTaskClient, googleCalendarClient, googleCalendarOAuthClient, gmailClient = {
         async listMessages() {
             throw new Error('Gmail is not configured.');
@@ -25,7 +27,7 @@ export class SnapshotService {
         async getRequiredOpenAiConfiguration() {
             throw new Error('OpenAI configuration is missing. Add the API key in Admin > Configuration.');
         }
-    }) {
+    }, natGeoDailyPhotoClient = new NatGeoDailyPhotoClientImpl()) {
         this.repository = repository;
         this.rssFeedRepository = rssFeedRepository;
         this.weatherClient = weatherClient;
@@ -38,6 +40,7 @@ export class SnapshotService {
         this.openAiNewsSummarizer = openAiNewsSummarizer;
         this.xkcdClient = xkcdClient;
         this.tenantAiConfigurationService = tenantAiConfigurationService;
+        this.natGeoDailyPhotoClient = natGeoDailyPhotoClient;
     }
     async generateForWidget(message) {
         const widget = await this.repository.findWidgetForSnapshotGeneration(message.widgetId);
@@ -177,6 +180,9 @@ export class SnapshotService {
         }
         if (widget.type === 'xkcd') {
             return this.buildXkcdWidgetSnapshot(widget, generatedAt);
+        }
+        if (widget.type === 'natgeo-daily-photo') {
+            return this.buildNatGeoDailyPhotoWidgetSnapshot(widget, generatedAt);
         }
         if (widget.type === 'calendar') {
             return this.buildCalendarWidgetSnapshot(widget, generatedAt);
@@ -547,6 +553,47 @@ export class SnapshotService {
                     sourceErrors
                 },
                 errorMessage,
+                generatedAt
+            };
+        }
+    }
+    async buildNatGeoDailyPhotoWidgetSnapshot(widget, generatedAt) {
+        try {
+            const photo = await this.natGeoDailyPhotoClient.getDailyPhoto();
+            return {
+                widgetId: widget.id,
+                widgetType: widget.type,
+                title: widget.title,
+                status: 'READY',
+                content: {
+                    title: photo.title,
+                    description: photo.description,
+                    imageUrl: photo.imageUrl,
+                    altText: photo.altText,
+                    permalink: photo.permalink,
+                    credit: photo.credit,
+                    emptyMessage: ''
+                },
+                errorMessage: null,
+                generatedAt
+            };
+        }
+        catch (error) {
+            return {
+                widgetId: widget.id,
+                widgetType: widget.type,
+                title: widget.title,
+                status: 'FAILED',
+                content: {
+                    title: 'NatGeo Daily Photo unavailable',
+                    description: 'The latest National Geographic Photo of the Day could not be loaded right now.',
+                    imageUrl: '',
+                    altText: 'The latest National Geographic Photo of the Day could not be loaded right now.',
+                    permalink: 'https://www.nationalgeographic.com/photo-of-the-day/',
+                    credit: '',
+                    emptyMessage: 'The latest National Geographic Photo of the Day could not be loaded right now. Please try again.'
+                },
+                errorMessage: error instanceof Error ? error.message : 'NatGeo Daily Photo snapshot generation failed.',
                 generatedAt
             };
         }
@@ -965,6 +1012,12 @@ function buildSummary(widgets) {
     });
     if (xkcdWidget && typeof xkcdWidget.content.title === 'string' && xkcdWidget.content.title.trim()) {
         return `Latest xkcd: ${xkcdWidget.content.title}.`;
+    }
+    const natGeoWidget = widgets.find(function findNatGeoWidget(widget) {
+        return widget.widgetType === 'natgeo-daily-photo' && widget.status === 'READY';
+    });
+    if (natGeoWidget && typeof natGeoWidget.content.title === 'string' && natGeoWidget.content.title.trim()) {
+        return `NatGeo Daily Photo: ${natGeoWidget.content.title}.`;
     }
     return 'Latest dashboard snapshot generated.';
 }

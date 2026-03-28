@@ -14,6 +14,7 @@ import type { GenerateWidgetSnapshotRequested } from './snapshot-job-types.js';
 import type { TodoistTask, TodoistTaskClient } from './todoist-task-client.js';
 import type { PersistedNewsArticleRecord, SnapshotRepository } from './snapshot-repository.js';
 import { XkcdClientImpl, type XkcdClient } from './xkcd-client.js';
+import { NatGeoDailyPhotoClientImpl, type NatGeoDailyPhotoClient } from './natgeo-daily-photo-client.js';
 import type {
   DashboardSnapshotRecord,
   DashboardSnapshotResponse,
@@ -45,7 +46,8 @@ export class SnapshotService {
       async getRequiredOpenAiConfiguration() {
         throw new Error('OpenAI configuration is missing. Add the API key in Admin > Configuration.');
       }
-    }
+    },
+    private readonly natGeoDailyPhotoClient: Pick<NatGeoDailyPhotoClient, 'getDailyPhoto'> = new NatGeoDailyPhotoClientImpl()
   ) {}
 
   async generateForWidget(message: GenerateWidgetSnapshotRequested): Promise<{
@@ -221,6 +223,10 @@ export class SnapshotService {
 
     if (widget.type === 'xkcd') {
       return this.buildXkcdWidgetSnapshot(widget, generatedAt);
+    }
+
+    if (widget.type === 'natgeo-daily-photo') {
+      return this.buildNatGeoDailyPhotoWidgetSnapshot(widget, generatedAt);
     }
 
     if (widget.type === 'calendar') {
@@ -617,6 +623,51 @@ export class SnapshotService {
           sourceErrors
         },
         errorMessage,
+        generatedAt
+      };
+    }
+  }
+
+  private async buildNatGeoDailyPhotoWidgetSnapshot(
+    widget: DashboardWidgetRecord,
+    generatedAt: Date
+  ): Promise<DashboardSnapshotWidgetRecord> {
+    try {
+      const photo = await this.natGeoDailyPhotoClient.getDailyPhoto();
+
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'READY',
+        content: {
+          title: photo.title,
+          description: photo.description,
+          imageUrl: photo.imageUrl,
+          altText: photo.altText,
+          permalink: photo.permalink,
+          credit: photo.credit,
+          emptyMessage: ''
+        },
+        errorMessage: null,
+        generatedAt
+      };
+    } catch (error) {
+      return {
+        widgetId: widget.id,
+        widgetType: widget.type,
+        title: widget.title,
+        status: 'FAILED',
+        content: {
+          title: 'NatGeo Daily Photo unavailable',
+          description: 'The latest National Geographic Photo of the Day could not be loaded right now.',
+          imageUrl: '',
+          altText: 'The latest National Geographic Photo of the Day could not be loaded right now.',
+          permalink: 'https://www.nationalgeographic.com/photo-of-the-day/',
+          credit: '',
+          emptyMessage: 'The latest National Geographic Photo of the Day could not be loaded right now. Please try again.'
+        },
+        errorMessage: error instanceof Error ? error.message : 'NatGeo Daily Photo snapshot generation failed.',
         generatedAt
       };
     }
@@ -1102,6 +1153,14 @@ function buildSummary(widgets: DashboardSnapshotWidgetRecord[]): string {
 
   if (xkcdWidget && typeof xkcdWidget.content.title === 'string' && xkcdWidget.content.title.trim()) {
     return `Latest xkcd: ${xkcdWidget.content.title}.`;
+  }
+
+  const natGeoWidget = widgets.find(function findNatGeoWidget(widget) {
+    return widget.widgetType === 'natgeo-daily-photo' && widget.status === 'READY';
+  });
+
+  if (natGeoWidget && typeof natGeoWidget.content.title === 'string' && natGeoWidget.content.title.trim()) {
+    return `NatGeo Daily Photo: ${natGeoWidget.content.title}.`;
   }
 
   return 'Latest dashboard snapshot generated.';

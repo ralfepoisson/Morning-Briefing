@@ -14,6 +14,8 @@ GOOGLE_OAUTH_CLIENT_ID="${GOOGLE_OAUTH_CLIENT_ID:-}"
 GOOGLE_OAUTH_CLIENT_SECRET="${GOOGLE_OAUTH_CLIENT_SECRET:-}"
 GOOGLE_OAUTH_REDIRECT_URI="${GOOGLE_OAUTH_REDIRECT_URI:-https://${FRONTEND_DOMAIN_NAME}/api/v1/connections/google-calendar/oauth/callback}"
 GOOGLE_OAUTH_STATE_SECRET="${GOOGLE_OAUTH_STATE_SECRET:-}"
+TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
+TELEGRAM_API_BASE_URL="${TELEGRAM_API_BASE_URL:-https://api.telegram.org}"
 NIGHTLY_REFRESH_SCHEDULE="${NIGHTLY_REFRESH_SCHEDULE:-cron(0 4 * * ? *)}"
 FRONTEND_DESIRED_COUNT="${FRONTEND_DESIRED_COUNT:-1}"
 BACKEND_DESIRED_COUNT="${BACKEND_DESIRED_COUNT:-1}"
@@ -99,6 +101,14 @@ deploy_stack() {
 
   if [[ -n "${GOOGLE_OAUTH_STATE_SECRET}" ]]; then
     serverless_args+=(--param="googleOauthStateSecret=${GOOGLE_OAUTH_STATE_SECRET}")
+  fi
+
+  if [[ -n "${TELEGRAM_BOT_TOKEN}" ]]; then
+    serverless_args+=(--param="telegramBotToken=${TELEGRAM_BOT_TOKEN}")
+  fi
+
+  if [[ -n "${TELEGRAM_API_BASE_URL}" ]]; then
+    serverless_args+=(--param="telegramApiBaseUrl=${TELEGRAM_API_BASE_URL}")
   fi
 
   (

@@ -76,6 +76,21 @@ The worker long-polls SQS, processes available widget snapshot and dashboard aud
 
 This script only enqueues per-widget refresh commands. It does not do the heavy snapshot generation work itself.
 
+### Run the daily local scheduler
+
+- `npm run scheduler:local`
+- or from the repo root: `./scripts/start_scheduler.sh`
+- or start the normal backend dev process with `./scripts/start_backend.sh` or `./scripts/start_dev_env.sh`
+
+The local scheduler keeps two UTC jobs alive:
+
+- widget snapshot refresh at `01:00` UTC
+- dashboard audio briefing refresh at `05:00` UTC
+
+`./scripts/start_backend.sh` exports `LOCAL_SCHEDULER_ENABLED=true`, so the scheduler now starts inside the local backend dev process by default.
+
+When started through `./scripts/start_scheduler.sh`, output is written to `src/backend/data/local-scheduler.log`.
+
 ## Environment Variables
 
 - `SNAPSHOT_QUEUE_ENABLED`: toggles queue publishing

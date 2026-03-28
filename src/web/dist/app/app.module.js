@@ -10,6 +10,7 @@
     baseUrl: runtimeConfig.apiBaseUrl || (window.location.protocol + '//' + defaultApiHost + ':3000/api/v1')
   }).constant('AuthConfig', {
     signInUrl: runtimeConfig.authServiceSignInUrl || '',
+    applicationId: runtimeConfig.authServiceApplicationId || '',
     signOutUrl: runtimeConfig.authServiceSignOutUrl || '',
     appBaseUrl: runtimeConfig.appBaseUrl || buildDefaultAppBaseUrl()
   }).config(httpConfig);

@@ -33,9 +33,12 @@ export class DashboardBriefingPromptService {
   }
 
   buildFallbackScript(input: DashboardBriefingInput): DashboardBriefingScript {
-    const fullScript = input.sections.map(function mapSection(section) {
-      return buildFallbackSectionScript(section);
-    }).filter(Boolean).join(' ').trim();
+    const fullScript = [
+      buildGreeting(input.listener),
+      ...input.sections.map(function mapSection(section) {
+        return buildFallbackSectionScript(section);
+      })
+    ].filter(Boolean).join(' ').trim();
 
     return {
       title: `${input.dashboardName} Audio Briefing`,
@@ -59,6 +62,16 @@ function normalizeScriptText(content: string): string {
   }
 
   return script;
+}
+
+function buildGreeting(listener: DashboardBriefingInput['listener']): string {
+  const name = readStringOrNull(listener.phoneticName) || readStringOrNull(listener.firstName);
+
+  if (name) {
+    return `Hi there ${name}.`;
+  }
+
+  return 'Hi there.';
 }
 
 function buildFallbackSectionScript(section: {
@@ -135,4 +148,8 @@ function buildFallbackSectionScript(section: {
 
 function readString(value: unknown, fallback: string): string {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+}
+
+function readStringOrNull(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }

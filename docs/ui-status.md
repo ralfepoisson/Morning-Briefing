@@ -4,7 +4,7 @@ This document tracks the current state of the web UI MVP under `src/web/`.
 
 ## Current status
 
-The frontend currently exists as a Bootstrap + AngularJS single-page application. Dashboard list, widget CRUD, and weather widget configuration now target the backend REST API, while widget content itself remains mocked in the UI/backend definition layer.
+The frontend currently exists as a Bootstrap + AngularJS single-page application. Dashboard list, widget CRUD, and weather widget configuration now target the backend REST API. Snapshot-based widgets now prefer explicit loading or failure states instead of seeded mock content while data is pending.
 
 ## Implemented
 
@@ -25,6 +25,7 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 - Dashboard creation action inside the top navigation dropdown
 - Simplified top navigation with secondary sections removed from the main bar
 - Compact branding treatment using the provided logo assets
+- Username/avatar button in the top right now opens a dedicated user profile page
 
 ### Dashboard workspace
 
@@ -48,15 +49,15 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 
 ### Weather widget
 
-- Mocked weather widget implemented
-- Weather tile includes current conditions, supporting summary, and detail chips
+- Snapshot-backed weather widget implemented
+- Weather tile includes current conditions, supporting summary, and detail chips when a snapshot is available
 - Weather widget can be configured with a city in dashboard edit mode
 - Weather location search uses backend reference-city endpoints
 
 ### Calendar widget
 
-- Mocked calendar widget implemented
-- Calendar tile shows same-day appointments
+- Snapshot-backed calendar widget implemented
+- Calendar tile shows same-day appointments when snapshot data is available
 - Each appointment shows time, title, and location
 - Calendar tile supports vertical resizing in edit mode
 
@@ -74,18 +75,36 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 - Todoist connections can be renamed and have their API key replaced from the Connectors page
 - Task-widget connection creation remains available from widget edit mode
 
+### Admin operations
+
+- The Widget Admin page lists the latest snapshot result for every widget
+- Admins can manually queue snapshot regeneration per widget or for all snapshot-backed widgets in one action
+
+### User profile and delivery configuration
+
+- Dedicated Profile page under `#/profile`
+- Users can edit display name, phonetic name, email address, profile image, and timezone
+- Generated briefing audio now greets the user with their phonetic name first, then their first name, then a generic greeting
+- Profile data now persists through the backend `users/me` API instead of being treated as auth-token-only metadata
+- Profile image uploads are stored with the user profile as base64 image data
+- Large profile images are resized in the browser before they are saved
+- Timezone selection now uses a dropdown built from browser-supported IANA timezones
+- Profile configuration includes Telegram delivery preferences for generated dashboard audio briefings
+- Telegram delivery is modeled under a channel-based `briefingDelivery` shape so WhatsApp and Discord can be added later without reshaping the page
+
 ## Current limitations
 
-- Some widget states still fall back to mocked previews while configuration is being staged in edit mode
+- Widgets depend on snapshot persistence, so newly configured widgets may briefly show a loading state until the first snapshot is available
 - Dashboard metadata updates are only partially wired and broader dashboard management is still minimal
 - Layout editing is custom and lightweight rather than using a dedicated dashboard grid library
 - Widget resizing is currently implemented only for calendar widgets
 - Weather, calendar, task, and email widgets expose meaningful configuration flows, while other widgets remain simpler
+- Telegram delivery still depends on server-side bot credentials being configured in the backend environment
 
 ## Next likely UI steps
 
 - Add more widget types to the widget library
 - Add richer configuration for newly introduced providers across calendar, email, and task widgets
 - Improve dashboard switching and multi-dashboard management
-- Connect widgets to snapshot-backed or live data
+- Add richer delivery-channel onboarding help and channel testing flows
 - Refine spacing, responsive behaviour, and visual polish across themes
