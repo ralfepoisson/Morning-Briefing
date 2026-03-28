@@ -16,6 +16,8 @@ GOOGLE_OAUTH_REDIRECT_URI="${GOOGLE_OAUTH_REDIRECT_URI:-https://${FRONTEND_DOMAI
 GOOGLE_OAUTH_STATE_SECRET="${GOOGLE_OAUTH_STATE_SECRET:-}"
 TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 TELEGRAM_API_BASE_URL="${TELEGRAM_API_BASE_URL:-https://api.telegram.org}"
+LIFE2_JWT_SECRET="${LIFE2_JWT_SECRET:-}"
+LIFE2_JWT_PUBLIC_KEY="${LIFE2_JWT_PUBLIC_KEY:-}"
 NIGHTLY_REFRESH_SCHEDULE="${NIGHTLY_REFRESH_SCHEDULE:-cron(0 4 * * ? *)}"
 FRONTEND_DESIRED_COUNT="${FRONTEND_DESIRED_COUNT:-1}"
 BACKEND_DESIRED_COUNT="${BACKEND_DESIRED_COUNT:-1}"
@@ -109,6 +111,14 @@ deploy_stack() {
 
   if [[ -n "${TELEGRAM_API_BASE_URL}" ]]; then
     serverless_args+=(--param="telegramApiBaseUrl=${TELEGRAM_API_BASE_URL}")
+  fi
+
+  if [[ -n "${LIFE2_JWT_SECRET}" ]]; then
+    serverless_args+=(--param="life2JwtSecret=${LIFE2_JWT_SECRET}")
+  fi
+
+  if [[ -n "${LIFE2_JWT_PUBLIC_KEY}" ]]; then
+    serverless_args+=(--param="life2JwtPublicKey=${LIFE2_JWT_PUBLIC_KEY}")
   fi
 
   (

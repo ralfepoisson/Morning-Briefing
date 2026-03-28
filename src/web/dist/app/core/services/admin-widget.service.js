@@ -19,5 +19,13 @@
         return response.data;
       });
     };
+
+    this.regenerateAllSnapshots = function regenerateAllSnapshots() {
+      return $http.post(ApiConfig.baseUrl + '/admin/widgets/regenerate-all-snapshots', {
+        bypassDuplicateCheck: true
+      }).then(function handleResponse(response) {
+        return response.data;
+      });
+    };
   }
 })();

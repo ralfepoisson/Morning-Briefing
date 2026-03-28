@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { buildApp } from './build-app.js';
 import { logApplicationEvent } from '../modules/admin/application-logger.js';
 import { isLocalDevSchedulerEnabled, startLocalDevScheduler } from '../modules/scheduling/local-dev-scheduler.js';
+import { isLocalDevSnapshotWorkerEnabled, startLocalDevSnapshotWorker } from '../modules/scheduling/local-dev-worker.js';
 const port = Number(process.env.PORT || 3000);
 const host = process.env.HOST || '127.0.0.1';
 async function start() {
@@ -23,6 +24,9 @@ async function start() {
         });
         if (isLocalDevSchedulerEnabled()) {
             startLocalDevScheduler();
+        }
+        if (isLocalDevSnapshotWorkerEnabled()) {
+            startLocalDevSnapshotWorker();
         }
     }
     catch (error) {

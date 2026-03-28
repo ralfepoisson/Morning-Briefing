@@ -7,8 +7,7 @@ test('DashboardBriefingPromptService fallback script prefers listener phonetic n
   const service = new DashboardBriefingPromptService();
 
   const result = service.buildFallbackScript(createInput({
-    phoneticName: 'Ralf',
-    firstName: 'Ralfe'
+    greetingName: 'Ralf'
   }));
 
   assert.match(result.fullScript, /^Hi there Ralf\./);
@@ -18,8 +17,7 @@ test('DashboardBriefingPromptService fallback script falls back to first name wh
   const service = new DashboardBriefingPromptService();
 
   const result = service.buildFallbackScript(createInput({
-    phoneticName: null,
-    firstName: 'Ralfe'
+    greetingName: 'Ralfe'
   }));
 
   assert.match(result.fullScript, /^Hi there Ralfe\./);
@@ -29,8 +27,7 @@ test('DashboardBriefingPromptService fallback script uses a generic greeting whe
   const service = new DashboardBriefingPromptService();
 
   const result = service.buildFallbackScript(createInput({
-    phoneticName: null,
-    firstName: null
+    greetingName: null
   }));
 
   assert.match(result.fullScript, /^Hi there\./);

@@ -33,7 +33,65 @@ export class TelegramDashboardBriefingDeliveryChannel {
             }
         });
         const botToken = normalizeOptionalString(this.config.botToken);
-        if (!input.audio || !profile || !profile.telegramDeliveryEnabled || !normalizeOptionalString(profile.telegramChatId)) {
+        const normalizedChatId = normalizeOptionalString(profile && profile.telegramChatId);
+        const deliveryContext = {
+            ownerUserId: input.user.userId,
+            briefingId: input.briefing.id,
+            channel: 'telegram',
+            jobId: input.deliveryContext && typeof input.deliveryContext.jobId === 'string'
+                ? input.deliveryContext.jobId
+                : null
+        };
+        if (!input.audio) {
+            logApplicationEvent({
+                level: 'info',
+                scope: 'dashboard-briefing',
+                event: 'dashboard_briefing_delivery_skipped',
+                message: 'Telegram delivery skipped because no generated audio is available.',
+                context: {
+                    ...deliveryContext,
+                    reason: 'audio_missing'
+                }
+            });
+            return false;
+        }
+        if (!profile) {
+            logApplicationEvent({
+                level: 'warn',
+                scope: 'dashboard-briefing',
+                event: 'dashboard_briefing_delivery_skipped',
+                message: 'Telegram delivery skipped because the user profile could not be loaded.',
+                context: {
+                    ...deliveryContext,
+                    reason: 'profile_missing'
+                }
+            });
+            return false;
+        }
+        if (!profile.telegramDeliveryEnabled) {
+            logApplicationEvent({
+                level: 'info',
+                scope: 'dashboard-briefing',
+                event: 'dashboard_briefing_delivery_skipped',
+                message: 'Telegram delivery skipped because Telegram delivery is disabled for the user.',
+                context: {
+                    ...deliveryContext,
+                    reason: 'channel_disabled'
+                }
+            });
+            return false;
+        }
+        if (!normalizedChatId) {
+            logApplicationEvent({
+                level: 'warn',
+                scope: 'dashboard-briefing',
+                event: 'dashboard_briefing_delivery_skipped',
+                message: 'Telegram delivery skipped because no Telegram chat ID is configured for the user.',
+                context: {
+                    ...deliveryContext,
+                    reason: 'chat_id_missing'
+                }
+            });
             return false;
         }
         if (!botToken) {
@@ -43,8 +101,8 @@ export class TelegramDashboardBriefingDeliveryChannel {
                 event: 'dashboard_briefing_delivery_skipped',
                 message: 'Telegram delivery is enabled for the user, but no Telegram bot token is configured.',
                 context: {
-                    ownerUserId: input.user.userId,
-                    briefingId: input.briefing.id
+                    ...deliveryContext,
+                    reason: 'bot_token_missing'
                 }
             });
             return false;
@@ -52,7 +110,20 @@ export class TelegramDashboardBriefingDeliveryChannel {
         try {
             const audioBuffer = await readFile(input.storagePath);
             const formData = new FormData();
-            formData.set('chat_id', profile.telegramChatId.trim());
+            logApplicationEvent({
+                level: 'info',
+                scope: 'dashboard-briefing',
+                event: 'dashboard_briefing_delivery_attempt_started',
+                message: 'Starting Telegram delivery for dashboard briefing audio.',
+                context: {
+                    ...deliveryContext,
+                    chatIdSuffix: normalizedChatId.slice(-4),
+                    storagePath: input.storagePath,
+                    mimeType: input.audio.mimeType,
+                    fileSizeBytes: audioBuffer.byteLength
+                }
+            });
+            formData.set('chat_id', normalizedChatId);
             formData.set('caption', buildTelegramCaption(profile.displayName, input.briefing));
             formData.set('title', input.briefing.scriptJson && typeof input.briefing.scriptJson.title === 'string'
                 ? input.briefing.scriptJson.title
@@ -63,7 +134,8 @@ export class TelegramDashboardBriefingDeliveryChannel {
                 body: formData
             });
             if (!response.ok) {
-                throw new Error(`Telegram delivery failed with status ${response.status}.`);
+                const responseText = await response.text();
+                throw new Error(`Telegram delivery failed with status ${response.status}: ${truncateText(responseText, 500)}.`);
             }
             logApplicationEvent({
                 level: 'info',
@@ -71,9 +143,8 @@ export class TelegramDashboardBriefingDeliveryChannel {
                 event: 'dashboard_briefing_delivery_sent',
                 message: 'Dashboard briefing audio sent to Telegram.',
                 context: {
-                    ownerUserId: input.user.userId,
-                    briefingId: input.briefing.id,
-                    channel: 'telegram'
+                    ...deliveryContext,
+                    chatIdSuffix: normalizedChatId.slice(-4)
                 }
             });
             return true;
@@ -85,9 +156,8 @@ export class TelegramDashboardBriefingDeliveryChannel {
                 event: 'dashboard_briefing_delivery_channel_failed',
                 message: error instanceof Error ? error.message : 'Telegram delivery failed.',
                 context: {
-                    ownerUserId: input.user.userId,
-                    briefingId: input.briefing.id,
-                    channel: 'telegram',
+                    ...deliveryContext,
+                    chatIdSuffix: normalizedChatId.slice(-4),
                     ...toLogErrorContext(error)
                 }
             });
@@ -113,4 +183,10 @@ function normalizeOptionalString(value) {
         return null;
     }
     return value.trim();
+}
+function truncateText(value, maxLength) {
+    if (value.length <= maxLength) {
+        return value;
+    }
+    return value.slice(0, maxLength - 1) + '…';
 }

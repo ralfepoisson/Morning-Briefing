@@ -104,8 +104,7 @@ test('DashboardBriefingAggregationService builds structured input from eligible 
 
   assert.ok(result);
   assert.deepEqual(result.input.listener, {
-    phoneticName: 'Ralf',
-    firstName: 'Ralfe'
+    greetingName: 'Ralf'
   });
   assert.equal(result.input.sections.length, 2);
   assert.deepEqual(result.includedWidgetTypes, ['weather', 'tasks']);

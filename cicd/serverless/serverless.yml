@@ -22,6 +22,8 @@ custom:
   googleOauthStateSecret: ${param:googleOauthStateSecret, ''}
   telegramBotToken: ${param:telegramBotToken, ''}
   telegramApiBaseUrl: ${param:telegramApiBaseUrl, 'https://api.telegram.org'}
+  life2JwtSecret: ${param:life2JwtSecret, ''}
+  life2JwtPublicKey: ${param:life2JwtPublicKey, ''}
   frontendDesiredCount: ${param:frontendDesiredCount, 1}
   backendDesiredCount: ${param:backendDesiredCount, 1}
   workerDesiredCount: ${param:workerDesiredCount, 1}
@@ -42,6 +44,17 @@ provider:
     Stage: ${sls:stage}
 
 resources:
+  Conditions:
+    HasLife2JwtSecret:
+      Fn::Not:
+        - Fn::Equals:
+            - ${self:custom.life2JwtSecret}
+            - ''
+    HasLife2JwtPublicKey:
+      Fn::Not:
+        - Fn::Equals:
+            - ${self:custom.life2JwtPublicKey}
+            - ''
   Resources:
     AppVpc:
       Type: AWS::EC2::VPC
@@ -264,6 +277,8 @@ resources:
                     - !Ref DatabasePasswordSecret
                     - !Ref GoogleOauthClientSecretSecret
                     - !Ref GoogleOauthStateSecretSecret
+                    - !If [HasLife2JwtSecret, !Ref Life2JwtSecretSecret, !Ref AWS::NoValue]
+                    - !If [HasLife2JwtPublicKey, !Ref Life2JwtPublicKeySecret, !Ref AWS::NoValue]
 
     EcsTaskRole:
       Type: AWS::IAM::Role
@@ -319,6 +334,20 @@ resources:
       Properties:
         Name: ${self:custom.namePrefix}/oauth/google-state-secret
         SecretString: ${self:custom.googleOauthStateSecret}
+
+    Life2JwtSecretSecret:
+      Type: AWS::SecretsManager::Secret
+      Condition: HasLife2JwtSecret
+      Properties:
+        Name: ${self:custom.namePrefix}/auth/life2-jwt-secret
+        SecretString: ${self:custom.life2JwtSecret}
+
+    Life2JwtPublicKeySecret:
+      Type: AWS::SecretsManager::Secret
+      Condition: HasLife2JwtPublicKey
+      Properties:
+        Name: ${self:custom.namePrefix}/auth/life2-jwt-public-key
+        SecretString: ${self:custom.life2JwtPublicKey}
 
     DatabaseSubnetGroup:
       Type: AWS::RDS::DBSubnetGroup
@@ -525,6 +554,16 @@ resources:
                 ValueFrom: !Ref GoogleOauthClientSecretSecret
               - Name: GOOGLE_OAUTH_STATE_SECRET
                 ValueFrom: !Ref GoogleOauthStateSecretSecret
+              - !If
+                - HasLife2JwtSecret
+                - Name: LIFE2_JWT_SECRET
+                  ValueFrom: !Ref Life2JwtSecretSecret
+                - !Ref AWS::NoValue
+              - !If
+                - HasLife2JwtPublicKey
+                - Name: LIFE2_JWT_PUBLIC_KEY
+                  ValueFrom: !Ref Life2JwtPublicKeySecret
+                - !Ref AWS::NoValue
 
     WorkerTaskDefinition:
       Type: AWS::ECS::TaskDefinition
@@ -592,6 +631,16 @@ resources:
             Secrets:
               - Name: DB_PASSWORD
                 ValueFrom: !Ref DatabasePasswordSecret
+              - !If
+                - HasLife2JwtSecret
+                - Name: LIFE2_JWT_SECRET
+                  ValueFrom: !Ref Life2JwtSecretSecret
+                - !Ref AWS::NoValue
+              - !If
+                - HasLife2JwtPublicKey
+                - Name: LIFE2_JWT_PUBLIC_KEY
+                  ValueFrom: !Ref Life2JwtPublicKeySecret
+                - !Ref AWS::NoValue
 
     FrontendTaskDefinition:
       Type: AWS::ECS::TaskDefinition

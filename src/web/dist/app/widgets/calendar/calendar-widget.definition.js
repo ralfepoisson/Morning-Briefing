@@ -24,7 +24,7 @@
       },
       createMockWidget: function createMockWidget(options) {
         var data = options.data || {};
-        var connectionLabel = data.connectionLabel || options.connectionLabel || (options.config && options.config.connectionName) || 'Not connected';
+        var connectionLabel = data.connectionLabel || options.connectionLabel || (options.config && options.config.connectionName) || '';
 
         return {
           id: options.id,
@@ -41,31 +41,10 @@
             provider: data.provider || 'google-calendar',
             connectionLabel: connectionLabel,
             dateLabel: data.dateLabel || options.dateLabel || 'Today',
-            emptyMessage: data.emptyMessage || (connectionLabel === 'Not connected'
+            emptyMessage: data.emptyMessage || (!connectionLabel
               ? 'Choose a Google Calendar connection in edit mode to configure this widget.'
-              : 'Live appointments will appear after you save the dashboard.'),
-            appointments: data.appointments || options.appointments || (connectionLabel === 'Not connected' ? [] : [
-              {
-                time: '09:00',
-                title: 'Stand-up',
-                location: 'Teams'
-              },
-              {
-                time: '10:30',
-                title: 'Deep work block',
-                location: 'Home office'
-              },
-              {
-                time: '13:00',
-                title: 'Client review',
-                location: 'WeWork Meeting Room'
-              },
-              {
-                time: '19:00',
-                title: 'Dinner reservation',
-                location: 'Le Petit Marchand'
-              }
-            ])
+              : 'Calendar events are still loading or unavailable. Refresh after the snapshot completes.'),
+            appointments: data.appointments || options.appointments || []
           }
         };
       }

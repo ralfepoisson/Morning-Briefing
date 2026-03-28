@@ -51,6 +51,7 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 
 - Snapshot-backed weather widget implemented
 - Weather tile includes current conditions, supporting summary, and detail chips when a snapshot is available
+- Snapshot-backed widgets now show the latest snapshot timestamp in a muted footer at the bottom right of each widget card
 - Weather widget can be configured with a city in dashboard edit mode
 - Weather location search uses backend reference-city endpoints
 

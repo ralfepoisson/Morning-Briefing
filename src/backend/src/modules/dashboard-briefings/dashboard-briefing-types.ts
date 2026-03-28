@@ -104,8 +104,7 @@ export type DashboardBriefingInput = {
   tone: string;
   targetDurationSeconds: number;
   listener: {
-    phoneticName: string | null;
-    firstName: string | null;
+    greetingName: string | null;
   };
   sections: DashboardBriefingSectionInput[];
 };

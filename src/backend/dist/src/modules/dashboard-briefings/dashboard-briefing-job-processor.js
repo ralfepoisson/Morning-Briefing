@@ -30,7 +30,8 @@ export class DashboardBriefingJobProcessor {
                 email: payload.ownerEmail,
                 isAdmin: payload.ownerIsAdmin
             }, {
-                force: payload.force
+                force: payload.force,
+                jobId: payload.jobId
             });
             logApplicationEvent({
                 level: 'info',

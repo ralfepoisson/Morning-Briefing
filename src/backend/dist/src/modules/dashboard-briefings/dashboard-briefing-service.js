@@ -65,7 +65,8 @@ export class DashboardBriefingService {
             context: {
                 dashboardId,
                 ownerUserId: user.userId,
-                force: !!options.force
+                force: !!options.force,
+                jobId: options.jobId || null
             }
         });
         const preferences = await this.repository.findPreference(dashboardId, user.userId) || buildDefaultPreference(dashboardId, user);
@@ -121,7 +122,8 @@ export class DashboardBriefingService {
                 context: {
                     dashboardId,
                     ownerUserId: user.userId,
-                    sourceSnapshotHash: aggregation.sourceSnapshotHash
+                    sourceSnapshotHash: aggregation.sourceSnapshotHash,
+                    jobId: options.jobId || null
                 }
             });
         }
@@ -149,7 +151,8 @@ export class DashboardBriefingService {
                     ownerUserId: user.userId,
                     briefingId: created.id,
                     modelName: this.llmService.getModelName(),
-                    sourceSnapshotHash: aggregation.sourceSnapshotHash
+                    sourceSnapshotHash: aggregation.sourceSnapshotHash,
+                    jobId: options.jobId || null
                 }
             });
             const script = await this.llmService.generateScript(aggregation.input);
@@ -163,7 +166,8 @@ export class DashboardBriefingService {
                     ownerUserId: user.userId,
                     briefingId: created.id,
                     estimatedDurationSeconds: script.estimatedDurationSeconds,
-                    scriptCharacterCount: script.fullScript.length
+                    scriptCharacterCount: script.fullScript.length,
+                    jobId: options.jobId || null
                 }
             });
             const audio = await this.ttsService.generateAndStore({
@@ -193,7 +197,8 @@ export class DashboardBriefingService {
                     briefingId: created.id,
                     provider: audio.provider,
                     voiceName: audio.voiceName,
-                    storageKey: audio.storageKey
+                    storageKey: audio.storageKey,
+                    jobId: options.jobId || null
                 }
             });
             const updated = await this.repository.updateBriefing({
@@ -225,7 +230,8 @@ export class DashboardBriefingService {
                     dashboardId,
                     briefingId: created.id,
                     widgetTypes: aggregation.includedWidgetTypes,
-                    sourceSnapshotHash: aggregation.sourceSnapshotHash
+                    sourceSnapshotHash: aggregation.sourceSnapshotHash,
+                    jobId: options.jobId || null
                 }
             });
             try {
@@ -233,7 +239,10 @@ export class DashboardBriefingService {
                     user,
                     briefing: toBriefingResponse(updated),
                     audio: updated.audio ? toAudioResponse(updated.audio) : null,
-                    storagePath: this.ttsService.resolveStoragePath(audio.storageKey)
+                    storagePath: this.ttsService.resolveStoragePath(audio.storageKey),
+                    deliveryContext: {
+                        jobId: options.jobId || null
+                    }
                 });
             }
             catch (deliveryError) {
@@ -246,6 +255,7 @@ export class DashboardBriefingService {
                         dashboardId,
                         briefingId: created.id,
                         ownerUserId: user.userId,
+                        jobId: options.jobId || null,
                         ...toLogErrorContext(deliveryError)
                     }
                 });
@@ -279,6 +289,7 @@ export class DashboardBriefingService {
                     briefingId: created ? created.id : null,
                     widgetTypes: aggregation.includedWidgetTypes,
                     sourceSnapshotHash: aggregation.sourceSnapshotHash,
+                    jobId: options.jobId || null,
                     ...toLogErrorContext(error)
                 }
             });

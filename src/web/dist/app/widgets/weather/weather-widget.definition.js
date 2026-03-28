@@ -39,20 +39,14 @@
           height: options.height || 360,
           config: config,
           data: {
-            location: data.location || options.location || configuredLocation || 'Select a city',
-            temperature: data.temperature || options.temperature || '18°',
-            condition: data.condition || options.condition || 'Partly sunny',
-            highLow: data.highLow || options.highLow || 'H: 20°  L: 11°',
+            location: data.location || options.location || configuredLocation || '',
+            temperature: data.temperature || options.temperature || '',
+            condition: data.condition || options.condition || '',
+            highLow: data.highLow || options.highLow || '',
             summary: data.summary || options.summary || (configuredLocation
-              ? 'Mock data for the MVP. This widget will later hydrate from a briefing snapshot.'
+              ? 'Weather data is still loading or unavailable. Refresh after the snapshot completes.'
               : 'Choose a city in edit mode to configure this widget.'),
-            details: data.details || options.details || (configuredLocation
-              ? [
-                  { label: 'Feels like', value: '17°' },
-                  { label: 'Rain', value: '10%' },
-                  { label: 'UV', value: 'Moderate' }
-                ]
-              : [])
+            details: data.details || options.details || []
           }
         };
       }

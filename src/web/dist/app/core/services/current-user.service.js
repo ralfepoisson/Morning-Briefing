@@ -59,6 +59,14 @@
       return !!(AuthService.isAuthenticated() && state.currentUser && state.currentUser.isAdmin);
     };
 
+    this.updateProfile = function updateProfile(payload) {
+      return $http.patch(ApiConfig.baseUrl + '/users/me', payload || {}).then(function handleResponse(response) {
+        state.currentUser = response.data && response.data.user ? response.data.user : null;
+        state.hasLoaded = true;
+        return angular.copy(state.currentUser);
+      });
+    };
+
     this.clear = clear;
 
     function clear() {

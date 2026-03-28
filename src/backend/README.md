@@ -70,6 +70,8 @@ Copy the reported queue URL into `SNAPSHOT_QUEUE_URL`.
 
 The worker long-polls SQS, processes available widget snapshot and dashboard audio jobs, and leaves failed messages for retry/DLQ handling.
 
+For normal local app startup, `./scripts/start_backend.sh` now enables the local worker inside the backend dev process by default, so a separate worker terminal is optional unless you want one explicitly.
+
 ### Run the nightly refresh locally
 
 - `npm run snapshot:refresh:nightly`
@@ -88,6 +90,7 @@ The local scheduler keeps two UTC jobs alive:
 - dashboard audio briefing refresh at `05:00` UTC
 
 `./scripts/start_backend.sh` exports `LOCAL_SCHEDULER_ENABLED=true`, so the scheduler now starts inside the local backend dev process by default.
+`./scripts/start_backend.sh` also exports `LOCAL_SNAPSHOT_WORKER_ENABLED=true`, so the local queue worker runs inside that same backend dev process by default.
 
 When started through `./scripts/start_scheduler.sh`, output is written to `src/backend/data/local-scheduler.log`.
 

@@ -116,13 +116,15 @@
           })
           : null;
 
-        widget.isLoading = false;
-
         if (!snapshotWidget || !snapshotWidget.content) {
+          widget.isLoading = !!widget.isGenerating;
           return;
         }
 
+        widget.isLoading = snapshotWidget.status === 'PENDING';
+        widget.isGenerating = snapshotWidget.status === 'PENDING';
         widget.data = snapshotWidget.content;
+        widget.errorMessage = snapshotWidget.errorMessage || '';
 
         if (widget.type === 'weather') {
           widget.title = 'Weather Outlook';
@@ -177,6 +179,7 @@
         includeInBriefingDefault: widgetPayload.includeInBriefingDefault,
         includeInBriefingOverride: widgetPayload.includeInBriefingOverride,
         includeInBriefing: widgetPayload.includeInBriefing,
+        isGenerating: widgetPayload.isGenerating === true,
         data: widgetPayload.data,
         location: widgetPayload.data && widgetPayload.data.location,
         temperature: widgetPayload.data && widgetPayload.data.temperature,

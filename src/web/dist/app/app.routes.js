@@ -24,6 +24,9 @@
       .when('/rss-feeds', {
         template: '<rss-feeds-page></rss-feeds-page>'
       })
+      .when('/profile', {
+        template: '<profile-page></profile-page>'
+      })
       .when('/admin/message-broker', {
         template: '<message-broker-page></message-broker-page>'
       })

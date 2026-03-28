@@ -1130,25 +1130,17 @@
       var locationLabel = getSelectedCityDisplayName(location);
 
       widget.data = widget.data || {};
-      widget.data.location = locationLabel || 'Select a city';
-      widget.data.temperature = widget.data.temperature || '18°';
-      widget.data.condition = widget.data.condition || 'Partly sunny';
-      widget.data.highLow = widget.data.highLow || 'H: 20°  L: 11°';
+      widget.data.location = locationLabel || '';
+      widget.data.temperature = '';
+      widget.data.condition = '';
+      widget.data.highLow = '';
       widget.data.summary = locationLabel
-        ? 'Mock data for the MVP. This widget will later hydrate from a briefing snapshot.'
+        ? 'Weather data is still loading or unavailable. Refresh after the snapshot completes.'
         : 'Choose a city in edit mode to configure this widget.';
-      widget.data.details = locationLabel
-        ? [
-            { label: 'Feels like', value: '17°' },
-            { label: 'Rain', value: '10%' },
-            { label: 'UV', value: 'Moderate' }
-          ]
-        : [];
+      widget.data.details = [];
     }
 
     function applyTasksWidgetPreview(widget, connection) {
-      var groups;
-
       if (!connection) {
         return;
       }
@@ -1157,38 +1149,11 @@
       widget.config.connectionName = connection.name;
       widget.config.provider = connection.type;
       widget.config.showUndatedTasks = $ctrl.widgetConfig.showUndatedTasks !== false;
-      groups = [
-        {
-          label: 'Due Today',
-          items: [
-            { title: 'Reply to insurance email', meta: 'today' },
-            { title: 'Confirm dinner reservation', meta: 'today' }
-          ]
-        },
-        {
-          label: 'Due Tomorrow',
-          items: [
-            { title: 'Draft project update', meta: 'tomorrow' },
-            { title: 'Buy birthday card', meta: 'tomorrow' }
-          ]
-        }
-      ];
-
-      if (widget.config.showUndatedTasks) {
-        groups.push({
-          label: 'No Due Date',
-          items: [
-            { title: 'Declutter camera roll', meta: '' },
-            { title: 'Research standing desk options', meta: '' }
-          ]
-        });
-      }
-
       widget.data = {
         provider: connection.type,
         connectionLabel: connection.name,
-        emptyMessage: 'Live tasks will appear after you save the dashboard.',
-        groups: groups
+        emptyMessage: 'Tasks are still loading or unavailable. Refresh after the snapshot completes.',
+        groups: []
       };
     }
 
@@ -1204,24 +1169,8 @@
         provider: connection.type,
         connectionLabel: connection.name,
         dateLabel: 'Today',
-        emptyMessage: 'Live appointments will appear after you save the dashboard.',
-        appointments: [
-          {
-            time: '09:00',
-            title: 'Stand-up',
-            location: 'Teams'
-          },
-          {
-            time: '11:30',
-            title: 'Planning session',
-            location: 'Studio'
-          },
-          {
-            time: '16:00',
-            title: 'Doctor appointment',
-            location: 'Rue des Fleurs'
-          }
-        ]
+        emptyMessage: 'Calendar events are still loading or unavailable. Refresh after the snapshot completes.',
+        appointments: []
       };
     }
 
@@ -1243,30 +1192,8 @@
         provider: connection.type,
         connectionLabel: connection.name,
         filters: filters,
-        emptyMessage: 'Live messages will appear after you save the dashboard.',
-        messages: [
-          {
-            id: 'email-1',
-            subject: 'Project kickoff agenda',
-            from: 'Alex Morgan <alex@example.com>',
-            receivedAt: '2026-03-26T07:45:00.000Z',
-            isUnread: true
-          },
-          {
-            id: 'email-2',
-            subject: 'Travel confirmation for next week',
-            from: 'Airline Updates <updates@example.com>',
-            receivedAt: '2026-03-26T06:10:00.000Z',
-            isUnread: false
-          },
-          {
-            id: 'email-3',
-            subject: 'Design review notes',
-            from: 'Priya Shah <priya@example.com>',
-            receivedAt: '2026-03-25T20:20:00.000Z',
-            isUnread: true
-          }
-        ]
+        emptyMessage: 'Email messages are still loading or unavailable. Refresh after the snapshot completes.',
+        messages: []
       };
     }
 
@@ -1279,10 +1206,10 @@
       widget.config.connectionName = connection.name;
       widget.config.provider = connection.type;
       widget.data = {
-        headline: 'News Briefing',
-        markdown: '# News Briefing\n\nHeadlines will appear after you save the dashboard and refresh the snapshot.',
+        headline: '',
+        markdown: '',
         categories: [],
-        emptyMessage: 'The selected LLM connection will summarize your configured RSS feeds after the next snapshot.',
+        emptyMessage: 'News is still loading or unavailable. Refresh after the snapshot completes.',
         sourceErrors: []
       };
     }

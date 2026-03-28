@@ -72,8 +72,7 @@ export class DashboardBriefingAggregationService {
       tone: preferences.tone,
       targetDurationSeconds: preferences.targetDurationSeconds,
       listener: {
-        phoneticName: normalizeOptionalString(user.phoneticName),
-        firstName: extractFirstName(user.displayName)
+        greetingName: normalizeOptionalString(user.phoneticName) || extractFirstName(user.displayName)
       },
       sections
     };
