@@ -143,6 +143,8 @@
       '          <button type="button" class="btn btn-outline-light" ng-click="$ctrl.openCreateConnectionModal()">Create new connection</button>' +
       '        </div>' +
       '        <p class="widget-config-helper" ng-if="$ctrl.widgetConfig.isLoadingConnections">Loading connections...</p>' +
+      '        <p class="widget-config-helper" ng-if="$ctrl.shouldShowReconnectAction()">Google access for this widget needs to be refreshed.</p>' +
+      '        <button type="button" class="btn btn-outline-light btn-sm" ng-if="$ctrl.shouldShowReconnectAction()" ng-click="$ctrl.reconnectSelectedWidgetConnection()">Reconnect Google</button>' +
       '      </div>' +
       '      <div ng-if="$ctrl.widgetConfig.widget.type === \'email\'">' +
       '        <label class="form-label mt-3">Mail filters</label>' +
@@ -486,6 +488,8 @@
     $ctrl.getWidgetConfigTitle = getWidgetConfigTitle;
     $ctrl.getSelectedConnection = getSelectedConnection;
     $ctrl.widgetSupportsConnections = widgetSupportsConnections;
+    $ctrl.shouldShowReconnectAction = shouldShowReconnectAction;
+    $ctrl.reconnectSelectedWidgetConnection = reconnectSelectedWidgetConnection;
     $ctrl.canSaveConnection = canSaveConnection;
     $ctrl.addEmailFilter = addEmailFilter;
     $ctrl.removeEmailFilter = removeEmailFilter;
@@ -633,7 +637,7 @@
 
       WidgetService.addWidget($ctrl.activeDashboard.id, type).then(function handleWidgetAdded() {
         UiShellService.closeWidgetPanel();
-        syncState();
+        $ctrl.widgets = WidgetService.listForDashboard($ctrl.activeDashboard.id);
       }).catch(function handleAddWidgetError(error) {
         NotificationService.error(getErrorMessage(error, 'Unable to add that widget right now.'), 'Unable to add widget');
       });
@@ -1343,6 +1347,52 @@
       }
 
       return !!$ctrl.connectionModal.apiKey;
+    }
+
+    function shouldShowReconnectAction() {
+      var connection = getSelectedConnection();
+      var widget = $ctrl.widgetConfig.widget;
+      var errorMessage = widget && widget.errorMessage ? widget.errorMessage : '';
+
+      if (!connection || !widgetSupportsConnections(widget && widget.type)) {
+        return false;
+      }
+
+      if (connection.type !== 'google-calendar' && connection.type !== 'gmail') {
+        return false;
+      }
+
+      return /oauth|token refresh|google/i.test(errorMessage);
+    }
+
+    function reconnectSelectedWidgetConnection() {
+      var connection = getSelectedConnection();
+      var widget = $ctrl.widgetConfig.widget;
+
+      if (!connection || !widget || !$ctrl.activeDashboard) {
+        return;
+      }
+
+      ConnectionService.saveWidgetOAuthContext({
+        dashboardId: $ctrl.activeDashboard.id,
+        widgetId: widget.id,
+        widgetType: widget.type
+      });
+
+      if (connection.type === 'google-calendar') {
+        ConnectionService.startGoogleCalendarOAuth($window.location.href, connection.id).catch(function handleReconnectError(error) {
+          ConnectionService.clearWidgetOAuthContext();
+          NotificationService.error(getErrorMessage(error, 'Unable to start Google Calendar reconnection right now.'), 'Unable to reconnect Google Calendar');
+        });
+        return;
+      }
+
+      if (connection.type === 'gmail') {
+        ConnectionService.startGmailOAuth($window.location.href, connection.id).catch(function handleReconnectError(error) {
+          ConnectionService.clearWidgetOAuthContext();
+          NotificationService.error(getErrorMessage(error, 'Unable to start Gmail reconnection right now.'), 'Unable to reconnect Gmail');
+        });
+      }
     }
 
     function buildConnectionCredentials(connectionModal) {

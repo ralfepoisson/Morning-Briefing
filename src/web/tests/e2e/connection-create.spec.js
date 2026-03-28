@@ -56,7 +56,7 @@ test.describe('Create Todoist connection from the task widget', function () {
       }));
     }, [TOKEN_KEY, SESSION_KEY, token]);
 
-    await page.route('**/api/v1/dashboards', async function (route) {
+    await page.route(/\/api\/v1\/dashboards$/, async function (route) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -82,6 +82,29 @@ test.describe('Create Todoist connection from the task widget', function () {
         contentType: 'application/json',
         body: JSON.stringify({
           message: 'Snapshot not found.'
+        })
+      });
+    });
+
+    await page.route('**/api/v1/dashboards/' + dashboard.id + '/audio-briefing/preferences', async function (route) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          enabled: false,
+          targetDurationSeconds: 60,
+          tone: 'calm',
+          voiceName: 'default'
+        })
+      });
+    });
+
+    await page.route('**/api/v1/dashboards/' + dashboard.id + '/audio-briefing', async function (route) {
+      await route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'Audio briefing not found.'
         })
       });
     });

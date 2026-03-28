@@ -53,6 +53,7 @@
       '          <button type="button" class="btn btn-outline-light icon-button widget-config-button" ng-if="$ctrl.isEditing" ng-mousedown="$event.stopPropagation()" ng-click="$ctrl.openWidgetConfigModal(widget, $event)" aria-label="Configure widget"><i class="fa-solid fa-gear" aria-hidden="true"></i></button>' +
       '        </div>' +
       '        <div class="widget-content" widget-renderer widget="widget"></div>' +
+      '        <div class="widget-timestamp" ng-if="widget.generatedAt">Snapshot: {{$ctrl.formatTimestamp(widget.generatedAt)}}</div>' +
       '        <div class="widget-resize-handle" ng-if="$ctrl.isEditing && $ctrl.isWidgetResizable(widget)" aria-hidden="true"></div>' +
       '      </article>' +
       '      <div class="canvas-empty-state" ng-if="!$ctrl.widgets.length">' +

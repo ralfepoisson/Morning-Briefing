@@ -1771,6 +1771,19 @@ body.theme-light .widget-refresh-button {
   overflow: hidden;
 }
 
+.widget-timestamp {
+  align-self: flex-end;
+  margin-top: 0.55rem;
+  padding-right: 1.35rem;
+  min-height: 1rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1;
+  text-align: right;
+  opacity: 0.82;
+  white-space: nowrap;
+}
+
 .widget-content > calendar-widget,
 .widget-content > email-widget,
 .widget-content > tasks-widget,

@@ -1772,16 +1772,16 @@ body.theme-light .widget-refresh-button {
 }
 
 .widget-timestamp {
-  align-self: flex-end;
-  margin-top: 0.55rem;
-  padding-right: 1.35rem;
-  min-height: 1rem;
+  position: absolute;
+  right: 12px;
+  bottom: 1px;
   color: var(--muted);
   font-size: 0.72rem;
   line-height: 1;
   text-align: right;
   opacity: 0.82;
   white-space: nowrap;
+  pointer-events: none;
 }
 
 .widget-content > calendar-widget,

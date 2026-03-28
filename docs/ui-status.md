@@ -45,6 +45,7 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 - Widget library opens from a right-side panel
 - Widget library adds widgets through backend widget endpoints
 - Dashboard widgets now load from backend widget endpoints
+- Unsaved widget layout and size edits are now preserved when additional widgets are added during the same edit session
 - Widget library includes placeholder slots for future widget types
 
 ### Weather widget
@@ -68,6 +69,7 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 - Email tile supports multiple Gmail search filters and merges the matching messages into a single list
 - Each email row shows timestamp, sender, subject, and read or unread status
 - Email widget follows the same dashboard connection flow pattern as the calendar widget
+- Widget configuration modals now offer an in-place Google reconnect action when the latest OAuth-backed snapshot failed during token refresh
 
 ### Connectors management
 

@@ -162,12 +162,13 @@
 
     function hydrateWidget(widgetPayload) {
       var definition = WidgetRegistryService.get(widgetPayload.type);
+      var widget;
 
       if (!definition || typeof definition.createMockWidget !== 'function') {
         return widgetPayload;
       }
 
-      return definition.createMockWidget({
+      widget = definition.createMockWidget({
         id: widgetPayload.id,
         dashboardId: widgetPayload.dashboardId,
         title: widgetPayload.title,
@@ -207,6 +208,19 @@
         generatedAt: widgetPayload.generatedAt || '',
         isLoading: widgetPayload.isLoading !== undefined ? widgetPayload.isLoading : true
       });
+
+      widget.minWidth = widgetPayload.minWidth;
+      widget.minHeight = widgetPayload.minHeight;
+      widget.isVisible = widgetPayload.isVisible;
+      widget.sortOrder = widgetPayload.sortOrder;
+      widget.includeInBriefingDefault = widgetPayload.includeInBriefingDefault;
+      widget.includeInBriefingOverride = widgetPayload.includeInBriefingOverride;
+      widget.includeInBriefing = widgetPayload.includeInBriefing;
+      widget.isGenerating = widgetPayload.isGenerating === true;
+      widget.generatedAt = widgetPayload.generatedAt || '';
+      widget.errorMessage = widgetPayload.errorMessage || '';
+
+      return widget;
     }
 
     function getMinWidth(type) {

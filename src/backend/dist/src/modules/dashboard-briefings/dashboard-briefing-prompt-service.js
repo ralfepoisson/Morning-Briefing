@@ -45,7 +45,7 @@ function normalizeScriptText(content) {
     return script;
 }
 function buildGreeting(listener) {
-    const name = readStringOrNull(listener.phoneticName) || readStringOrNull(listener.firstName);
+    const name = readStringOrNull(listener.greetingName);
     if (name) {
         return `Hi there ${name}.`;
     }
