@@ -39,6 +39,7 @@ export interface DashboardBriefingRepository extends DashboardBriefingAggregatio
     id: string;
     tenantId: string;
     isGenerating: boolean;
+    hasReadySnapshot: boolean;
     owner: {
       id: string;
       displayName: string;

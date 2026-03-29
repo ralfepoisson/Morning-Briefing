@@ -5,6 +5,7 @@ export type ScheduledDashboardBriefingRecord = {
   id: string;
   tenantId: string;
   isGenerating: boolean;
+  hasReadySnapshot: boolean;
   owner: {
     id: string;
     displayName: string;
@@ -31,11 +32,13 @@ export class ScheduledDashboardBriefingRefreshService {
     enqueuedCount: number;
     skippedDisabledCount: number;
     skippedGeneratingCount: number;
+    skippedMissingSnapshotsCount: number;
   }> {
     const dashboards = await this.repository.listDashboardsForScheduledGeneration();
     let enqueuedCount = 0;
     let skippedDisabledCount = 0;
     let skippedGeneratingCount = 0;
+    let skippedMissingSnapshotsCount = 0;
 
     for (const dashboard of dashboards) {
       if (dashboard.isGenerating) {
@@ -45,6 +48,11 @@ export class ScheduledDashboardBriefingRefreshService {
 
       if (dashboard.briefingPreference && dashboard.briefingPreference.enabled === false) {
         skippedDisabledCount += 1;
+        continue;
+      }
+
+      if (!dashboard.hasReadySnapshot) {
+        skippedMissingSnapshotsCount += 1;
         continue;
       }
 
@@ -76,6 +84,7 @@ export class ScheduledDashboardBriefingRefreshService {
         enqueuedCount,
         skippedDisabledCount,
         skippedGeneratingCount,
+        skippedMissingSnapshotsCount,
         dashboardCount: dashboards.length
       }
     });
@@ -83,7 +92,8 @@ export class ScheduledDashboardBriefingRefreshService {
     return {
       enqueuedCount,
       skippedDisabledCount,
-      skippedGeneratingCount
+      skippedGeneratingCount,
+      skippedMissingSnapshotsCount
     };
   }
 }

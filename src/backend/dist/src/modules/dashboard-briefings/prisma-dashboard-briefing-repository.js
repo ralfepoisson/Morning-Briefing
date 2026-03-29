@@ -16,6 +16,24 @@ export class PrismaDashboardBriefingRepository {
                     id: true,
                     tenantId: true,
                     isGenerating: true,
+                    widgets: {
+                        where: {
+                            archivedAt: null,
+                            isVisible: true
+                        },
+                        select: {
+                            snapshots: {
+                                orderBy: [
+                                    { generatedAt: 'desc' },
+                                    { id: 'desc' }
+                                ],
+                                take: 1,
+                                select: {
+                                    status: true
+                                }
+                            }
+                        }
+                    },
                     owner: {
                         select: {
                             id: true,
@@ -39,6 +57,9 @@ export class PrismaDashboardBriefingRepository {
                     id: dashboard.id,
                     tenantId: dashboard.tenantId,
                     isGenerating: dashboard.isGenerating,
+                    hasReadySnapshot: dashboard.widgets.some(function hasReadySnapshot(widget) {
+                        return widget.snapshots[0]?.status === 'READY';
+                    }),
                     owner: dashboard.owner,
                     briefingPreference: dashboard.briefingPreferences
                         ? {
@@ -62,6 +83,24 @@ export class PrismaDashboardBriefingRepository {
                 select: {
                     id: true,
                     tenantId: true,
+                    widgets: {
+                        where: {
+                            archivedAt: null,
+                            isVisible: true
+                        },
+                        select: {
+                            snapshots: {
+                                orderBy: [
+                                    { generatedAt: 'desc' },
+                                    { id: 'desc' }
+                                ],
+                                take: 1,
+                                select: {
+                                    status: true
+                                }
+                            }
+                        }
+                    },
                     owner: {
                         select: {
                             id: true,
@@ -80,6 +119,9 @@ export class PrismaDashboardBriefingRepository {
                     id: dashboard.id,
                     tenantId: dashboard.tenantId,
                     isGenerating: false,
+                    hasReadySnapshot: dashboard.widgets.some(function hasReadySnapshot(widget) {
+                        return widget.snapshots[0]?.status === 'READY';
+                    }),
                     owner: dashboard.owner,
                     briefingPreference: null
                 };

@@ -35,6 +35,7 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 - Newly created dashboards open in edit mode on first load
 - Explicit dashboard edit mode
 - `Edit Dashboard` / `Save Dashboard` flow
+- Icon-only dashboard refresh control beside `Edit Dashboard` reloads the current dashboard widgets and latest snapshot state, showing a loading spinner until the refresh completes
 - Dashboard list and create actions are wired to the backend REST API
 - Dashboard save now persists widget layout and widget configuration edits through backend widget update endpoints
 

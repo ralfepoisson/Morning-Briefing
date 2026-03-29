@@ -4,6 +4,138 @@ const TOKEN_KEY = 'morningBriefing.auth.token';
 const SESSION_KEY = 'morningBriefing.auth.session';
 
 test.describe('Dashboard widget configuration flows', function () {
+  test('refresh dashboard button shows a loading icon until widget reload completes', async function ({ page }) {
+    const dashboard = createDashboard();
+    const widgetsState = [createWeatherWidget()];
+    const initialSnapshot = {
+      id: 'snapshot-1',
+      dashboardId: dashboard.id,
+      snapshotDate: '2026-03-28',
+      generationStatus: 'READY',
+      summary: {},
+      generatedAt: '2026-03-28T07:45:00.000Z',
+      widgets: [
+        {
+          widgetId: widgetsState[0].id,
+          widgetType: widgetsState[0].type,
+          title: widgetsState[0].title,
+          status: 'READY',
+          content: widgetsState[0].data,
+          errorMessage: null,
+          generatedAt: '2026-03-28T07:45:00.000Z'
+        }
+      ]
+    };
+    const refreshedSnapshot = clone(initialSnapshot);
+    let widgetRequestCount = 0;
+    let snapshotRequestCount = 0;
+    let releaseWidgetReload;
+    let releaseSnapshotReload;
+    const widgetReloadGate = new Promise(function (resolve) {
+      releaseWidgetReload = resolve;
+    });
+    const snapshotReloadGate = new Promise(function (resolve) {
+      releaseSnapshotReload = resolve;
+    });
+
+    refreshedSnapshot.generatedAt = '2026-03-29T08:15:00.000Z';
+    refreshedSnapshot.widgets[0].generatedAt = '2026-03-29T08:15:00.000Z';
+
+    await signIn(page);
+
+    await page.route(/\/api\/v1\/dashboards$/, async function (route) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          items: [dashboard]
+        })
+      });
+    });
+
+    await page.route('**/api/v1/dashboards/' + dashboard.id + '/widgets', async function (route) {
+      widgetRequestCount += 1;
+
+      if (widgetRequestCount > 1) {
+        await widgetReloadGate;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          items: widgetsState.map(clone)
+        })
+      });
+    });
+
+    await page.route('**/api/v1/dashboards/' + dashboard.id + '/snapshots/latest', async function (route) {
+      snapshotRequestCount += 1;
+
+      if (snapshotRequestCount > 1) {
+        await snapshotReloadGate;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(snapshotRequestCount === 1 ? initialSnapshot : refreshedSnapshot)
+      });
+    });
+
+    await page.route('**/api/v1/dashboards/' + dashboard.id + '/audio-briefing/preferences', async function (route) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          enabled: false,
+          targetDurationSeconds: 60,
+          tone: 'calm',
+          voiceName: 'default'
+        })
+      });
+    });
+
+    await page.route('**/api/v1/dashboards/' + dashboard.id + '/audio-briefing', async function (route) {
+      await route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'Audio briefing not found.'
+        })
+      });
+    });
+
+    await page.goto('/#/');
+    await expect(page.getByRole('heading', { name: dashboard.name })).toBeVisible();
+
+    const refreshButton = page.getByRole('button', { name: 'Refresh dashboard' });
+    const refreshIcon = refreshButton.locator('i');
+
+    await expect(refreshIcon).toHaveClass(/fa-rotate-right/);
+
+    await refreshButton.click();
+
+    await expect(refreshButton).toBeDisabled();
+    await expect(refreshIcon).toHaveClass(/fa-spinner/);
+
+    releaseWidgetReload();
+    await expect.poll(function () {
+      return snapshotRequestCount;
+    }).toBe(2);
+
+    await expect(refreshButton).toBeDisabled();
+    await expect(refreshIcon).toHaveClass(/fa-spinner/);
+
+    releaseSnapshotReload();
+
+    await expect(refreshButton).toBeEnabled();
+    await expect(refreshIcon).toHaveClass(/fa-rotate-right/);
+    expect(widgetRequestCount).toBe(2);
+    expect(snapshotRequestCount).toBe(2);
+    await expect(page.locator('.widget-card').first()).toContainText('3/29/2026');
+  });
+
   test('persists Include in Audio Briefing selections across a dashboard save', async function ({ page }) {
     const dashboard = createDashboard();
     const widgetsState = [

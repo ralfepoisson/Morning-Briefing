@@ -11,6 +11,7 @@ export class ScheduledDashboardBriefingRefreshService {
         let enqueuedCount = 0;
         let skippedDisabledCount = 0;
         let skippedGeneratingCount = 0;
+        let skippedMissingSnapshotsCount = 0;
         for (const dashboard of dashboards) {
             if (dashboard.isGenerating) {
                 skippedGeneratingCount += 1;
@@ -18,6 +19,10 @@ export class ScheduledDashboardBriefingRefreshService {
             }
             if (dashboard.briefingPreference && dashboard.briefingPreference.enabled === false) {
                 skippedDisabledCount += 1;
+                continue;
+            }
+            if (!dashboard.hasReadySnapshot) {
+                skippedMissingSnapshotsCount += 1;
                 continue;
             }
             await this.publisher.publishGenerateDashboardAudioBriefing({
@@ -46,13 +51,15 @@ export class ScheduledDashboardBriefingRefreshService {
                 enqueuedCount,
                 skippedDisabledCount,
                 skippedGeneratingCount,
+                skippedMissingSnapshotsCount,
                 dashboardCount: dashboards.length
             }
         });
         return {
             enqueuedCount,
             skippedDisabledCount,
-            skippedGeneratingCount
+            skippedGeneratingCount,
+            skippedMissingSnapshotsCount
         };
     }
 }

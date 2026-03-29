@@ -11,6 +11,7 @@ test('ScheduledDashboardBriefingRefreshService enqueues one job per eligible das
           id: 'dash-1',
           tenantId: 'tenant-1',
           isGenerating: false,
+          hasReadySnapshot: true,
           owner: {
             id: 'owner-1',
             displayName: 'Owner One',
@@ -26,6 +27,7 @@ test('ScheduledDashboardBriefingRefreshService enqueues one job per eligible das
           id: 'dash-2',
           tenantId: 'tenant-1',
           isGenerating: false,
+          hasReadySnapshot: true,
           owner: {
             id: 'owner-2',
             displayName: 'Owner Two',
@@ -43,6 +45,7 @@ test('ScheduledDashboardBriefingRefreshService enqueues one job per eligible das
           id: 'dash-3',
           tenantId: 'tenant-1',
           isGenerating: true,
+          hasReadySnapshot: true,
           owner: {
             id: 'owner-3',
             displayName: 'Owner Three',
@@ -67,7 +70,8 @@ test('ScheduledDashboardBriefingRefreshService enqueues one job per eligible das
   assert.deepEqual(result, {
     enqueuedCount: 1,
     skippedDisabledCount: 1,
-    skippedGeneratingCount: 1
+    skippedGeneratingCount: 1,
+    skippedMissingSnapshotsCount: 0
   });
   assert.equal(publisher.items.length, 1);
   assert.deepEqual(publisher.items[0], {
@@ -85,6 +89,45 @@ test('ScheduledDashboardBriefingRefreshService enqueues one job per eligible das
     correlationId: null,
     causationId: null
   });
+});
+
+test('ScheduledDashboardBriefingRefreshService skips dashboards without a ready snapshot', async function () {
+  const repository = {
+    async listDashboardsForScheduledGeneration() {
+      return [
+        {
+          id: 'dash-1',
+          tenantId: 'tenant-1',
+          isGenerating: false,
+          hasReadySnapshot: false,
+          owner: {
+            id: 'owner-1',
+            displayName: 'Owner One',
+            phoneticName: null,
+            timezone: 'UTC',
+            locale: 'en-GB',
+            email: 'owner-1@example.com',
+            isAdmin: false
+          },
+          briefingPreference: {
+            enabled: true
+          }
+        }
+      ];
+    }
+  };
+  const publisher = new InMemoryPublisher();
+  const service = new ScheduledDashboardBriefingRefreshService(repository, publisher);
+
+  const result = await service.enqueueAllDashboards(new Date('2026-03-29T05:00:00.000Z'));
+
+  assert.deepEqual(result, {
+    enqueuedCount: 0,
+    skippedDisabledCount: 0,
+    skippedGeneratingCount: 0,
+    skippedMissingSnapshotsCount: 1
+  });
+  assert.equal(publisher.items.length, 0);
 });
 
 class InMemoryPublisher implements DashboardBriefingJobPublisher {
