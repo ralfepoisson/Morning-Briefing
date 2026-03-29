@@ -511,6 +511,7 @@ test('SnapshotService generates a news snapshot from RSS feeds and the tenant Op
         tenantId: 'tenant-1',
         dashboardId: 'dash-1',
         ownerUserId: 'user-1',
+        ownerPreferredLanguage: 'fr-FR',
         type: 'news',
         title: 'News Briefing',
         x: 0,
@@ -613,6 +614,7 @@ test('SnapshotService generates a news snapshot from RSS feeds and the tenant Op
         assert.equal(input.apiKey, 'tenant-openai-secret');
         assert.equal(input.model, 'gpt-5-mini');
         assert.equal(input.baseUrl, 'https://api.openai.com');
+        assert.equal(input.preferredLanguage, 'fr-FR');
         assert.equal(input.categories.length, 1);
         assert.equal(input.categories[0].articles.length, 1);
 
@@ -702,6 +704,7 @@ test('SnapshotService excludes previously considered news articles from a new da
     },
     {
       async summarize(input) {
+        assert.equal(input.preferredLanguage, 'fr-FR');
         assert.equal(input.categories.length, 1);
         assert.deepEqual(input.categories[0].articles.map(function mapArticle(article) {
           return article.url;
@@ -775,6 +778,7 @@ test('SnapshotService reuses the same considered news article pool within a day'
     },
     {
       async summarize(input) {
+        assert.equal(input.preferredLanguage, 'fr-FR');
         assert.equal(input.categories.length, 1);
         assert.deepEqual(input.categories[0].articles.map(function mapArticle(article) {
           return article.url;
@@ -1860,6 +1864,7 @@ function createNewsDashboardRecord(): SnapshotDashboardRecord {
         tenantId: 'tenant-1',
         dashboardId: 'dash-1',
         ownerUserId: 'user-1',
+        ownerPreferredLanguage: 'fr-FR',
         type: 'news',
         title: 'News Briefing',
         x: 0,

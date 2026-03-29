@@ -101,6 +101,7 @@ export type DashboardBriefingInput = {
   dashboardName: string;
   generatedAt: string;
   language: string;
+  preferredLanguage: string;
   tone: string;
   targetDurationSeconds: number;
   listener: {

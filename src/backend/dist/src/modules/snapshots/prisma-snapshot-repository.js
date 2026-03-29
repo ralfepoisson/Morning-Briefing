@@ -16,6 +16,12 @@ export class PrismaSnapshotRepository {
                 archivedAt: null
             },
             include: {
+                owner: {
+                    select: {
+                        preferredLanguage: true,
+                        locale: true
+                    }
+                },
                 widgets: {
                     where: {
                         archivedAt: null
@@ -43,7 +49,15 @@ export class PrismaSnapshotRepository {
             ownerUserId: dashboard.ownerUserId,
             name: dashboard.name,
             description: dashboard.description || '',
-            widgets: dashboard.widgets.map(mapDashboardWidgetRecord)
+            widgets: dashboard.widgets.map(function mapWidget(widget) {
+                return mapDashboardWidgetRecord({
+                    ...widget,
+                    dashboard: {
+                        ownerUserId: dashboard.ownerUserId,
+                        owner: dashboard.owner
+                    }
+                });
+            })
         };
     }
     async findLatestDashboardSnapshot(dashboardId, userId) {
@@ -213,7 +227,16 @@ export class PrismaSnapshotRepository {
                 }
             },
             include: {
-                dashboard: true,
+                dashboard: {
+                    include: {
+                        owner: {
+                            select: {
+                                preferredLanguage: true,
+                                locale: true
+                            }
+                        }
+                    }
+                },
                 connectors: {
                     include: {
                         connector: true
@@ -240,7 +263,16 @@ export class PrismaSnapshotRepository {
                 }
             },
             include: {
-                dashboard: true,
+                dashboard: {
+                    include: {
+                        owner: {
+                            select: {
+                                preferredLanguage: true,
+                                locale: true
+                            }
+                        }
+                    }
+                },
                 connectors: {
                     include: {
                         connector: true
@@ -671,6 +703,9 @@ function mapDashboardWidgetRecord(widget) {
         tenantId: widget.tenantId,
         dashboardId: widget.dashboardId,
         ownerUserId: widget.dashboard ? widget.dashboard.ownerUserId : '',
+        ownerPreferredLanguage: widget.dashboard && widget.dashboard.owner
+            ? (widget.dashboard.owner.preferredLanguage || widget.dashboard.owner.locale)
+            : null,
         type: widget.widgetType,
         title: widget.title,
         x: widget.positionX,

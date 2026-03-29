@@ -1,5 +1,6 @@
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
 import { DefaultUserService } from '../default-user/default-user-service.js';
+import { isSupportedPreferredLanguage } from './user-language-options.js';
 export async function registerUserRoutes(app, dependencies = createUserRouteDependencies()) {
     app.get('/api/v1/users/me', async function handleGetCurrentUser(request) {
         const user = await dependencies.defaultUserService.getDefaultUser(request);
@@ -57,6 +58,12 @@ export async function registerUserRoutes(app, dependencies = createUserRouteDepe
                 message: 'timezone must be a valid IANA timezone.'
             };
         }
+        if (typeof body.preferredLanguage !== 'undefined' && !isSupportedPreferredLanguage(body.preferredLanguage)) {
+            reply.code(400);
+            return {
+                message: 'preferredLanguage must be one of the supported language codes.'
+            };
+        }
         if (body.briefingDelivery &&
             body.briefingDelivery.telegram &&
             typeof body.briefingDelivery.telegram.enabled !== 'undefined' &&
@@ -86,6 +93,7 @@ export async function registerUserRoutes(app, dependencies = createUserRouteDepe
                 email: normalizeOptionalString(body.email, undefined),
                 avatarDataUrl: normalizeOptionalString(body.avatarDataUrl, null),
                 timezone: normalizeOptionalString(body.timezone, undefined),
+                preferredLanguage: normalizeOptionalString(body.preferredLanguage, undefined),
                 telegramChatId: normalizeTelegramChatId(body.briefingDelivery),
                 telegramDeliveryEnabled: normalizeTelegramDeliveryEnabled(body.briefingDelivery)
             }
@@ -201,6 +209,9 @@ function serializeCurrentUser(user, fallbackUser) {
             : (user && typeof user.avatarUrl === 'string' ? user.avatarUrl : null),
         timezone: user && typeof user.timezone === 'string' ? user.timezone : fallbackUser.timezone,
         locale: user && typeof user.locale === 'string' ? user.locale : fallbackUser.locale,
+        preferredLanguage: user && typeof user.preferredLanguage === 'string'
+            ? user.preferredLanguage
+            : (fallbackUser.preferredLanguage || fallbackUser.locale),
         isAdmin: user && typeof user.isAdmin === 'boolean' ? user.isAdmin : fallbackUser.isAdmin,
         briefingDelivery: {
             telegram: {

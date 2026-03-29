@@ -3,6 +3,7 @@ export type DashboardWidgetRecord = {
   tenantId: string;
   dashboardId: string;
   ownerUserId: string;
+  ownerPreferredLanguage?: string | null;
   type: string;
   title: string;
   x: number;

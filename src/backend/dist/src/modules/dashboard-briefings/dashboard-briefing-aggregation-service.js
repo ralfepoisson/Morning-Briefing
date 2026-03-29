@@ -45,6 +45,7 @@ export class DashboardBriefingAggregationService {
             dashboardName: dashboard.name,
             generatedAt: new Date().toISOString(),
             language: preferences.language,
+            preferredLanguage: normalizeOptionalString(user.preferredLanguage) || preferences.language || user.locale,
             tone: preferences.tone,
             targetDurationSeconds: preferences.targetDurationSeconds,
             listener: {
@@ -70,7 +71,7 @@ export class DashboardBriefingAggregationService {
         });
         return {
             input,
-            sourceSnapshotHash: createAggregationHash(dashboard.id, preferences, dashboard.widgets),
+            sourceSnapshotHash: createAggregationHash(dashboard.id, preferences, normalizeOptionalString(user.preferredLanguage) || preferences.language || user.locale, dashboard.widgets),
             includedWidgetTypes: Array.from(new Set(sections.map(function mapSection(section) {
                 return section.widgetType;
             }))),
@@ -245,13 +246,14 @@ function buildSection(widget, snapshot) {
     }
     return null;
 }
-function createAggregationHash(dashboardId, preferences, widgets) {
+function createAggregationHash(dashboardId, preferences, preferredLanguage, widgets) {
     return createHash('sha256').update(stableStringify({
         dashboardId,
         preferences: {
             targetDurationSeconds: preferences.targetDurationSeconds,
             tone: preferences.tone,
             language: preferences.language,
+            preferredLanguage,
             voiceName: preferences.voiceName,
             includeWidgetTypes: preferences.includeWidgetTypes
         },

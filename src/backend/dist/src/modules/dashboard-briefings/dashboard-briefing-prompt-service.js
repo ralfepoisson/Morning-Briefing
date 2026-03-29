@@ -6,6 +6,7 @@ export class DashboardBriefingPromptService {
             developer: 'You write spoken dashboard audio briefings. Return only the final spoken script as plain text. ' +
                 'Use only the provided structured input. Do not invent facts, times, locations, or summaries. ' +
                 'Skip empty sections, keep delivery natural and concise, avoid robotic repetition, and stay within the target duration. ' +
+                `Ensure the final output is in ${input.preferredLanguage}. ` +
                 'Do not wrap the response in JSON, markdown, labels, or commentary.',
             user: stableStringify(input)
         };

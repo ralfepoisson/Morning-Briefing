@@ -9,7 +9,7 @@
       '      <div>' +
       '        <div class="stage-kicker">Profile</div>' +
       '        <h1 class="stage-title stage-title--compact">User profile</h1>' +
-      '        <p class="stage-copy stage-copy--compact mb-0">Manage the identity details shown around the app and choose how generated dashboard audio reaches you.</p>' +
+      '        <p class="stage-copy stage-copy--compact mb-0">Manage the identity details shown around the app, choose your preferred output language, and decide how generated dashboard audio reaches you.</p>' +
       '      </div>' +
       '      <div class="profile-hero__controls">' +
       '        <div class="profile-hero__badge">' +
@@ -22,7 +22,7 @@
       '        </div>' +
       '        <div class="profile-hero__actions">' +
       '          <button type="button" class="btn btn-outline-secondary" ng-click="$ctrl.reset()" ng-disabled="$ctrl.isSaving">Reset</button>' +
-      '          <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.isSaving || !$ctrl.form.displayName || !$ctrl.form.email || !$ctrl.form.timezone">' +
+      '          <button type="submit" class="btn btn-primary" ng-disabled="$ctrl.isSaving || !$ctrl.form.displayName || !$ctrl.form.email || !$ctrl.form.timezone || !$ctrl.form.preferredLanguage">' +
       '            <span ng-if="!$ctrl.isSaving">Save profile</span>' +
       '            <span ng-if="$ctrl.isSaving">Saving...</span>' +
       '          </button>' +
@@ -51,6 +51,10 @@
       '        <div>' +
       '          <label class="form-label" for="profileTimezone">Timezone</label>' +
       '          <select id="profileTimezone" class="form-select form-select-lg" ng-model="$ctrl.form.timezone" ng-options="timezone for timezone in $ctrl.timezoneOptions" required></select>' +
+      '        </div>' +
+      '        <div>' +
+      '          <label class="form-label" for="profilePreferredLanguage">Preferred language</label>' +
+      '          <select id="profilePreferredLanguage" class="form-select form-select-lg" ng-model="$ctrl.form.preferredLanguage" ng-options="option.value as option.label for option in $ctrl.preferredLanguageOptions" required></select>' +
       '        </div>' +
       '      </div>' +
       '      <div class="profile-upload-panel mt-3">' +
@@ -107,6 +111,7 @@
     $ctrl.isSaving = false;
     $ctrl.avatarError = '';
     $ctrl.timezoneOptions = buildTimezoneOptions();
+    $ctrl.preferredLanguageOptions = buildPreferredLanguageOptions();
     $ctrl.user = null;
     $ctrl.form = buildForm(null);
 
@@ -188,6 +193,7 @@
       email: user && user.email ? user.email : '',
       avatarDataUrl: user && user.avatarDataUrl ? user.avatarDataUrl : '',
       timezone: user && user.timezone ? user.timezone : 'UTC',
+      preferredLanguage: user && user.preferredLanguage ? user.preferredLanguage : 'en-GB',
       briefingDelivery: {
         telegram: {
           enabled: !!(user && user.briefingDelivery && user.briefingDelivery.telegram && user.briefingDelivery.telegram.enabled),
@@ -206,6 +212,7 @@
       email: form.email,
       avatarDataUrl: form.avatarDataUrl || null,
       timezone: form.timezone,
+      preferredLanguage: form.preferredLanguage,
       briefingDelivery: {
         telegram: {
           enabled: !!(form.briefingDelivery && form.briefingDelivery.telegram && form.briefingDelivery.telegram.enabled),
@@ -223,6 +230,23 @@
     }
 
     return ['UTC', 'Europe/Paris', 'Europe/London', 'America/New_York', 'America/Los_Angeles', 'Asia/Tokyo'];
+  }
+
+  function buildPreferredLanguageOptions() {
+    return [
+      { value: 'en-GB', label: 'English (UK)' },
+      { value: 'en-US', label: 'English (US)' },
+      { value: 'fr-FR', label: 'French' },
+      { value: 'de-DE', label: 'German' },
+      { value: 'es-ES', label: 'Spanish' },
+      { value: 'it-IT', label: 'Italian' },
+      { value: 'nl-NL', label: 'Dutch' },
+      { value: 'pt-PT', label: 'Portuguese' },
+      { value: 'ja-JP', label: 'Japanese' },
+      { value: 'ko-KR', label: 'Korean' },
+      { value: 'zh-CN', label: 'Chinese (Simplified)' },
+      { value: 'ar-SA', label: 'Arabic' }
+    ];
   }
 
   function deriveInitials(value) {

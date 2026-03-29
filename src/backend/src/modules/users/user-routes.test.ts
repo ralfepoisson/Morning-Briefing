@@ -19,6 +19,7 @@ test('GET /api/v1/users/me returns the authenticated user profile', async functi
           avatarDataUrl: 'data:image/png;base64,QUJDRA==',
           timezone: 'Europe/Paris',
           locale: 'en-GB',
+          preferredLanguage: 'fr-FR',
           isAdmin: true,
             isActive: true,
             telegramChatId: '123456',
@@ -37,6 +38,7 @@ test('GET /api/v1/users/me returns the authenticated user profile', async functi
           displayName: 'Ralfe',
           timezone: 'Europe/Paris',
           locale: 'en-GB',
+          preferredLanguage: 'fr-FR',
           email: 'ralfe@example.com',
           isAdmin: true
         };
@@ -61,6 +63,7 @@ test('GET /api/v1/users/me returns the authenticated user profile', async functi
         avatarDataUrl: 'data:image/png;base64,QUJDRA==',
         timezone: 'Europe/Paris',
         locale: 'en-GB',
+        preferredLanguage: 'fr-FR',
         isAdmin: true,
         briefingDelivery: {
           telegram: {
@@ -97,6 +100,7 @@ test('PATCH /api/v1/users/me updates the authenticated user profile and Telegram
             avatarDataUrl: 'data:image/png;base64,SU1BR0U=',
             timezone: 'America/New_York',
             locale: 'en-GB',
+            preferredLanguage: 'fr-FR',
             isAdmin: true,
             isActive: true,
             telegramChatId: '987654321',
@@ -115,6 +119,7 @@ test('PATCH /api/v1/users/me updates the authenticated user profile and Telegram
           displayName: 'Ralfe',
           timezone: 'Europe/Paris',
           locale: 'en-GB',
+          preferredLanguage: 'fr-FR',
           email: 'ralfe@example.com',
           isAdmin: true
         };
@@ -132,6 +137,7 @@ test('PATCH /api/v1/users/me updates the authenticated user profile and Telegram
         email: 'ralfe.mornings@example.com',
         avatarDataUrl: 'data:image/png;base64,SU1BR0U=',
         timezone: 'America/New_York',
+        preferredLanguage: 'fr-FR',
         briefingDelivery: {
           telegram: {
             enabled: true,
@@ -152,6 +158,7 @@ test('PATCH /api/v1/users/me updates the authenticated user profile and Telegram
         email: 'ralfe.mornings@example.com',
         avatarDataUrl: 'data:image/png;base64,SU1BR0U=',
         timezone: 'America/New_York',
+        preferredLanguage: 'fr-FR',
         telegramChatId: '987654321',
         telegramDeliveryEnabled: true
       }
@@ -166,6 +173,7 @@ test('PATCH /api/v1/users/me updates the authenticated user profile and Telegram
         avatarDataUrl: 'data:image/png;base64,SU1BR0U=',
         timezone: 'America/New_York',
         locale: 'en-GB',
+        preferredLanguage: 'fr-FR',
         isAdmin: true,
         briefingDelivery: {
           telegram: {
@@ -199,6 +207,7 @@ test('PATCH /api/v1/users/me rejects an invalid avatar upload payload', async fu
           displayName: 'Ralfe',
           timezone: 'Europe/Paris',
           locale: 'en-GB',
+          preferredLanguage: 'en-GB',
           email: 'ralfe@example.com',
           isAdmin: true
         };
@@ -218,6 +227,51 @@ test('PATCH /api/v1/users/me rejects an invalid avatar upload payload', async fu
     assert.equal(response.statusCode, 400);
     assert.deepEqual(response.json(), {
       message: 'avatarDataUrl must be a valid base64 image data URL.'
+    });
+  } finally {
+    await app.close();
+  }
+});
+
+test('PATCH /api/v1/users/me rejects an invalid preferred language', async function () {
+  const app = Fastify();
+
+  await registerUserRoutes(app, {
+    prisma: {
+      appUser: {
+        update: async function update() {
+          throw new Error('not expected');
+        }
+      } as never
+    } as never,
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          displayName: 'Ralfe',
+          timezone: 'Europe/Paris',
+          locale: 'en-GB',
+          preferredLanguage: 'en-GB',
+          email: 'ralfe@example.com',
+          isAdmin: true
+        };
+      }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/v1/users/me',
+      payload: {
+        preferredLanguage: 'Klingon'
+      }
+    });
+
+    assert.equal(response.statusCode, 400);
+    assert.deepEqual(response.json(), {
+      message: 'preferredLanguage must be one of the supported language codes.'
     });
   } finally {
     await app.close();

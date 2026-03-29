@@ -142,6 +142,7 @@ model AppUser {
   avatarUrl    String?            @map("avatar_url")
   timezone     String
   locale       String
+  preferredLanguage String        @default("en-GB") @map("preferred_language")
   isAdmin      Boolean            @default(false) @map("is_admin")
   isActive     Boolean            @default(true) @map("is_active")
   telegramChatId String?          @map("telegram_chat_id")

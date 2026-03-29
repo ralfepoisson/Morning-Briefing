@@ -72,6 +72,9 @@ export class DefaultUserService {
             phoneticName: typeof user.phoneticName === 'string' && user.phoneticName.trim() ? user.phoneticName.trim() : null,
             timezone: user.timezone,
             locale: user.locale,
+            preferredLanguage: typeof user.preferredLanguage === 'string' && user.preferredLanguage.trim()
+                ? user.preferredLanguage.trim()
+                : user.locale,
             email: user.email,
             isAdmin: user.isAdmin
         };
@@ -105,6 +108,9 @@ export class DefaultUserService {
             phoneticName: typeof user.phoneticName === 'string' && user.phoneticName.trim() ? user.phoneticName.trim() : null,
             timezone: user.timezone,
             locale: user.locale,
+            preferredLanguage: typeof user.preferredLanguage === 'string' && user.preferredLanguage.trim()
+                ? user.preferredLanguage.trim()
+                : user.locale,
             email: user.email,
             isAdmin: user.isAdmin
         };
@@ -136,6 +142,9 @@ export class DefaultUserService {
                     displayName: existingUser.displayName,
                     timezone: existingUser.timezone,
                     locale: existingUser.locale,
+                    preferredLanguage: typeof existingUser.preferredLanguage === 'string' && existingUser.preferredLanguage.trim()
+                        ? existingUser.preferredLanguage.trim()
+                        : existingUser.locale,
                     isAdmin: shouldGrantBootstrapAdminAccess ? true : existingUser.isAdmin,
                     isActive: true
                 }
@@ -149,6 +158,7 @@ export class DefaultUserService {
                 displayName: input.displayName,
                 timezone: input.timezone,
                 locale: input.locale,
+                preferredLanguage: input.locale,
                 isAdmin: await this.shouldGrantBootstrapAdminAccess(input.tenantId)
             }
         });

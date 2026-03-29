@@ -35,6 +35,9 @@
       '            </div>' +
       '          </section>' +
       '          <button type="button" class="btn btn-outline-light icon-button" ng-if="$ctrl.isEditing" ng-click="$ctrl.openEditDashboardModal()" aria-label="Configure dashboard"><i class="fa-solid fa-gear" aria-hidden="true"></i></button>' +
+      '          <button type="button" class="btn btn-outline-light icon-button" ng-if="$ctrl.activeDashboard" ng-click="$ctrl.refreshDashboard($event)" ng-disabled="$ctrl.isRefreshingDashboard" aria-label="Refresh dashboard" title="Refresh dashboard">' +
+      '            <i class="fa-solid" ng-class="$ctrl.isRefreshingDashboard ? \'fa-spinner fa-spin\' : \'fa-rotate-right\'" aria-hidden="true"></i>' +
+      '          </button>' +
       '          <button type="button" class="btn btn-light text-dark" ng-click="$ctrl.toggleEditing()">{{ $ctrl.isEditing ? "Save Dashboard" : "Edit Dashboard" }}</button>' +
       '          <button type="button" class="btn btn-outline-light" ng-if="$ctrl.isEditing" ng-click="$ctrl.openWidgetPanel()">+ Widget</button>' +
       '        </div>' +
@@ -275,6 +278,7 @@
     $ctrl.widgetConfig = buildEmptyWidgetConfigState();
     $ctrl.connectionModal = buildEmptyConnectionModalState();
     $ctrl.refreshingWidgetId = '';
+    $ctrl.isRefreshingDashboard = false;
     $ctrl.audioBriefing = null;
     $ctrl.audioBriefingPreferences = buildDefaultAudioBriefingPreferences();
     $ctrl.isGeneratingAudioBriefing = false;
@@ -680,6 +684,25 @@
       return !!(widget && $ctrl.refreshingWidgetId === widget.id);
     };
 
+    $ctrl.refreshDashboard = function refreshDashboard($event) {
+      if ($event) {
+        $event.preventDefault();
+        $event.stopPropagation();
+      }
+
+      if (!$ctrl.activeDashboard || $ctrl.isRefreshingDashboard) {
+        return;
+      }
+
+      $ctrl.isRefreshingDashboard = true;
+
+      reloadDashboardWidgets($ctrl.activeDashboard.id).catch(function handleDashboardRefreshError(error) {
+        NotificationService.error(getErrorMessage(error, 'Unable to refresh the dashboard right now.'), 'Dashboard refresh failed');
+      }).finally(function clearDashboardRefreshing() {
+        $ctrl.isRefreshingDashboard = false;
+      });
+    };
+
     $ctrl.generateAudioBriefing = function generateAudioBriefing(force) {
       if (!$ctrl.activeDashboard || $ctrl.isGeneratingAudioBriefing) {
         return;
@@ -895,22 +918,8 @@
         $ctrl.widgets = widgets;
         $ctrl.audioBriefingPreferences = audioBriefingPreferences || buildDefaultAudioBriefingPreferences();
         $ctrl.audioBriefing = audioBriefing;
-        return DashboardSnapshotService.loadLatestForDashboard(activeDashboardId).then(function handleSnapshot(snapshot) {
-          if (!$ctrl.activeDashboard || $ctrl.activeDashboard.id !== activeDashboardId) {
-            return widgets;
-          }
-
-          WidgetService.applySnapshot(activeDashboardId, snapshot);
-          $ctrl.widgets = WidgetService.listForDashboard(activeDashboardId);
-          return $ctrl.widgets;
-        }).catch(function ignoreSnapshotFailure() {
-          if (!$ctrl.activeDashboard || $ctrl.activeDashboard.id !== activeDashboardId) {
-            return widgets;
-          }
-
-          WidgetService.applySnapshot(activeDashboardId, null);
-          $ctrl.widgets = WidgetService.listForDashboard(activeDashboardId);
-          return $ctrl.widgets;
+        return reloadDashboardWidgets(activeDashboardId).catch(function ignoreSnapshotFailure() {
+          return widgets;
         });
       }).catch(function handleWidgetLoadError(error) {
         $ctrl.widgets = [];
@@ -925,6 +934,34 @@
       }
 
       return WidgetService.saveDashboardWidgets($ctrl.activeDashboard.id);
+    }
+
+    function reloadDashboardWidgets(dashboardId) {
+      return WidgetService.loadForDashboard(dashboardId).then(function handleWidgetsLoaded(widgets) {
+        if (!$ctrl.activeDashboard || $ctrl.activeDashboard.id !== dashboardId) {
+          return widgets;
+        }
+
+        $ctrl.widgets = widgets;
+
+        return DashboardSnapshotService.loadLatestForDashboard(dashboardId).then(function handleSnapshot(snapshot) {
+          if (!$ctrl.activeDashboard || $ctrl.activeDashboard.id !== dashboardId) {
+            return widgets;
+          }
+
+          WidgetService.applySnapshot(dashboardId, snapshot);
+          $ctrl.widgets = WidgetService.listForDashboard(dashboardId);
+          return $ctrl.widgets;
+        }).catch(function handleSnapshotFailure(error) {
+          if (!$ctrl.activeDashboard || $ctrl.activeDashboard.id !== dashboardId) {
+            return widgets;
+          }
+
+          WidgetService.applySnapshot(dashboardId, null);
+          $ctrl.widgets = WidgetService.listForDashboard(dashboardId);
+          throw error;
+        });
+      });
     }
 
     function bindUiWatchers() {

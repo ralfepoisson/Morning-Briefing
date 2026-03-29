@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import { registerAdminConfigurationRoutes } from '../modules/admin/configuration-routes.js';
 import { registerAdminConnectorRoutes } from '../modules/admin/connector-routes.js';
 import { registerAdminDashboardRoutes } from '../modules/admin/dashboard-routes.js';
+import { registerAlexaSkillRoutes } from '../modules/alexa/alexa-skill-routes.js';
 import { assertAuthenticatedRequest } from '../modules/default-user/default-user-service.js';
 import { registerLogRoutes } from '../modules/admin/log-routes.js';
 import { registerMessageBrokerRoutes } from '../modules/admin/message-broker-routes.js';
@@ -52,6 +53,7 @@ export async function buildApp() {
     }
   });
 
+  await registerAlexaSkillRoutes(app);
   await registerDashboardRoutes(app);
   await registerDashboardBriefingRoutes(app);
   await registerConnectionRoutes(app);
@@ -78,5 +80,6 @@ function isProtectedApiRoute(url: string): boolean {
   }
 
   return pathname !== '/api/v1/connections/google-calendar/oauth/callback'
-    && pathname !== '/api/v1/connections/gmail/oauth/callback';
+    && pathname !== '/api/v1/connections/gmail/oauth/callback'
+    && pathname !== '/api/v1/integrations/alexa';
 }

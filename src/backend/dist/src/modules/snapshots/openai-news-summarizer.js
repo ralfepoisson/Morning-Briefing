@@ -24,7 +24,8 @@ export class OpenAiNewsSummarizer {
                                     type: 'input_text',
                                     text: 'You summarize news for a morning briefing. Return JSON only with this shape: ' +
                                         '{"headline":"string","categories":[{"name":"string","bullets":[{"headline":"string","summary":"string","url":"string","sourceName":"string"}]}]}. ' +
-                                        'Use 2-4 bullets per category, prefer the strongest recurring themes, keep summaries concise, and preserve article URLs exactly.'
+                                        'Use 2-4 bullets per category, prefer the strongest recurring themes, keep summaries concise, preserve article URLs exactly, ' +
+                                        `and ensure every generated field is written in ${input.preferredLanguage}.`
                                 }
                             ]
                         },

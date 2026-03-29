@@ -560,6 +560,7 @@ export class SnapshotService {
         apiKey: openAiConfiguration.apiKey,
         model: openAiConfiguration.model,
         baseUrl: 'https://api.openai.com',
+        preferredLanguage: widget.ownerPreferredLanguage || 'en-GB',
         snapshotDate,
         categories: preparedCategories
       });

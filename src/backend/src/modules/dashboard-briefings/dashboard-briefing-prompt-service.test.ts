@@ -33,6 +33,16 @@ test('DashboardBriefingPromptService fallback script uses a generic greeting whe
   assert.match(result.fullScript, /^Hi there\./);
 });
 
+test('DashboardBriefingPromptService buildPrompt instructs the model to answer in the preferred language', function () {
+  const service = new DashboardBriefingPromptService();
+
+  const prompt = service.buildPrompt(createInput({
+    greetingName: 'Ralfe'
+  }));
+
+  assert.match(prompt.developer, /Ensure the final output is in fr-FR\./);
+});
+
 function createInput(listener: DashboardBriefingInput['listener']): DashboardBriefingInput {
   return {
     tenantId: 'tenant-1',
@@ -40,6 +50,7 @@ function createInput(listener: DashboardBriefingInput['listener']): DashboardBri
     dashboardName: 'Morning Briefing',
     generatedAt: '2026-03-27T06:00:00.000Z',
     language: 'en-GB',
+    preferredLanguage: 'fr-FR',
     tone: 'calm, concise, professional',
     targetDurationSeconds: 75,
     listener,

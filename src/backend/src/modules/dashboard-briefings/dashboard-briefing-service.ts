@@ -408,7 +408,7 @@ function buildDefaultPreference(dashboardId: string, user: DefaultUserContext): 
     autoGenerate: false,
     targetDurationSeconds: 75,
     tone: 'calm, concise, professional',
-    language: user.locale || 'en-GB',
+    language: user.preferredLanguage || user.locale || 'en-GB',
     voiceName: 'default',
     includeWidgetTypes: [],
     createdAt: new Date(0),

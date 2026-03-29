@@ -26,6 +26,7 @@ class AppUser {
   avatar_url : varchar?
   timezone : varchar
   locale : varchar
+  preferred_language : varchar
   telegram_chat_id : varchar?
   telegram_delivery_enabled : boolean
   is_active : boolean
@@ -242,6 +243,12 @@ Represents the configured widget instance
 placed on a dashboard layout.
 end note
 
+note right of AppUser
+Voice assistants use account-linked bearer tokens
+resolved at request time.
+No Alexa-specific identity is persisted yet.
+end note
+
 note right of WidgetSnapshot
 Stores the resolved content displayed
 for a widget at a specific point in time.
@@ -272,6 +279,9 @@ auth token refreshes. Telegram is the
 first implemented audio-delivery channel.
 Profile images are currently stored as
 base64 data on the user record.
+Preferred language is also stored here so
+every LLM prompt can target the user's
+chosen output language.
 end note
 
 note bottom of BriefingSnapshot

@@ -56,8 +56,10 @@ cloud "External Providers\nWeather / Calendar / Email / Tasks / News / Media" as
 cloud "OpenAI Responses API" as OpenAiResponses
 cloud "AWS Polly" as AwsPolly
 cloud "Telegram Bot API" as TelegramApi
+cloud "Alexa Custom Skill\nVoice requests + spoken responses" as AlexaSkill
 
 WebUi --> ApiLayer : REST /api/v1
+AlexaSkill --> ApiLayer : POST /api/v1/integrations/alexa
 WebUi --> AuthService : browser redirect\napplicationId + redirect
 AuthService --> WebUi : callback\nLife2 JWT
 ApiLayer --> AppLayer
@@ -70,6 +72,7 @@ InfraLayer --> Providers
 InfraLayer --> OpenAiResponses
 InfraLayer --> AwsPolly
 InfraLayer --> TelegramApi
+ApiLayer --> AlexaSkill : skill response JSON
 SnapshotScheduler --> AppLayer : invokes widget snapshot enqueue
 AudioScheduler --> AppLayer : invokes dashboard audio enqueue
 Sqs --> Lambda : event source mapping
@@ -84,8 +87,10 @@ Lambda --> [Snapshot Job Processor]
 [Audio Briefing Use Cases] ..> [TTS Provider] : audio generation
 [Audio Briefing Use Cases] ..> [Audio Storage] : persist files
 [Audio Briefing Use Cases] ..> [Delivery Channels] : user fan-out
+[Audio Briefing Use Cases] ..> AlexaSkill : serves saved script on demand
 [Audio Briefing Use Cases] ..> Postgres : metadata + preferences
 [User Profile Use Cases] ..> Postgres : profile + delivery settings
+[User Profile Use Cases] ..> [LLM Provider] : preferred language context
 [LLM Provider] ..> [Tenant AI Configuration]
 [LLM Provider] ..> OpenAiResponses
 [TTS Provider] ..> AwsPolly

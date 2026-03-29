@@ -85,6 +85,36 @@ test('gmail oauth callback is not blocked by api authentication', async function
   }
 });
 
+test('alexa integration route is not blocked by api authentication', async function () {
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/integrations/alexa',
+      payload: {
+        version: '1.0',
+        request: {
+          type: 'LaunchRequest',
+          requestId: 'req-1'
+        },
+        context: {
+          System: {
+            application: {
+              applicationId: 'amzn1.ask.skill.example'
+            },
+            user: {}
+          }
+        }
+      }
+    });
+
+    assert.notEqual(response.statusCode, 401);
+  } finally {
+    await app.close();
+  }
+});
+
 test('connection preflight requests allow authorization and content-type headers', async function () {
   const app = await buildApp();
 

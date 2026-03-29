@@ -21,6 +21,7 @@ test('DashboardBriefingService reuses latest ready briefing when source hash is 
             dashboardName: 'Morning Briefing',
             generatedAt: '2026-03-25T06:00:00.000Z',
             language: 'en-GB',
+            preferredLanguage: 'fr-FR',
             tone: 'calm, concise, professional',
             targetDurationSeconds: 75,
             sections: [
@@ -100,6 +101,7 @@ test('DashboardBriefingService toggles dashboard generating state around fresh g
             dashboardName: 'Morning Briefing',
             generatedAt: '2026-03-25T06:00:00.000Z',
             language: 'en-GB',
+            preferredLanguage: 'fr-FR',
             tone: 'calm, concise, professional',
             targetDurationSeconds: 75,
             sections: [
@@ -191,6 +193,7 @@ test('DashboardBriefingService delivers generated audio after the briefing is re
             dashboardName: 'Morning Briefing',
             generatedAt: '2026-03-25T06:00:00.000Z',
             language: 'en-GB',
+            preferredLanguage: 'fr-FR',
             tone: 'calm, concise, professional',
             targetDurationSeconds: 75,
             sections: [

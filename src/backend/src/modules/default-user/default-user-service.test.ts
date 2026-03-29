@@ -22,6 +22,7 @@ test('DefaultUserService preserves saved profile values for the local default us
             phoneticName: 'Pro-file',
             timezone: 'America/New_York',
             locale: 'en-US',
+            preferredLanguage: 'fr-FR',
             isAdmin: true,
             isActive: true
           };
@@ -41,6 +42,7 @@ test('DefaultUserService preserves saved profile values for the local default us
           phoneticName: 'Pro-file',
           timezone: 'America/New_York',
           locale: 'en-US',
+          preferredLanguage: 'fr-FR',
           isAdmin: true,
           isActive: true
         };
@@ -60,6 +62,7 @@ test('DefaultUserService preserves saved profile values for the local default us
     phoneticName: 'Pro-file',
     timezone: 'America/New_York',
     locale: 'en-US',
+    preferredLanguage: 'fr-FR',
     email: 'profile@example.com',
     isAdmin: true
   });

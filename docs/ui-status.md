@@ -87,9 +87,10 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 ### User profile and delivery configuration
 
 - Dedicated Profile page under `#/profile`
-- Users can edit display name, phonetic name, email address, profile image, and timezone
+- Users can edit display name, phonetic name, email address, profile image, timezone, and preferred language
 - Generated briefing audio now greets the user with their phonetic name first, then their first name, then a generic greeting
 - Profile data now persists through the backend `users/me` API instead of being treated as auth-token-only metadata
+- News summaries and generated audio briefing scripts now follow the preferred language saved on the user profile
 - Profile image uploads are stored with the user profile as base64 image data
 - Large profile images are resized in the browser before they are saved
 - Timezone selection now uses a dropdown built from browser-supported IANA timezones

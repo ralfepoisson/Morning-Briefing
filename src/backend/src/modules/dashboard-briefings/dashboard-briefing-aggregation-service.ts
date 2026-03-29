@@ -69,6 +69,7 @@ export class DashboardBriefingAggregationService {
       dashboardName: dashboard.name,
       generatedAt: new Date().toISOString(),
       language: preferences.language,
+      preferredLanguage: normalizeOptionalString(user.preferredLanguage) || preferences.language || user.locale,
       tone: preferences.tone,
       targetDurationSeconds: preferences.targetDurationSeconds,
       listener: {
@@ -96,7 +97,12 @@ export class DashboardBriefingAggregationService {
 
     return {
       input,
-      sourceSnapshotHash: createAggregationHash(dashboard.id, preferences, dashboard.widgets),
+      sourceSnapshotHash: createAggregationHash(
+        dashboard.id,
+        preferences,
+        normalizeOptionalString(user.preferredLanguage) || preferences.language || user.locale,
+        dashboard.widgets
+      ),
       includedWidgetTypes: Array.from(new Set(sections.map(function mapSection(section) {
         return section.widgetType;
       }))),
@@ -307,6 +313,7 @@ function buildSection(
 function createAggregationHash(
   dashboardId: string,
   preferences: DashboardBriefingPreferenceRecord,
+  preferredLanguage: string,
   widgets: Array<{
     id: string;
     type: string;
@@ -320,6 +327,7 @@ function createAggregationHash(
       targetDurationSeconds: preferences.targetDurationSeconds,
       tone: preferences.tone,
       language: preferences.language,
+      preferredLanguage,
       voiceName: preferences.voiceName,
       includeWidgetTypes: preferences.includeWidgetTypes
     },

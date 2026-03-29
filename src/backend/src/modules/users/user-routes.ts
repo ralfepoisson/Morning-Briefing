@@ -2,6 +2,7 @@ import type { PrismaClient } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
 import { DefaultUserService } from '../default-user/default-user-service.js';
+import { isSupportedPreferredLanguage } from './user-language-options.js';
 
 type UserRouteDependencies = {
   prisma: Pick<PrismaClient, 'appUser'>;
@@ -18,6 +19,7 @@ type AppUserRecord = {
   avatarUrl: string | null;
   timezone: string;
   locale: string;
+  preferredLanguage: string;
   isAdmin: boolean;
   isActive: boolean;
   telegramChatId: string | null;
@@ -51,6 +53,7 @@ export async function registerUserRoutes(
       email?: unknown;
       avatarDataUrl?: unknown;
       timezone?: unknown;
+      preferredLanguage?: unknown;
       briefingDelivery?: {
         telegram?: {
           enabled?: unknown;
@@ -108,6 +111,13 @@ export async function registerUserRoutes(
       };
     }
 
+    if (typeof body.preferredLanguage !== 'undefined' && !isSupportedPreferredLanguage(body.preferredLanguage)) {
+      reply.code(400);
+      return {
+        message: 'preferredLanguage must be one of the supported language codes.'
+      };
+    }
+
     if (
       body.briefingDelivery &&
       body.briefingDelivery.telegram &&
@@ -143,6 +153,7 @@ export async function registerUserRoutes(
         email: normalizeOptionalString(body.email, undefined),
         avatarDataUrl: normalizeOptionalString(body.avatarDataUrl, null),
         timezone: normalizeOptionalString(body.timezone, undefined),
+        preferredLanguage: normalizeOptionalString(body.preferredLanguage, undefined),
         telegramChatId: normalizeTelegramChatId(body.briefingDelivery),
         telegramDeliveryEnabled: normalizeTelegramDeliveryEnabled(body.briefingDelivery)
       }
@@ -271,6 +282,7 @@ function serializeCurrentUser(user: Partial<AppUserRecord> | null | undefined, f
   email: string;
   timezone: string;
   locale: string;
+  preferredLanguage?: string | null;
   isAdmin: boolean;
 }) {
   return {
@@ -284,6 +296,9 @@ function serializeCurrentUser(user: Partial<AppUserRecord> | null | undefined, f
       : (user && typeof user.avatarUrl === 'string' ? user.avatarUrl : null),
     timezone: user && typeof user.timezone === 'string' ? user.timezone : fallbackUser.timezone,
     locale: user && typeof user.locale === 'string' ? user.locale : fallbackUser.locale,
+    preferredLanguage: user && typeof user.preferredLanguage === 'string'
+      ? user.preferredLanguage
+      : (fallbackUser.preferredLanguage || fallbackUser.locale),
     isAdmin: user && typeof user.isAdmin === 'boolean' ? user.isAdmin : fallbackUser.isAdmin,
     briefingDelivery: {
       telegram: {

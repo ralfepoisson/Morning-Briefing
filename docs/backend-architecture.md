@@ -91,7 +91,7 @@ The existing AngularJS UI already implies a few important backend requirements:
 - Widget type definitions remain code-owned in the application layer, while widget instance configuration belongs in the database.
 - Widget display content should come from snapshot data or connector-backed reads, not be mixed into widget configuration rows.
 - Connector management needs both creation from task-widget flows and a dedicated page for later credential edits.
-- User profile management needs persisted preferences that survive future auth-token refreshes, including delivery-channel settings for generated audio briefings and uploaded profile imagery.
+- User profile management needs persisted preferences that survive future auth-token refreshes, including delivery-channel settings for generated audio briefings, uploaded profile imagery, and a preferred output language for all LLM-generated text.
 
 That last point is the main reason to keep both `dashboard_widget.config_json` and `widget_snapshot.content_json`. One stores configuration; the other stores rendered content for a specific briefing run.
 
@@ -228,7 +228,7 @@ Audio Briefing extends the existing snapshot architecture at the dashboard level
 2. A dashboard briefing aggregation step selects the latest eligible snapshots for the dashboard.
 3. Widget-type-specific transformers normalize those snapshots into one dashboard briefing input payload.
 4. A tenant-scoped OpenAI configuration is loaded from admin-managed configuration.
-5. OpenAI generates a structured JSON script contract.
+5. OpenAI generates a structured JSON script contract, explicitly instructed to answer in the user profile's preferred language.
 6. AWS Polly converts the full script into audio and stores the generated file.
 7. A delivery orchestration step fan-outs the saved audio to any enabled user channels, starting with Telegram.
 8. The dashboard UI fetches the latest saved briefing metadata and plays the stored audio artifact.
@@ -242,7 +242,9 @@ Audio Briefing extends the existing snapshot architecture at the dashboard level
 - Briefing preferences are dashboard-scoped and stored separately from widget configuration.
 - Tenant-scoped AI configuration is stored separately from both widget configuration and briefing preferences.
 - User delivery preferences are stored on the user profile so channel choices follow the person rather than a single dashboard.
+- User preferred language is stored on the user profile and injected into every LLM prompt so news summaries and audio scripts stay consistent for that person.
 - User avatars are stored directly on the user profile as base64 image data so the current UI can upload without adding a separate media service yet.
+- Voice assistants can reuse the saved dashboard briefing script instead of re-synthesizing audio, starting with an Alexa custom skill webhook that reads the latest `READY` briefing for the linked user.
 - Manual regeneration belongs to admin tooling or scheduled jobs, not the end-user dashboard.
 - Manual audio regeneration is queue-backed so the HTTP request only enqueues work and the worker performs the heavy generation.
 - Cache reuse is based on a source hash built from the included widget snapshot identities and the current dashboard briefing preferences.
@@ -310,9 +312,10 @@ Recommended approach:
 ## Implemented So Far
 
 - `GET /api/v1/me` resolves a temporary default local user named `Ralfe`
-- `GET /api/v1/users/me` returns the persisted current-user profile, including avatar data and audio delivery preferences
-- `PATCH /api/v1/users/me` updates the persisted current-user profile, including Telegram delivery settings
+- `GET /api/v1/users/me` returns the persisted current-user profile, including avatar data, preferred language, and audio delivery preferences
+- `PATCH /api/v1/users/me` updates the persisted current-user profile, including preferred language and Telegram delivery settings
 - Dashboard audio briefing generation now personalizes the opening greeting from the persisted user profile, preferring phonetic name over first name
+- News summarization and dashboard audio briefing prompts now both instruct the LLM to respond in the persisted user preferred language
 - `GET /api/v1/dashboards` lists that user's dashboards
 - `POST /api/v1/dashboards` creates dashboards for that user
 - `PATCH /api/v1/dashboards/:dashboardId` updates dashboard metadata
@@ -325,7 +328,7 @@ Reference-city imports are designed around the GeoNames `cities5000` open datase
 
 Widget definitions remain code-owned rather than database-owned. The backend currently uses a server-side widget definition catalog to validate widget types, choose default layout values, and provide explicit empty or configuration-required states while snapshot-backed content is pending.
 
-The current-user bootstrap path now preserves saved profile fields such as display name, timezone, avatar URL, and Telegram delivery preferences instead of overwriting them on every sign-in.
+The current-user bootstrap path now preserves saved profile fields such as display name, timezone, preferred language, avatar URL, and Telegram delivery preferences instead of overwriting them on every sign-in.
 
 ## Related Diagrams
 
