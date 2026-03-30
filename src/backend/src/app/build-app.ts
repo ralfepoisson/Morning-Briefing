@@ -9,6 +9,7 @@ import { registerLogRoutes } from '../modules/admin/log-routes.js';
 import { registerMessageBrokerRoutes } from '../modules/admin/message-broker-routes.js';
 import { registerAdminWidgetRoutes } from '../modules/admin/widget-routes.js';
 import { registerConnectionRoutes } from '../modules/connections/connection-routes.js';
+import { registerContactRoutes } from '../modules/contact/contact-routes.js';
 import { registerDashboardBriefingRoutes } from '../modules/dashboard-briefings/dashboard-briefing-routes.js';
 import { registerDashboardRoutes } from '../modules/dashboards/dashboard-routes.js';
 import { registerReferenceCityRoutes } from '../modules/reference-data/reference-city-routes.js';
@@ -54,6 +55,7 @@ export async function buildApp() {
   });
 
   await registerAlexaSkillRoutes(app);
+  await registerContactRoutes(app);
   await registerDashboardRoutes(app);
   await registerDashboardBriefingRoutes(app);
   await registerConnectionRoutes(app);
@@ -81,5 +83,6 @@ function isProtectedApiRoute(url: string): boolean {
 
   return pathname !== '/api/v1/connections/google-calendar/oauth/callback'
     && pathname !== '/api/v1/connections/gmail/oauth/callback'
+    && pathname !== '/api/v1/public/contact'
     && pathname !== '/api/v1/integrations/alexa';
 }

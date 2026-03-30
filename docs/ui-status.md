@@ -15,12 +15,19 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 - Bootstrap styling integrated
 - Font Awesome Free integrated for UI icons
 - Theme-aware branding using `logo-dark.png` and `logo-light.png`
+- Public landing page available at `#/` without authentication
+- Public Terms of Service page available at `#/terms`
+- Public Privacy Policy page available at `#/privacy`
+- Public Contact page available at `#/contact` with a submission form
+- Authenticated dashboard workspace now lives at `#/dashboard`
 
 ### Top navigation
 
 - Horizontal top navigation bar
 - Dark mode and light mode toggle
 - Theme preference is stored in local storage and restored on page load
+- Public navigation links for Home, Terms, and Privacy
+- Public contact form posts to a backend email-delivery endpoint
 - Dashboard dropdown in the top navigation for selecting existing dashboards
 - Dashboard creation action inside the top navigation dropdown
 - Simplified top navigation with secondary sections removed from the main bar

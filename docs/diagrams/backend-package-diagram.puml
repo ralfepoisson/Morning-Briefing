@@ -4,8 +4,9 @@ skinparam packageStyle rectangle
 skinparam linetype ortho
 left to right direction
 
-package "Web UI\n(AngularJS SPA)" as WebUi
+package "Web UI\n(AngularJS SPA)\nPublic pages + authenticated dashboard" as WebUi
 cloud "Life2 Auth Service\nBrowser sign-in + callback" as AuthService
+cloud "SMTP Mail Provider" as SmtpProvider
 
 package "Backend API\nNode.js + Fastify" as Api {
   package "API Layer" as ApiLayer {
@@ -68,6 +69,7 @@ AppLayer --> InfraLayer
 InfraLayer --> Postgres
 InfraLayer --> Sqs
 InfraLayer --> Secrets
+InfraLayer --> SmtpProvider
 InfraLayer --> Providers
 InfraLayer --> OpenAiResponses
 InfraLayer --> AwsPolly
@@ -104,6 +106,10 @@ Lambda --> [Snapshot Job Processor]
 note bottom of WebUi
 UI communicates with backend only through REST.
 No direct database or provider access.
+Public home, terms, and privacy pages render client-side
+without calling authenticated APIs.
+The public contact page posts to a backend route that relays
+mail through configured SMTP credentials.
 end note
 
 note bottom of InfraLayer

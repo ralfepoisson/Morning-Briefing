@@ -115,6 +115,27 @@ test('alexa integration route is not blocked by api authentication', async funct
   }
 });
 
+test('public contact route is not blocked by api authentication', async function () {
+  const app = await buildApp();
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/public/contact',
+      payload: {
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+        subject: 'Hello',
+        message: 'I would like to get in touch about Daily Briefing.'
+      }
+    });
+
+    assert.notEqual(response.statusCode, 401);
+  } finally {
+    await app.close();
+  }
+});
+
 test('connection preflight requests allow authorization and content-type headers', async function () {
   const app = await buildApp();
 

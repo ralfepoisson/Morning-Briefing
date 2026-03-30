@@ -9,6 +9,10 @@
       '      <img class="brand-logo" ng-src="{{$ctrl.ui.theme === \'light\' ? \'./assets/img/logo-light.png\' : \'./assets/img/logo-dark.png\'}}" alt="Morning Briefing logo" />' +
       '    </a>' +
       '    <div class="top-nav-links d-flex align-items-center gap-2 ms-auto">' +
+      '      <a class="nav-link" ng-class="{active: $ctrl.isActiveRoute(\'/\')}" href="#/">Home</a>' +
+      '      <a class="nav-link" ng-class="{active: $ctrl.isActiveRoute(\'/terms\')}" href="#/terms">Terms</a>' +
+      '      <a class="nav-link" ng-class="{active: $ctrl.isActiveRoute(\'/privacy\')}" href="#/privacy">Privacy</a>' +
+      '      <a class="nav-link" ng-class="{active: $ctrl.isActiveRoute(\'/contact\')}" href="#/contact">Contact</a>' +
       '      <div class="dashboard-menu" ng-if="$ctrl.isAuthenticated()" ng-class="{\'dashboard-menu--open\': $ctrl.isDashboardMenuOpen}">' +
       '        <button class="dashboard-menu__trigger" type="button" ng-click="$ctrl.toggleDashboardMenu()" aria-haspopup="true" aria-expanded="{{$ctrl.isDashboardMenuOpen}}">' +
       '          <span class="dashboard-menu__eyebrow">Dashboards</span>' +
@@ -68,6 +72,7 @@
       '        <button type="button" class="theme-toggle__button" ng-class="{active: $ctrl.ui.theme === \'light\'}" ng-click="$ctrl.setTheme(\'light\')">Light</button>' +
       '        <button type="button" class="theme-toggle__button" ng-class="{active: $ctrl.ui.theme === \'dark\'}" ng-click="$ctrl.setTheme(\'dark\')">Dark</button>' +
       '      </div>' +
+      '      <button type="button" class="btn btn-sm btn-primary" ng-if="!$ctrl.auth.session" ng-click="$ctrl.signIn()">Sign in</button>' +
       '      <div class="top-nav-session" ng-if="$ctrl.auth.session">' +
       '        <button type="button" class="top-nav-profile-trigger" ng-class="{\'top-nav-profile-trigger--active\': $ctrl.isActiveRoute(\'/profile\')}" ng-click="$ctrl.openProfile()">' +
       '          <span class="top-nav-profile-trigger__avatar" ng-if="$ctrl.getAvatarUrl()"><img ng-src="{{$ctrl.getAvatarUrl()}}" alt="" /></span>' +
@@ -172,6 +177,12 @@
       $ctrl.isAdminMenuOpen = false;
       AuthService.signOut();
       refreshAuthState();
+    };
+
+    $ctrl.signIn = function signIn() {
+      $ctrl.isDashboardMenuOpen = false;
+      $ctrl.isAdminMenuOpen = false;
+      AuthService.beginSignIn('/dashboard');
     };
 
     $ctrl.openProfile = function openProfile() {

@@ -6,6 +6,15 @@
   var RETURN_PATH_KEY = 'morningBriefing.auth.returnPath';
   var ERROR_KEY = 'morningBriefing.auth.error';
   var PUBLIC_ROUTES = {
+    '/': true,
+    '/terms': true,
+    '/privacy': true,
+    '/contact': true,
+    '/signed-out': true,
+    '/auth/callback': true
+  };
+  var AUTH_REDIRECT_ROUTES = {
+    '/': true,
     '/signed-out': true,
     '/auth/callback': true
   };
@@ -89,6 +98,10 @@
 
     this.isPublicRoute = function isPublicRoute(path) {
       return !!PUBLIC_ROUTES[path];
+    };
+
+    this.shouldRedirectAuthenticatedPublicRoute = function shouldRedirectAuthenticatedPublicRoute(path) {
+      return !!AUTH_REDIRECT_ROUTES[path];
     };
 
     this.hasIncomingToken = function hasIncomingToken() {

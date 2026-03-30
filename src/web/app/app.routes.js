@@ -10,7 +10,19 @@
 
     $routeProvider
       .when('/', {
+        template: '<home-page></home-page>'
+      })
+      .when('/dashboard', {
         template: '<dashboard-page></dashboard-page>'
+      })
+      .when('/terms', {
+        template: '<terms-page></terms-page>'
+      })
+      .when('/privacy', {
+        template: '<privacy-page></privacy-page>'
+      })
+      .when('/contact', {
+        template: '<contact-page></contact-page>'
       })
       .when('/signed-out', {
         template: '<auth-status-page></auth-status-page>'

@@ -14,7 +14,7 @@ test.describe('Life2 auth callback', () => {
     });
 
     await page.goto('/#/signed-out');
-    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.getByRole('main').getByRole('button', { name: 'Sign in' }).click();
     await page.waitForURL('**/signIn**');
 
     const signInUrl = new URL(page.url());
@@ -33,7 +33,7 @@ test.describe('Life2 auth callback', () => {
     });
 
     await page.goto(`/#/auth/callback?token=${encodeURIComponent(token)}`);
-    await page.waitForURL('**/#/');
+    await page.waitForURL('**/#/dashboard');
 
     const storedToken = await page.evaluate((key) => window.localStorage.getItem(key), TOKEN_KEY);
     const storedSession = await page.evaluate((key) => window.localStorage.getItem(key), SESSION_KEY);
