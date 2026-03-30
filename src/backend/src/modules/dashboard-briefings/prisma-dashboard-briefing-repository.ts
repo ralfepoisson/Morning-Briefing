@@ -44,6 +44,17 @@ export class PrismaDashboardBriefingRepository implements DashboardBriefingRepos
               }
             }
           },
+          dashboardBriefings: {
+            orderBy: [
+              { updatedAt: 'desc' },
+              { createdAt: 'desc' }
+            ],
+            take: 1,
+            select: {
+              status: true,
+              updatedAt: true
+            }
+          },
           owner: {
             select: {
               id: true,
@@ -71,6 +82,12 @@ export class PrismaDashboardBriefingRepository implements DashboardBriefingRepos
           hasReadySnapshot: dashboard.widgets.some(function hasReadySnapshot(widget) {
             return widget.snapshots[0]?.status === 'READY';
           }),
+          latestBriefing: dashboard.dashboardBriefings[0]
+            ? {
+              status: dashboard.dashboardBriefings[0].status,
+              updatedAt: dashboard.dashboardBriefings[0].updatedAt
+            }
+            : null,
           owner: dashboard.owner,
           briefingPreference: dashboard.briefingPreferences
             ? {
@@ -112,6 +129,17 @@ export class PrismaDashboardBriefingRepository implements DashboardBriefingRepos
               }
             }
           },
+          dashboardBriefings: {
+            orderBy: [
+              { updatedAt: 'desc' },
+              { createdAt: 'desc' }
+            ],
+            take: 1,
+            select: {
+              status: true,
+              updatedAt: true
+            }
+          },
           owner: {
             select: {
               id: true,
@@ -134,6 +162,12 @@ export class PrismaDashboardBriefingRepository implements DashboardBriefingRepos
           hasReadySnapshot: dashboard.widgets.some(function hasReadySnapshot(widget) {
             return widget.snapshots[0]?.status === 'READY';
           }),
+          latestBriefing: dashboard.dashboardBriefings[0]
+            ? {
+              status: dashboard.dashboardBriefings[0].status,
+              updatedAt: dashboard.dashboardBriefings[0].updatedAt
+            }
+            : null,
           owner: dashboard.owner,
           briefingPreference: null
         };

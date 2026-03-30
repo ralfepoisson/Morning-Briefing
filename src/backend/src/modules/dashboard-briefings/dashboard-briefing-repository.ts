@@ -40,6 +40,10 @@ export interface DashboardBriefingRepository extends DashboardBriefingAggregatio
     tenantId: string;
     isGenerating: boolean;
     hasReadySnapshot: boolean;
+    latestBriefing: {
+      status: 'PENDING' | 'GENERATING' | 'READY' | 'FAILED';
+      updatedAt: Date;
+    } | null;
     owner: {
       id: string;
       displayName: string;

@@ -6,6 +6,10 @@ export type ScheduledDashboardBriefingRecord = {
   tenantId: string;
   isGenerating: boolean;
   hasReadySnapshot: boolean;
+  latestBriefing: {
+    status: 'PENDING' | 'GENERATING' | 'READY' | 'FAILED';
+    updatedAt: Date;
+  } | null;
   owner: {
     id: string;
     displayName: string;
@@ -21,9 +25,12 @@ export type ScheduledDashboardBriefingRecord = {
 };
 
 export class ScheduledDashboardBriefingRefreshService {
+  private static readonly STALE_GENERATING_THRESHOLD_MS = 30 * 60 * 1000;
+
   constructor(
     private readonly repository: {
       listDashboardsForScheduledGeneration(): Promise<ScheduledDashboardBriefingRecord[]>;
+      setDashboardGenerating(dashboardId: string, ownerUserId: string, isGenerating: boolean): Promise<void>;
     },
     private readonly publisher: Pick<DashboardBriefingJobPublisher, 'publishGenerateDashboardAudioBriefing'>
   ) {}
@@ -33,17 +40,36 @@ export class ScheduledDashboardBriefingRefreshService {
     skippedDisabledCount: number;
     skippedGeneratingCount: number;
     skippedMissingSnapshotsCount: number;
+    recoveredStaleGeneratingCount: number;
   }> {
     const dashboards = await this.repository.listDashboardsForScheduledGeneration();
     let enqueuedCount = 0;
     let skippedDisabledCount = 0;
     let skippedGeneratingCount = 0;
     let skippedMissingSnapshotsCount = 0;
+    let recoveredStaleGeneratingCount = 0;
 
     for (const dashboard of dashboards) {
       if (dashboard.isGenerating) {
-        skippedGeneratingCount += 1;
-        continue;
+        if (isStaleGeneratingDashboard(dashboard, now)) {
+          await this.repository.setDashboardGenerating(dashboard.id, dashboard.owner.id, false);
+          recoveredStaleGeneratingCount += 1;
+          logApplicationEvent({
+            level: 'warn',
+            scope: 'dashboard-briefing',
+            event: 'scheduled_dashboard_briefing_stale_generating_reset',
+            message: 'Recovered a dashboard briefing stuck in generating state before scheduled enqueue.',
+            context: {
+              dashboardId: dashboard.id,
+              ownerUserId: dashboard.owner.id,
+              latestBriefingStatus: dashboard.latestBriefing ? dashboard.latestBriefing.status : null,
+              latestBriefingUpdatedAt: dashboard.latestBriefing ? dashboard.latestBriefing.updatedAt.toISOString() : null
+            }
+          });
+        } else {
+          skippedGeneratingCount += 1;
+          continue;
+        }
       }
 
       if (dashboard.briefingPreference && dashboard.briefingPreference.enabled === false) {
@@ -85,6 +111,7 @@ export class ScheduledDashboardBriefingRefreshService {
         skippedDisabledCount,
         skippedGeneratingCount,
         skippedMissingSnapshotsCount,
+        recoveredStaleGeneratingCount,
         dashboardCount: dashboards.length
       }
     });
@@ -93,7 +120,24 @@ export class ScheduledDashboardBriefingRefreshService {
       enqueuedCount,
       skippedDisabledCount,
       skippedGeneratingCount,
-      skippedMissingSnapshotsCount
+      skippedMissingSnapshotsCount,
+      recoveredStaleGeneratingCount
     };
   }
+}
+
+function isStaleGeneratingDashboard(
+  dashboard: Pick<ScheduledDashboardBriefingRecord, 'latestBriefing'>,
+  now: Date
+): boolean {
+  if (!dashboard.latestBriefing) {
+    return true;
+  }
+
+  if (dashboard.latestBriefing.status !== 'GENERATING') {
+    return true;
+  }
+
+  return now.getTime() - dashboard.latestBriefing.updatedAt.getTime() >=
+    ScheduledDashboardBriefingRefreshService.STALE_GENERATING_THRESHOLD_MS;
 }

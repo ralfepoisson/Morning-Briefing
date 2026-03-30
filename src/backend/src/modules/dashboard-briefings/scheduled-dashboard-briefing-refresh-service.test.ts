@@ -12,6 +12,7 @@ test('ScheduledDashboardBriefingRefreshService enqueues one job per eligible das
           tenantId: 'tenant-1',
           isGenerating: false,
           hasReadySnapshot: true,
+          latestBriefing: null,
           owner: {
             id: 'owner-1',
             displayName: 'Owner One',
@@ -28,6 +29,7 @@ test('ScheduledDashboardBriefingRefreshService enqueues one job per eligible das
           tenantId: 'tenant-1',
           isGenerating: false,
           hasReadySnapshot: true,
+          latestBriefing: null,
           owner: {
             id: 'owner-2',
             displayName: 'Owner Two',
@@ -46,6 +48,10 @@ test('ScheduledDashboardBriefingRefreshService enqueues one job per eligible das
           tenantId: 'tenant-1',
           isGenerating: true,
           hasReadySnapshot: true,
+          latestBriefing: {
+            status: 'GENERATING',
+            updatedAt: new Date('2026-03-26T04:50:00.000Z')
+          },
           owner: {
             id: 'owner-3',
             displayName: 'Owner Three',
@@ -60,6 +66,9 @@ test('ScheduledDashboardBriefingRefreshService enqueues one job per eligible das
           }
         }
       ];
+    },
+    async setDashboardGenerating() {
+      throw new Error('should not reset generating state');
     }
   };
   const publisher = new InMemoryPublisher();
@@ -71,7 +80,8 @@ test('ScheduledDashboardBriefingRefreshService enqueues one job per eligible das
     enqueuedCount: 1,
     skippedDisabledCount: 1,
     skippedGeneratingCount: 1,
-    skippedMissingSnapshotsCount: 0
+    skippedMissingSnapshotsCount: 0,
+    recoveredStaleGeneratingCount: 0
   });
   assert.equal(publisher.items.length, 1);
   assert.deepEqual(publisher.items[0], {
@@ -100,6 +110,7 @@ test('ScheduledDashboardBriefingRefreshService skips dashboards without a ready 
           tenantId: 'tenant-1',
           isGenerating: false,
           hasReadySnapshot: false,
+          latestBriefing: null,
           owner: {
             id: 'owner-1',
             displayName: 'Owner One',
@@ -114,6 +125,9 @@ test('ScheduledDashboardBriefingRefreshService skips dashboards without a ready 
           }
         }
       ];
+    },
+    async setDashboardGenerating() {
+      throw new Error('should not reset generating state');
     }
   };
   const publisher = new InMemoryPublisher();
@@ -125,9 +139,65 @@ test('ScheduledDashboardBriefingRefreshService skips dashboards without a ready 
     enqueuedCount: 0,
     skippedDisabledCount: 0,
     skippedGeneratingCount: 0,
-    skippedMissingSnapshotsCount: 1
+    skippedMissingSnapshotsCount: 1,
+    recoveredStaleGeneratingCount: 0
   });
   assert.equal(publisher.items.length, 0);
+});
+
+test('ScheduledDashboardBriefingRefreshService recovers a stale generating dashboard and enqueues it', async function () {
+  const resets = [] as Array<{ dashboardId: string; ownerUserId: string; isGenerating: boolean }>;
+  const repository = {
+    async listDashboardsForScheduledGeneration() {
+      return [
+        {
+          id: 'dash-1',
+          tenantId: 'tenant-1',
+          isGenerating: true,
+          hasReadySnapshot: true,
+          latestBriefing: {
+            status: 'GENERATING',
+            updatedAt: new Date('2026-03-30T04:00:00.000Z')
+          },
+          owner: {
+            id: 'owner-1',
+            displayName: 'Owner One',
+            phoneticName: null,
+            timezone: 'UTC',
+            locale: 'en-GB',
+            email: 'owner-1@example.com',
+            isAdmin: false
+          },
+          briefingPreference: {
+            enabled: true
+          }
+        }
+      ];
+    },
+    async setDashboardGenerating(dashboardId: string, ownerUserId: string, isGenerating: boolean) {
+      resets.push({ dashboardId, ownerUserId, isGenerating });
+    }
+  };
+  const publisher = new InMemoryPublisher();
+  const service = new ScheduledDashboardBriefingRefreshService(repository, publisher);
+
+  const result = await service.enqueueAllDashboards(new Date('2026-03-30T05:00:00.000Z'));
+
+  assert.deepEqual(result, {
+    enqueuedCount: 1,
+    skippedDisabledCount: 0,
+    skippedGeneratingCount: 0,
+    skippedMissingSnapshotsCount: 0,
+    recoveredStaleGeneratingCount: 1
+  });
+  assert.deepEqual(resets, [
+    {
+      dashboardId: 'dash-1',
+      ownerUserId: 'owner-1',
+      isGenerating: false
+    }
+  ]);
+  assert.equal(publisher.items.length, 1);
 });
 
 class InMemoryPublisher implements DashboardBriefingJobPublisher {

@@ -260,14 +260,16 @@
     controller: DashboardPageController
   });
 
-  DashboardPageController.$inject = ['DashboardService', 'DashboardSnapshotService', 'AudioBriefingService', 'ConnectionService', 'WidgetService', 'WidgetRegistryService', 'ReferenceDataService', 'UiShellService', 'NotificationService', '$scope', '$window', '$q', '$location'];
+  DashboardPageController.$inject = ['DashboardService', 'DashboardSnapshotService', 'AudioBriefingService', 'ConnectionService', 'WidgetService', 'WidgetRegistryService', 'ReferenceDataService', 'UiShellService', 'NotificationService', '$scope', '$window', '$q', '$location', '$timeout'];
 
-  function DashboardPageController(DashboardService, DashboardSnapshotService, AudioBriefingService, ConnectionService, WidgetService, WidgetRegistryService, ReferenceDataService, UiShellService, NotificationService, $scope, $window, $q, $location) {
+  function DashboardPageController(DashboardService, DashboardSnapshotService, AudioBriefingService, ConnectionService, WidgetService, WidgetRegistryService, ReferenceDataService, UiShellService, NotificationService, $scope, $window, $q, $location, $timeout) {
     var $ctrl = this;
+    var AUTO_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
     var hasCompletedInitialStateLoad = false;
     var pendingWidgetOAuthResult = readPendingWidgetOAuthResult();
     var audioElement = null;
     var audioPlaybackUrl = '';
+    var dashboardAutoRefreshPromise = null;
 
     $ctrl.ready = false;
     $ctrl.isEditing = false;
@@ -302,6 +304,8 @@
     };
 
     $ctrl.$onDestroy = function onDestroy() {
+      cancelDashboardAutoRefresh();
+
       if (audioElement) {
         audioElement.pause();
         audioElement = null;
@@ -409,6 +413,7 @@
         return;
       }
 
+      cancelDashboardAutoRefresh();
       $ctrl.isEditing = true;
     };
 
@@ -694,12 +699,8 @@
         return;
       }
 
-      $ctrl.isRefreshingDashboard = true;
-
-      reloadDashboardWidgets($ctrl.activeDashboard.id).catch(function handleDashboardRefreshError(error) {
-        NotificationService.error(getErrorMessage(error, 'Unable to refresh the dashboard right now.'), 'Dashboard refresh failed');
-      }).finally(function clearDashboardRefreshing() {
-        $ctrl.isRefreshingDashboard = false;
+      runDashboardRefresh($ctrl.activeDashboard.id, {
+        notifyOnError: true
       });
     };
 
@@ -892,6 +893,7 @@
       $ctrl.activeDashboard = DashboardService.getActive();
 
       if (!$ctrl.activeDashboard) {
+        cancelDashboardAutoRefresh();
         $ctrl.closeWidgetConfigModal();
         $ctrl.widgets = [];
         $ctrl.audioBriefing = null;
@@ -918,10 +920,12 @@
         $ctrl.widgets = widgets;
         $ctrl.audioBriefingPreferences = audioBriefingPreferences || buildDefaultAudioBriefingPreferences();
         $ctrl.audioBriefing = audioBriefing;
+        syncDashboardAutoRefresh(activeDashboardId);
         return reloadDashboardWidgets(activeDashboardId).catch(function ignoreSnapshotFailure() {
           return widgets;
         });
       }).catch(function handleWidgetLoadError(error) {
+        cancelDashboardAutoRefresh();
         $ctrl.widgets = [];
         NotificationService.error(getErrorMessage(error, 'Unable to load dashboard widgets right now.'), 'Unable to load dashboard');
         return [];
@@ -962,6 +966,63 @@
           throw error;
         });
       });
+    }
+
+    function runDashboardRefresh(dashboardId, options) {
+      var refreshOptions = options || {};
+
+      if (!$ctrl.activeDashboard || $ctrl.activeDashboard.id !== dashboardId || $ctrl.isRefreshingDashboard) {
+        return $q.resolve([]);
+      }
+
+      cancelDashboardAutoRefresh();
+      $ctrl.isRefreshingDashboard = true;
+
+      return reloadDashboardWidgets(dashboardId).catch(function handleDashboardRefreshError(error) {
+        if (refreshOptions.notifyOnError) {
+          NotificationService.error(getErrorMessage(error, 'Unable to refresh the dashboard right now.'), 'Dashboard refresh failed');
+        } else {
+          console.warn('[DashboardPage] automatic dashboard refresh failed', {
+            dashboardId: dashboardId,
+            error: getErrorMessage(error, 'Unable to refresh the dashboard right now.')
+          });
+        }
+
+        throw error;
+      }).finally(function finishDashboardRefresh() {
+        $ctrl.isRefreshingDashboard = false;
+        syncDashboardAutoRefresh(dashboardId);
+      });
+    }
+
+    function syncDashboardAutoRefresh(dashboardId) {
+      cancelDashboardAutoRefresh();
+
+      if (!dashboardId || !$ctrl.activeDashboard || $ctrl.activeDashboard.id !== dashboardId || $ctrl.isEditing) {
+        return;
+      }
+
+      dashboardAutoRefreshPromise = $timeout(function refreshDashboardOnInterval() {
+        dashboardAutoRefreshPromise = null;
+
+        if (!$ctrl.activeDashboard || $ctrl.activeDashboard.id !== dashboardId || $ctrl.isEditing) {
+          syncDashboardAutoRefresh(dashboardId);
+          return;
+        }
+
+        runDashboardRefresh(dashboardId, {
+          notifyOnError: false
+        }).catch(angular.noop);
+      }, AUTO_REFRESH_INTERVAL_MS, false);
+    }
+
+    function cancelDashboardAutoRefresh() {
+      if (!dashboardAutoRefreshPromise) {
+        return;
+      }
+
+      $timeout.cancel(dashboardAutoRefreshPromise);
+      dashboardAutoRefreshPromise = null;
     }
 
     function bindUiWatchers() {
