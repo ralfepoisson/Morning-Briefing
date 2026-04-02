@@ -27,17 +27,17 @@
 
       if (AuthService.consumeCallback()) {
         console.log('[AuthCallbackPage] consumeCallback returned true, redirecting', {
-          target: AuthService.consumePendingReturnPath() || '/'
+          target: AuthService.consumePendingReturnPath() || '/dashboard'
         });
-        $location.url(AuthService.consumePendingReturnPath() || '/');
+        $location.url(AuthService.consumePendingReturnPath() || '/dashboard');
         return;
       }
 
       if (AuthService.isAuthenticated()) {
         console.log('[AuthCallbackPage] already authenticated, redirecting', {
-          target: AuthService.consumePendingReturnPath() || '/'
+          target: AuthService.consumePendingReturnPath() || '/dashboard'
         });
-        $location.url(AuthService.consumePendingReturnPath() || '/');
+        $location.url(AuthService.consumePendingReturnPath() || '/dashboard');
         return;
       }
 
@@ -50,9 +50,9 @@
 
         if (AuthService.isAuthenticated()) {
           console.log('[AuthCallbackPage] authenticated after timeout, redirecting', {
-            target: AuthService.consumePendingReturnPath() || '/'
+            target: AuthService.consumePendingReturnPath() || '/dashboard'
           });
-          $location.url(AuthService.consumePendingReturnPath() || '/');
+          $location.url(AuthService.consumePendingReturnPath() || '/dashboard');
           return;
         }
 

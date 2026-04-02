@@ -36,7 +36,7 @@
     };
 
     $ctrl.signIn = function signIn() {
-      AuthService.beginSignIn('/');
+      AuthService.beginSignIn('/dashboard');
     };
 
     function redirectIfAuthenticated() {
@@ -58,10 +58,10 @@
     }
 
     function resolvePostSignInPath() {
-      var nextPath = AuthService.consumePendingReturnPath() || '/';
+      var nextPath = AuthService.consumePendingReturnPath() || '/dashboard';
 
       if (AuthService.isPublicRoute(nextPath)) {
-        return '/';
+        return '/dashboard';
       }
 
       return nextPath;

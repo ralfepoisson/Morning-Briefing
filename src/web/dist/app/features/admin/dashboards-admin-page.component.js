@@ -268,11 +268,11 @@
         }
 
         NotificationService.error('You need admin access to view that page.', 'Admin access required');
-        $location.path('/');
+        $location.path('/dashboard');
         return null;
       }).catch(function handleAccessError(error) {
         NotificationService.error(getErrorMessage(error, 'We could not verify your access right now.'), 'Unable to verify access');
-        $location.path('/');
+        $location.path('/dashboard');
         return null;
       });
     }

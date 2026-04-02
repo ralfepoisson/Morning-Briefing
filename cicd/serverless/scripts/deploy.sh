@@ -18,6 +18,15 @@ TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 TELEGRAM_API_BASE_URL="${TELEGRAM_API_BASE_URL:-https://api.telegram.org}"
 LIFE2_JWT_SECRET="${LIFE2_JWT_SECRET:-}"
 LIFE2_JWT_PUBLIC_KEY="${LIFE2_JWT_PUBLIC_KEY:-}"
+CONTACT_TO_EMAIL="${CONTACT_TO_EMAIL:-ralfepoisson@gmail.com}"
+CONTACT_FROM_EMAIL="${CONTACT_FROM_EMAIL:-}"
+CONTACT_DELIVERY_PROVIDER="${CONTACT_DELIVERY_PROVIDER:-ses}"
+CONTACT_AWS_REGION="${CONTACT_AWS_REGION:-${REGION}}"
+CONTACT_SMTP_HOST="${CONTACT_SMTP_HOST:-}"
+CONTACT_SMTP_PORT="${CONTACT_SMTP_PORT:-587}"
+CONTACT_SMTP_SECURE="${CONTACT_SMTP_SECURE:-false}"
+CONTACT_SMTP_USER="${CONTACT_SMTP_USER:-}"
+CONTACT_SMTP_PASS="${CONTACT_SMTP_PASS:-}"
 NIGHTLY_REFRESH_SCHEDULE="${NIGHTLY_REFRESH_SCHEDULE:-cron(0 4 * * ? *)}"
 FRONTEND_DESIRED_COUNT="${FRONTEND_DESIRED_COUNT:-1}"
 BACKEND_DESIRED_COUNT="${BACKEND_DESIRED_COUNT:-1}"
@@ -119,6 +128,42 @@ deploy_stack() {
 
   if [[ -n "${LIFE2_JWT_PUBLIC_KEY}" ]]; then
     serverless_args+=(--param="life2JwtPublicKey=${LIFE2_JWT_PUBLIC_KEY}")
+  fi
+
+  if [[ -n "${CONTACT_TO_EMAIL}" ]]; then
+    serverless_args+=(--param="contactToEmail=${CONTACT_TO_EMAIL}")
+  fi
+
+  if [[ -n "${CONTACT_FROM_EMAIL}" ]]; then
+    serverless_args+=(--param="contactFromEmail=${CONTACT_FROM_EMAIL}")
+  fi
+
+  if [[ -n "${CONTACT_DELIVERY_PROVIDER}" ]]; then
+    serverless_args+=(--param="contactDeliveryProvider=${CONTACT_DELIVERY_PROVIDER}")
+  fi
+
+  if [[ -n "${CONTACT_AWS_REGION}" ]]; then
+    serverless_args+=(--param="contactAwsRegion=${CONTACT_AWS_REGION}")
+  fi
+
+  if [[ -n "${CONTACT_SMTP_HOST}" ]]; then
+    serverless_args+=(--param="contactSmtpHost=${CONTACT_SMTP_HOST}")
+  fi
+
+  if [[ -n "${CONTACT_SMTP_PORT}" ]]; then
+    serverless_args+=(--param="contactSmtpPort=${CONTACT_SMTP_PORT}")
+  fi
+
+  if [[ -n "${CONTACT_SMTP_SECURE}" ]]; then
+    serverless_args+=(--param="contactSmtpSecure=${CONTACT_SMTP_SECURE}")
+  fi
+
+  if [[ -n "${CONTACT_SMTP_USER}" ]]; then
+    serverless_args+=(--param="contactSmtpUser=${CONTACT_SMTP_USER}")
+  fi
+
+  if [[ -n "${CONTACT_SMTP_PASS}" ]]; then
+    serverless_args+=(--param="contactSmtpPass=${CONTACT_SMTP_PASS}")
   fi
 
   (

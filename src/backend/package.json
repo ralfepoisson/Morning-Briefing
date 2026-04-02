@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-polly": "^3.1017.0",
+    "@aws-sdk/client-sesv2": "^3.1022.0",
     "@aws-sdk/client-sqs": "^3.1012.0",
     "@fastify/cors": "^11.2.0",
     "@prisma/client": "^6.6.0",

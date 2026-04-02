@@ -24,6 +24,15 @@ custom:
   telegramApiBaseUrl: ${param:telegramApiBaseUrl, 'https://api.telegram.org'}
   life2JwtSecret: ${param:life2JwtSecret, ''}
   life2JwtPublicKey: ${param:life2JwtPublicKey, ''}
+  contactToEmail: ${param:contactToEmail, 'ralfepoisson@gmail.com'}
+  contactFromEmail: ${param:contactFromEmail, ''}
+  contactDeliveryProvider: ${param:contactDeliveryProvider, 'ses'}
+  contactAwsRegion: ${param:contactAwsRegion, '${self:custom.region}'}
+  contactSmtpHost: ${param:contactSmtpHost, ''}
+  contactSmtpPort: ${param:contactSmtpPort, '587'}
+  contactSmtpSecure: ${param:contactSmtpSecure, 'false'}
+  contactSmtpUser: ${param:contactSmtpUser, ''}
+  contactSmtpPass: ${param:contactSmtpPass, ''}
   frontendDesiredCount: ${param:frontendDesiredCount, 1}
   backendDesiredCount: ${param:backendDesiredCount, 1}
   workerDesiredCount: ${param:workerDesiredCount, 1}
@@ -54,6 +63,16 @@ resources:
       Fn::Not:
         - Fn::Equals:
             - ${self:custom.life2JwtPublicKey}
+            - ''
+    HasContactSmtpUser:
+      Fn::Not:
+        - Fn::Equals:
+            - ${self:custom.contactSmtpUser}
+            - ''
+    HasContactSmtpPass:
+      Fn::Not:
+        - Fn::Equals:
+            - ${self:custom.contactSmtpPass}
             - ''
   Resources:
     AppVpc:
@@ -279,6 +298,8 @@ resources:
                     - !Ref GoogleOauthStateSecretSecret
                     - !If [HasLife2JwtSecret, !Ref Life2JwtSecretSecret, !Ref AWS::NoValue]
                     - !If [HasLife2JwtPublicKey, !Ref Life2JwtPublicKeySecret, !Ref AWS::NoValue]
+                    - !If [HasContactSmtpUser, !Ref ContactSmtpUserSecret, !Ref AWS::NoValue]
+                    - !If [HasContactSmtpPass, !Ref ContactSmtpPassSecret, !Ref AWS::NoValue]
 
     EcsTaskRole:
       Type: AWS::IAM::Role
@@ -348,6 +369,20 @@ resources:
       Properties:
         Name: ${self:custom.namePrefix}/auth/life2-jwt-public-key
         SecretString: ${self:custom.life2JwtPublicKey}
+
+    ContactSmtpUserSecret:
+      Type: AWS::SecretsManager::Secret
+      Condition: HasContactSmtpUser
+      Properties:
+        Name: ${self:custom.namePrefix}/contact/smtp-user
+        SecretString: ${self:custom.contactSmtpUser}
+
+    ContactSmtpPassSecret:
+      Type: AWS::SecretsManager::Secret
+      Condition: HasContactSmtpPass
+      Properties:
+        Name: ${self:custom.namePrefix}/contact/smtp-pass
+        SecretString: ${self:custom.contactSmtpPass}
 
     DatabaseSubnetGroup:
       Type: AWS::RDS::DBSubnetGroup
@@ -547,6 +582,20 @@ resources:
                 Value: ${self:custom.telegramBotToken}
               - Name: TELEGRAM_API_BASE_URL
                 Value: ${self:custom.telegramApiBaseUrl}
+              - Name: CONTACT_TO_EMAIL
+                Value: ${self:custom.contactToEmail}
+              - Name: CONTACT_FROM_EMAIL
+                Value: ${self:custom.contactFromEmail}
+              - Name: CONTACT_DELIVERY_PROVIDER
+                Value: ${self:custom.contactDeliveryProvider}
+              - Name: CONTACT_AWS_REGION
+                Value: ${self:custom.contactAwsRegion}
+              - Name: CONTACT_SMTP_HOST
+                Value: ${self:custom.contactSmtpHost}
+              - Name: CONTACT_SMTP_PORT
+                Value: ${self:custom.contactSmtpPort}
+              - Name: CONTACT_SMTP_SECURE
+                Value: ${self:custom.contactSmtpSecure}
             Secrets:
               - Name: DB_PASSWORD
                 ValueFrom: !Ref DatabasePasswordSecret
@@ -563,6 +612,16 @@ resources:
                 - HasLife2JwtPublicKey
                 - Name: LIFE2_JWT_PUBLIC_KEY
                   ValueFrom: !Ref Life2JwtPublicKeySecret
+                - !Ref AWS::NoValue
+              - !If
+                - HasContactSmtpUser
+                - Name: CONTACT_SMTP_USER
+                  ValueFrom: !Ref ContactSmtpUserSecret
+                - !Ref AWS::NoValue
+              - !If
+                - HasContactSmtpPass
+                - Name: CONTACT_SMTP_PASS
+                  ValueFrom: !Ref ContactSmtpPassSecret
                 - !Ref AWS::NoValue
 
     WorkerTaskDefinition:

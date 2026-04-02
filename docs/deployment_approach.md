@@ -46,6 +46,17 @@ Before running the deploy:
    - JavaScript origin: `https://briefing.ralfepoisson.com`
    - Redirect URI: `https://briefing.ralfepoisson.com/api/v1/connections/google-calendar/oauth/callback`
 5. Review database changes carefully. Any Prisma migration failure will leave ECS services at `0` until recovery is completed.
+6. If the release includes the public contact form, confirm production SMTP settings are exported before deploy:
+   - `CONTACT_FROM_EMAIL`
+   - `CONTACT_DELIVERY_PROVIDER=ses`
+   - `CONTACT_AWS_REGION=eu-west-1`
+   - optional `CONTACT_TO_EMAIL` override if the default recipient should change
+   - If you are not using SES, provide the SMTP variables instead:
+   - `CONTACT_SMTP_HOST`
+   - `CONTACT_SMTP_PORT`
+   - `CONTACT_SMTP_SECURE`
+   - `CONTACT_SMTP_USER`
+   - `CONTACT_SMTP_PASS`
 
 ## Required deployment checks
 
@@ -147,6 +158,7 @@ Examples:
 - Connector work: verify both connector administration and widget consumption.
 - Auth/OAuth work: verify login, callback, and post-redirect state.
 - Database work: verify both startup health and one write path.
+- Public contact form work: verify the `Contact` page loads anonymously and a real submission reaches the configured inbox.
 
 ## Failure mode: migration leaves production at 0 tasks
 

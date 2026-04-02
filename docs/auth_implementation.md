@@ -110,9 +110,9 @@ Local development defaults currently use:
 ```js
 window.__MORNING_BRIEFING_CONFIG__ = Object.assign({
   apiBaseUrl: window.location.protocol + '//' + morningBriefingApiHost + ':3000/api/v1',
-  authServiceSignInUrl: 'http://localhost:63431/signIn',
-  authServiceApplicationId: 'morning-briefing-web',
-  authServiceSignOutUrl: 'http://localhost:63431/logout',
+  authServiceSignInUrl: 'http://auth-service.localhost:46138/signIn',
+  authServiceApplicationId: '4b396734eb3f182551e23f4069e4a7a6b15baf46231393cf',
+  authServiceSignOutUrl: 'http://auth-service.localhost:46138/logout',
   appBaseUrl: window.location.origin + '/'
 }, window.__MORNING_BRIEFING_CONFIG__ || {});
 ```
@@ -129,7 +129,13 @@ That default is emitted from:
 
 and can still be overridden with `FRONTEND_AUTH_SERVICE_SIGN_IN_URL`.
 
-The public browser-flow application identifier is emitted from the same build step through `FRONTEND_AUTH_SERVICE_APPLICATION_ID`.
+Production frontend builds currently default `authServiceApplicationId` to:
+
+```text
+39863fc2-c2b9-4b5f-82ee-04841b2e9980
+```
+
+That default is emitted from the same build step and can still be overridden with `FRONTEND_AUTH_SERVICE_APPLICATION_ID`.
 
 ### Callback route
 
@@ -325,7 +331,7 @@ The SPA sends users to the central auth UI using:
 Example local redirect:
 
 ```text
-http://localhost:63431/signIn?applicationId=morning-briefing-web&redirect=http%3A%2F%2Flocalhost%3A8080%2F%23%2Fauth%2Fcallback
+http://auth-service.localhost:46138/signIn?applicationId=4b396734eb3f182551e23f4069e4a7a6b15baf46231393cf&redirect=http%3A%2F%2Flocalhost%3A8080%2F%23%2Fauth%2Fcallback
 ```
 
 The auth service must then redirect back to:

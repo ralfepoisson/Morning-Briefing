@@ -10,14 +10,14 @@
 
     if (AuthService.consumeCallback()) {
       $location.url(buildPostSignInUrl(resolvePostSignInPath()));
-    } else if (AuthService.isAuthenticated() && AuthService.isPublicRoute($location.path())) {
+    } else if (AuthService.isAuthenticated() && AuthService.shouldRedirectAuthenticatedPublicRoute($location.path())) {
       $location.url(buildPostSignInUrl(resolvePostSignInPath()));
     }
 
     $rootScope.$on('$routeChangeStart', function handleRouteChangeStart(event, next) {
       var nextPath = next && next.$$route && next.$$route.originalPath ? next.$$route.originalPath : '/';
 
-      if (AuthService.isAuthenticated() && AuthService.isPublicRoute(nextPath)) {
+      if (AuthService.isAuthenticated() && AuthService.shouldRedirectAuthenticatedPublicRoute(nextPath)) {
         event.preventDefault();
         $location.url(buildPostSignInUrl(resolvePostSignInPath()));
         return;
@@ -40,10 +40,10 @@
     });
 
     function resolvePostSignInPath() {
-      var nextPath = AuthService.consumePendingReturnPath() || '/';
+      var nextPath = AuthService.consumePendingReturnPath() || '/dashboard';
 
       if (AuthService.isPublicRoute(nextPath)) {
-        return '/';
+        return '/dashboard';
       }
 
       return nextPath;
