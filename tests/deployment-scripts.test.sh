@@ -104,6 +104,10 @@ grep -Fq 'sudo install -d -m 0750 "${APP_ROOT}/data/audio"' "${ROOT_DIR}/cicd/ho
 grep -Fq 'sudo chown 10001:10001 "${APP_ROOT}/data/audio"' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host data ownership is not expressed as numeric UID/GID"
 echo "ok - host data ownership uses numeric UID and GID"
 
+grep -Fq 'backend_ready="$(wait_for_http http://127.0.0.1:13000/health/ready)"' "${ROOT_DIR}/cicd/host/health-check.sh" || fail "backend host-port readiness is not retried"
+grep -Fq 'wait_for_http http://127.0.0.1:18080/healthz >/dev/null' "${ROOT_DIR}/cicd/host/health-check.sh" || fail "frontend host-port readiness is not retried"
+echo "ok - host-port readiness probes are bounded and retried"
+
 if rg -g '!**/node_modules/**' -e 'AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN).*(printf|echo)' -e 'source .*export_credentials' "${ROOT_DIR}/cicd" "${ROOT_DIR}/scripts" >/dev/null; then
   fail "credential-printing behavior remains"
 fi

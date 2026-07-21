@@ -24,15 +24,27 @@ wait_healthy() {
   return 1
 }
 
+wait_for_http() {
+  local url="$1" response
+  for _ in $(seq 1 20); do
+    if response="$(curl --fail --silent --show-error --max-time 10 "${url}" 2>/dev/null)"; then
+      printf '%s' "${response}"
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
 wait_healthy frontend
 wait_healthy backend
 if [[ "${START_WORKER}" == "true" ]]; then
   wait_healthy worker
 fi
 
-curl --fail --silent --show-error --max-time 10 http://127.0.0.1:13000/health/ready \
-  | jq -e '.status == "ready"' >/dev/null
-curl --fail --silent --show-error --max-time 10 http://127.0.0.1:18080/healthz >/dev/null
+backend_ready="$(wait_for_http http://127.0.0.1:13000/health/ready)"
+jq -e '.status == "ready"' <<<"${backend_ready}" >/dev/null
+wait_for_http http://127.0.0.1:18080/healthz >/dev/null
 
 apache_frontend_type="$(curl --fail --silent --show-error --max-time 10 -H 'Host: briefing.ralfepoisson.com' -o /dev/null -w '%{content_type}' http://127.0.0.1:8080/)"
 [[ "${apache_frontend_type}" == text/html* ]]
