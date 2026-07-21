@@ -12,7 +12,7 @@ node "Consolidated ARM64 EC2\npersonal-projects" as Host {
   package "Morning Briefing Compose Release" as Compose {
     component "Frontend\nStrict TypeScript + Vite 8\nNginx static SPA\nloopback port" as Frontend
     package "Backend image\nNode.js + Fastify" as BackendImage {
-      component "Backend API\n/api/v1 + DB/broker readiness" as Backend
+      component "Backend API\n/api/v1 + DB readiness\nBroker topology bootstrap/readiness" as Backend
       component "Worker\nmanual ack + bounded prefetch" as Worker
       component "One-shot commands\nmigrate / widget refresh / audio refresh" as OneShots
     }

@@ -19,6 +19,9 @@ assert.equal(config.enabled, true, 'MESSAGE_BROKER_ENABLED must be true for inte
 assert.ok(config.url, 'MESSAGE_BROKER_URL must be configured for integration tests');
 try {
     switch (phase) {
+        case 'fresh-readiness':
+            await verifyFreshBrokerReadiness();
+            break;
         case 'prepare-durability':
             await prepareDurability();
             break;
@@ -190,6 +193,24 @@ async function verifyReadiness() {
         MESSAGE_BROKER_URL: 'amqp://integration:integration-only@127.0.0.1:1'
     }), /./, 'broker readiness did not fail closed for an unreachable endpoint');
     console.log('ok - RabbitMQ readiness succeeds when connected and fails closed when unreachable');
+}
+async function verifyFreshBrokerReadiness() {
+    await checkRabbitMqReadiness(process.env);
+    const connection = await connectRabbitMq(config);
+    const channel = await connection.createChannel();
+    try {
+        await channel.checkExchange(config.exchange);
+        await Promise.all([
+            channel.checkQueue(config.queue),
+            channel.checkQueue(config.retryQueue),
+            channel.checkQueue(config.dlq)
+        ]);
+    }
+    finally {
+        await channel.close().catch(() => undefined);
+        await connection.close().catch(() => undefined);
+    }
+    console.log('ok - backend readiness bootstraps durable topology on a fresh RabbitMQ data directory');
 }
 async function seedFixture() {
     const prisma = getPrismaClient();

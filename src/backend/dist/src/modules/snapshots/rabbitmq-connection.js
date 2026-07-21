@@ -52,12 +52,7 @@ export async function checkRabbitMqReadiness(env = process.env) {
     const model = await connectRabbitMq(config);
     const channel = await model.createChannel();
     try {
-        await channel.checkExchange(config.exchange);
-        await Promise.all([
-            channel.checkQueue(config.queue),
-            channel.checkQueue(config.retryQueue),
-            channel.checkQueue(config.dlq)
-        ]);
+        await assertRabbitMqTopology(channel, config);
     }
     finally {
         await channel.close().catch(() => undefined);

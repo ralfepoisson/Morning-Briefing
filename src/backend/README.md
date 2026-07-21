@@ -62,6 +62,8 @@ Declare the durable topology:
 
 - `npm run message-broker:setup`
 
+The production backend readiness check performs the same idempotent durable declaration, so a fresh RabbitMQ data directory is bootstrapped before `/health/ready` reports success. The setup command remains useful for explicit local administration and verification.
+
 ### Run the worker locally
 
 - `npm run snapshot:worker`

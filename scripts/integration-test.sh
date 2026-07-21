@@ -72,7 +72,7 @@ docker network create "${network}" >/dev/null
 docker run --rm --platform linux/arm64 --user 0:0 \
   --volume "${rabbitmq_data_dir}:/integration-rabbitmq" \
   --entrypoint sh "${rabbitmq_image}" \
-  -c 'chown 100:101 /integration-rabbitmq && chmod 0700 /integration-rabbitmq'
+  -c 'test -z "$(find /integration-rabbitmq -mindepth 1 -maxdepth 1 -print -quit)" && chown 100:101 /integration-rabbitmq && chmod 0700 /integration-rabbitmq'
 docker run -d --name "${postgres_container}" --network "${network}" \
   -e POSTGRES_PASSWORD=integration-only \
   -e POSTGRES_DB=morning_briefing \
@@ -90,6 +90,15 @@ rabbitmq_data_contract="$(docker exec "${rabbitmq_container}" stat -c '%u:%g:%a'
 [[ "${rabbitmq_data_contract}" == '100:101:700' ]]
 docker exec --user 100:101 "${rabbitmq_container}" test -w /var/lib/rabbitmq
 echo 'RabbitMQ bind storage is private and writable only through UID 100/GID 101.'
+
+run_broker_integration "${database_url}" fresh-readiness
+fresh_exchange_contract="$(docker exec "${rabbitmq_container}" rabbitmqctl -q list_exchanges name type durable)"
+grep -Eq '^morning-briefing\.integration\.jobs[[:space:]]+direct[[:space:]]+true$' <<<"${fresh_exchange_contract}"
+fresh_queue_contract="$(docker exec "${rabbitmq_container}" rabbitmqctl -q list_queues name type durable)"
+grep -Eq '^morning-briefing\.integration\.jobs[[:space:]]+quorum[[:space:]]+true$' <<<"${fresh_queue_contract}"
+grep -Eq '^morning-briefing\.integration\.jobs\.retry[[:space:]]+quorum[[:space:]]+true$' <<<"${fresh_queue_contract}"
+grep -Eq '^morning-briefing\.integration\.jobs\.dlq[[:space:]]+quorum[[:space:]]+true$' <<<"${fresh_queue_contract}"
+echo 'Fresh persistent data activation created the durable exchange and quorum queues.'
 
 docker run --rm --network "${network}" \
   -e DATABASE_URL="${database_url}" \
