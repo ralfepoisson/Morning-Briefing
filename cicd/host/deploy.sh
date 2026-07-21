@@ -4,6 +4,7 @@ set -euo pipefail
 APP_ROOT="${APP_ROOT:-/srv/apps/morning-briefing}"
 release_dir="${1:-}"
 [[ -n "${release_dir}" ]] || { echo "Usage: deploy.sh <absolute-release-directory>" >&2; exit 2; }
+[[ "$(id -u)" -eq 0 ]] || { echo "Deployment must run through the root activation boundary." >&2; exit 1; }
 release_dir="$(cd "${release_dir}" && pwd)"
 
 # shellcheck source=../../../scripts/lib/release-common.sh
@@ -27,9 +28,9 @@ for secret_file in "${APP_ROOT}/secrets/backend.env" "${APP_ROOT}/secrets/worker
 done
 require_env_key "${APP_ROOT}/shared/config/backend.env" SNAPSHOT_QUEUE_URL
 require_env_key "${APP_ROOT}/shared/config/worker.env" SNAPSHOT_QUEUE_URL
-sudo "${release_dir}/cicd/host/install-systemd-units.sh" "${release_dir}"
-sudo install -d -m 0750 "${APP_ROOT}/data/audio"
-sudo chown 10001:10001 "${APP_ROOT}/data/audio"
+"${release_dir}/cicd/host/install-systemd-units.sh" "${release_dir}"
+install -d -m 0750 "${APP_ROOT}/data/audio"
+chown 10001:10001 "${APP_ROOT}/data/audio"
 install -d -m 0750 "${APP_ROOT}/backups" "${APP_ROOT}/locks"
 
 compose() {

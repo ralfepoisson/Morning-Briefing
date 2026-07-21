@@ -4,6 +4,7 @@ set -euo pipefail
 APP_ROOT="${APP_ROOT:-/srv/apps/morning-briefing}"
 target="${1:-}"
 [[ -n "${target}" ]] || { echo "Usage: rollback.sh <release-directory>" >&2; exit 2; }
+[[ "$(id -u)" -eq 0 ]] || { echo "Rollback must run through the root boundary." >&2; exit 1; }
 [[ "${target}" == /* ]] || target="${APP_ROOT}/releases/${target}"
 [[ -f "${target}/release-manifest.json" ]] || { echo "Target release manifest is missing." >&2; exit 1; }
 

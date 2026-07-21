@@ -117,9 +117,14 @@ if rg -n 'systemctl (enable|start|restart)|systemctl .*--now' "${ROOT_DIR}/cicd/
 fi
 echo "ok - scheduled jobs use a deployment-preserved root oneshot boundary"
 
-grep -Fq 'sudo install -d -m 0750 "${APP_ROOT}/data/audio"' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host data directory is not created securely"
-grep -Fq 'sudo chown 10001:10001 "${APP_ROOT}/data/audio"' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host data ownership is not expressed as numeric UID/GID"
+grep -Fq 'Deployment must run through the root activation boundary.' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host deployment is not restricted to the root activation boundary"
+grep -Fq 'install -d -m 0750 "${APP_ROOT}/data/audio"' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host data directory is not created securely"
+grep -Fq 'chown 10001:10001 "${APP_ROOT}/data/audio"' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host data ownership is not expressed as numeric UID/GID"
 echo "ok - host data ownership uses numeric UID and GID"
+
+grep -Fq 'sudo -n /srv/apps/morning-briefing/current/cicd/host/rollback.sh' "${ROOT_DIR}/scripts/rollback.sh" || fail "rollback cannot traverse the root-owned application path"
+grep -Fq 'acquire_deploy_lock "${APP_ROOT}/locks/deploy.lock"' "${ROOT_DIR}/cicd/host/rollback.sh" || fail "root-bound rollback does not preserve deployment locking"
+echo "ok - rollback uses the non-interactive root boundary and retains locking"
 
 grep -Fq 'backend_ready="$(wait_for_http http://127.0.0.1:13000/health/ready)"' "${ROOT_DIR}/cicd/host/health-check.sh" || fail "backend host-port readiness is not retried"
 grep -Fq 'wait_for_http http://127.0.0.1:18080/healthz >/dev/null' "${ROOT_DIR}/cicd/host/health-check.sh" || fail "frontend host-port readiness is not retried"
@@ -150,5 +155,7 @@ grep -q 'src/web" audit$' "${ROOT_DIR}/scripts/ci.sh" || fail "CI does not enfor
 echo "ok - CI enforces complete type, build, unit, configuration, and audit gates"
 
 "${ROOT_DIR}/tests/systemd-permission-model.test.sh"
+"${ROOT_DIR}/tests/publish-transport.test.sh"
+"${ROOT_DIR}/tests/release-bundle-activation.test.sh"
 
 echo "deployment script tests passed"

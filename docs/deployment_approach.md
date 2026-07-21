@@ -118,6 +118,8 @@ The approved host deploy must:
 
 Database readiness must be distinct from liveness. A process that returns HTTP 200 while its configured database endpoint is gone is not ready.
 
+The publisher never writes directly beneath `/srv/apps` as the SSH login user. It creates a deterministic release bundle, computes its SHA-256 locally, uploads only that mode-`0600` bundle into a user-owned staging directory under the remote home, and sends the trusted checksum and Git SHA to the checked-in activator through `sudo -n bash -s`. The root activator first copies the archive out of the user-controlled directory, verifies the bundle checksum, rejects unsafe paths and links, validates the release manifest and Compose checksum, and only then atomically installs a root-owned immutable release. It enters the existing deploy script as root, where the global lock, backup, health, and rollback transaction remain authoritative. The user staging directory is removed after either success or failure; `/srv/apps` stays mode `0700` and runtime secrets stay mode `0600`.
+
 ## Scheduling
 
 Use systemd timers to invoke one-shot Compose services:
@@ -147,7 +149,7 @@ Before cutover:
 
 ## Rollback
 
-`scripts/rollback.sh <release>` restores the previous Compose configuration and exact image digests, waits for health, rechecks Apache routes, and leaves an audit record. A failed pre-switch release leaves `current` untouched.
+`scripts/rollback.sh <release>` crosses the same protected host path with `sudo -n`, then restores the previous Compose configuration and exact image digests under the deployment lock, waits for health, rechecks Apache routes, and leaves an audit record. A failed pre-switch release leaves `current` untouched.
 
 Rollback is not automatically safe after every database migration. Each migration must be classified before deployment:
 

@@ -35,7 +35,8 @@ validate_digest_ref "${frontend_ref}"
 
 compose_sha="$(sha256_file "${ROOT_DIR}/cicd/compose/compose.yaml")"
 migration_id="$(basename "$(find "${ROOT_DIR}/src/backend/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | sort | tail -1)")"
-created_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+commit_time="$(git -C "${ROOT_DIR}" show -s --format=%cI HEAD)"
+created_at="$(node -e 'process.stdout.write(new Date(process.argv[1]).toISOString())' "${commit_time}")"
 
 jq -n \
   --arg gitSha "${sha}" --arg backend "${backend_ref}" --arg frontend "${frontend_ref}" \
@@ -51,17 +52,43 @@ FRONTEND_LOOPBACK_PORT=18080
 EOF
 validate_release_manifest "${artifact_dir}/release-manifest.json"
 
+bundle_root="$(mktemp -d "${TMPDIR:-/tmp}/morning-briefing-release-bundle.XXXXXX")"
+cleanup_bundle_root() {
+  find "${bundle_root}" -mindepth 1 -delete
+  rmdir "${bundle_root}"
+}
+trap cleanup_bundle_root EXIT
+install -d \
+  "${bundle_root}/cicd/compose" \
+  "${bundle_root}/cicd/host" \
+  "${bundle_root}/scripts/lib"
+cp -R "${ROOT_DIR}/cicd/compose/." "${bundle_root}/cicd/compose/"
+cp -R "${ROOT_DIR}/cicd/host/." "${bundle_root}/cicd/host/"
+cp -R "${ROOT_DIR}/scripts/lib/." "${bundle_root}/scripts/lib/"
+install -m 0644 "${artifact_dir}/release-manifest.json" "${bundle_root}/release-manifest.json"
+install -m 0644 "${artifact_dir}/release.env" "${bundle_root}/release.env"
+bundle_path="${artifact_dir}/release-bundle.tar.gz"
+find "${bundle_root}" -exec touch -t 197001010000 {} +
+COPYFILE_DISABLE=1 tar -C "${bundle_root}" -cf - . | gzip -n > "${bundle_path}"
+bundle_sha="$(sha256_file "${bundle_path}")"
+
 if [[ "${1:-}" == "--no-upload" ]]; then
-  echo "Release manifest created at ${artifact_dir}."
+  echo "Release manifest and checksum ${bundle_sha} created at ${artifact_dir}."
   exit 0
 fi
 
-remote_dir="/srv/apps/morning-briefing/releases/${sha}"
-ssh personal-projects "install -d -m 0750 '${remote_dir}'"
-(cd "${ROOT_DIR}" && rsync -aR --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
-  ./cicd/compose ./cicd/host ./scripts/lib "personal-projects:${remote_dir}/")
-rsync -a --chmod=Fu=rw,Fgo=r \
-  "${artifact_dir}/release-manifest.json" "${artifact_dir}/release.env" \
-  "personal-projects:${remote_dir}/"
-ssh personal-projects "'${remote_dir}/cicd/host/deploy.sh' '${remote_dir}'"
+remote_stage="$(ssh personal-projects 'umask 077; mktemp -d "$HOME/.morning-briefing-release.XXXXXXXX"')"
+[[ "${remote_stage}" =~ ^/home/[A-Za-z0-9._-]+/\.morning-briefing-release\.[A-Za-z0-9._-]+$ ]] \
+  || die "Remote staging path is unsafe."
+remote_bundle="${remote_stage}/release-bundle.tar.gz"
+rsync -a --chmod=F600 "${bundle_path}" "personal-projects:${remote_bundle}"
+
+activation_status=0
+ssh personal-projects \
+  "sudo -n bash -s -- '${remote_bundle}' '${bundle_sha}' '${sha}'" \
+  < "${ROOT_DIR}/cicd/host/activate-release-bundle.sh" || activation_status=$?
+ssh personal-projects \
+  "find '${remote_stage}' -mindepth 1 -delete && rmdir '${remote_stage}'" \
+  || { echo "Unable to remove remote release staging directory." >&2; [[ "${activation_status}" -ne 0 ]] || activation_status=1; }
+[[ "${activation_status}" -eq 0 ]] || exit "${activation_status}"
 echo "Published ${sha} using immutable image digests."

@@ -7,6 +7,7 @@ left to right direction
 actor Browser
 cloud "Shared ALB\nTLS + AWS WAF" as SharedAlb
 node "Consolidated ARM64 EC2\npersonal-projects" as Host {
+  component "Release activator\nuser-owned staging bundle\nSHA-256 + manifest verified\nsudo -n root boundary" as ReleaseActivator
   component "Apache 2.4\n:8080" as Apache
   package "Morning Briefing Compose Release" as Compose {
     component "Frontend\nStrict TypeScript + Vite 8\nNginx static SPA\nloopback port" as Frontend
@@ -64,6 +65,7 @@ cloud "Telegram Bot API" as Telegram
 cloud "SMTP / Amazon SES" as Mail
 
 Browser --> SharedAlb : HTTPS briefing.ralfepoisson.com
+ReleaseActivator --> Compose : atomically install immutable release
 SharedAlb --> Apache : HTTP :8080
 Apache --> Backend : /api/*
 Apache --> Frontend : all other paths
@@ -101,6 +103,8 @@ runtime secret files remain root-owned mode 0600.
 end note
 
 note bottom of Host
+Publisher transport cannot traverse /srv/apps as the login user.
+Root copies and verifies the staged bundle before extraction.
 Application containers do not own PostgreSQL.
 Backend and frontend bind only to loopback-facing ports.
 Backend, worker, and one-shots use a separate egress bridge

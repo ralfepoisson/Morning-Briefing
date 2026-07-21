@@ -169,6 +169,9 @@ test.describe('Dashboard widget configuration flows', function () {
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await page.getByRole('button', { name: 'Save Dashboard' }).click();
 
+    await expect.poll(function () {
+      return patchPayloads.length;
+    }).toBe(1);
     expect(patchPayloads).toHaveLength(1);
     expect(patchPayloads[0].includeInBriefingOverride).toBe(false);
 
