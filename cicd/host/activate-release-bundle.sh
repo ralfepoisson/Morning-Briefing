@@ -43,7 +43,7 @@ while IFS= read -r archive_path; do
   [[ "${archive_path}" != /* && "/${archive_path}/" != *'/../'* ]] \
     || die "Release bundle contains an unsafe path."
   case "${archive_path}" in
-    cicd|cicd/compose|cicd/compose/*|cicd/host|cicd/host/*|scripts|scripts/lib|scripts/lib/*|release-manifest.json|release.env) ;;
+    cicd|cicd/|cicd/compose|cicd/compose/*|cicd/host|cicd/host/*|scripts|scripts/|scripts/lib|scripts/lib/*|release-manifest.json|release.env) ;;
     *) die "Release bundle contains an unexpected path: ${archive_path}" ;;
   esac
 done < <(tar -tzf "${root_bundle}")
