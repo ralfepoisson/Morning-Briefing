@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./playwright-fixtures');
 
 test.describe('Public pages', () => {
   test('home, terms, privacy, and contact pages are accessible without authentication', async ({ page }) => {

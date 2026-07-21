@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./playwright-fixtures');
 
 const TOKEN_KEY = 'morningBriefing.auth.token';
 const SESSION_KEY = 'morningBriefing.auth.session';
@@ -45,8 +45,6 @@ const calendarConnection = {
 
 test.describe('Google Calendar OAuth callback return', function () {
   test('stages the returned Google Calendar connection onto the calendar widget', async function ({ page }) {
-    test.fail(true, 'Known issue: the post-OAuth calendar restore flow does not yet auto-stage the connector reliably.');
-
     const token = createToken({
       userid: 'ralfepoisson@gmail.com',
       accountId: 'playwright-google-calendar',
@@ -69,7 +67,7 @@ test.describe('Google Calendar OAuth callback return', function () {
       }));
     }, [TOKEN_KEY, SESSION_KEY, WIDGET_OAUTH_CONTEXT_KEY, token, dashboard.id, calendarWidget.id]);
 
-    await page.route('http://127.0.0.1:3000/api/v1/dashboards', async function (route) {
+    await page.route('**/api/v1/dashboards', async function (route) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -79,7 +77,7 @@ test.describe('Google Calendar OAuth callback return', function () {
       });
     });
 
-    await page.route('http://127.0.0.1:3000/api/v1/dashboards/' + dashboard.id + '/widgets', async function (route) {
+    await page.route('**/api/v1/dashboards/' + dashboard.id + '/widgets', async function (route) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -89,7 +87,7 @@ test.describe('Google Calendar OAuth callback return', function () {
       });
     });
 
-    await page.route('http://127.0.0.1:3000/api/v1/dashboards/' + dashboard.id + '/snapshots/latest', async function (route) {
+    await page.route('**/api/v1/dashboards/' + dashboard.id + '/snapshots/latest', async function (route) {
       await route.fulfill({
         status: 404,
         contentType: 'application/json',
@@ -99,7 +97,30 @@ test.describe('Google Calendar OAuth callback return', function () {
       });
     });
 
-    await page.route('http://127.0.0.1:3000/api/v1/connections?type=google-calendar', async function (route) {
+    await page.route('**/api/v1/dashboards/' + dashboard.id + '/audio-briefing/preferences', async function (route) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          enabled: false,
+          targetDurationSeconds: 60,
+          tone: 'calm',
+          voiceName: 'default'
+        })
+      });
+    });
+
+    await page.route('**/api/v1/dashboards/' + dashboard.id + '/audio-briefing', async function (route) {
+      await route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'Audio briefing not found.'
+        })
+      });
+    });
+
+    await page.route('**/api/v1/connections?type=google-calendar', async function (route) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -113,7 +134,7 @@ test.describe('Google Calendar OAuth callback return', function () {
 
     await expect(page.getByRole('heading', { name: dashboard.name })).toBeVisible();
     await expect(page.getByText('Connection: Google Calendar')).toBeVisible();
-    await expect(page.getByText('Live appointments will appear after you save the dashboard.')).toBeVisible();
+    await expect(page.getByText('Calendar events are still loading or unavailable. Refresh after the snapshot completes.')).toBeVisible();
 
     await expect.poll(async function () {
       return page.url();

@@ -27,7 +27,10 @@ test('GET /api/v1/connections returns available connections', async function () 
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -72,7 +75,10 @@ test('POST /api/v1/connections creates a Todoist connection', async function () 
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -134,7 +140,10 @@ test('GET /api/v1/connections/google-calendar/oauth/start redirects to Google', 
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -183,7 +192,10 @@ test('POST /api/v1/connections/google-calendar/oauth/start returns a Google auth
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -239,7 +251,10 @@ test('GET /api/v1/connections/google-calendar/oauth/callback creates a connectio
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -422,6 +437,7 @@ test('GET /api/v1/connections/google-calendar/oauth/callback updates an existing
         assert.equal(input.tenantId, 'tenant-1');
         assert.equal(input.connectionId, 'connection-42');
         assert.equal(input.name, 'Work Calendar');
+        assert.ok(input.credentials);
         assert.equal(input.credentials.refreshToken, 'refresh-token');
         assert.equal(input.credentials.calendarId, 'work@example.com');
 
@@ -542,7 +558,10 @@ test('POST /api/v1/connections/gmail/oauth/start returns a Google authorization 
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -683,7 +702,10 @@ test('PATCH /api/v1/connections/:connectionId updates a Todoist connection', asy
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },

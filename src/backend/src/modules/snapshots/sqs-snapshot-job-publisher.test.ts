@@ -7,7 +7,8 @@ test('SqsSnapshotJobPublisher sends the expected widget snapshot command', async
   const commands: SendMessageCommand[] = [];
   const publisher = new SqsSnapshotJobPublisher({
     async send(command) {
-      commands.push(command as SendMessageCommand);
+      assert.ok(command instanceof SendMessageCommand);
+      commands.push(command);
       return {};
     }
   }, 'https://example.com/queue');
@@ -43,7 +44,8 @@ test('SqsSnapshotJobPublisher marks forced admin refreshes to bypass duplicate c
   const commands: SendMessageCommand[] = [];
   const publisher = new SqsSnapshotJobPublisher({
     async send(command) {
-      commands.push(command as SendMessageCommand);
+      assert.ok(command instanceof SendMessageCommand);
+      commands.push(command);
       return {};
     }
   }, 'https://example.com/queue');

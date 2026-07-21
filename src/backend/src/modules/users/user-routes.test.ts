@@ -88,7 +88,7 @@ test('PATCH /api/v1/users/me updates the authenticated user profile and Telegram
   await registerUserRoutes(app, {
     prisma: {
       appUser: {
-        update: async function update(input) {
+        update: async function update(input: { where: { id: string }; data: Record<string, unknown> }) {
           updateInput = input;
 
           return {

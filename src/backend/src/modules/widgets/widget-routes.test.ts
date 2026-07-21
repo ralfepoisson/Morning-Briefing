@@ -21,7 +21,10 @@ test('GET /api/v1/dashboards/:dashboardId/widgets returns widget instances', asy
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -68,7 +71,10 @@ test('POST /api/v1/dashboards/:dashboardId/widgets creates a widget', async func
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -124,7 +130,10 @@ test('POST /api/v1/dashboards/:dashboardId/widgets creates an xkcd widget', asyn
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -194,7 +203,10 @@ test('POST /api/v1/dashboards/:dashboardId/widgets creates a NatGeo Daily Photo 
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -264,7 +276,10 @@ test('POST /api/v1/dashboards/:dashboardId/widgets creates an email widget', asy
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -335,7 +350,10 @@ test('POST /api/v1/dashboards/:dashboardId/widgets rejects blank widget type', a
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -383,7 +401,10 @@ test('PATCH /api/v1/dashboards/:dashboardId/widgets/:widgetId updates widget lay
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -460,7 +481,10 @@ test('DELETE /api/v1/dashboards/:dashboardId/widgets/:widgetId archives a widget
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -509,6 +533,9 @@ function createWidgetResponse(overrides: Partial<DashboardWidgetResponse>): Dash
     minHeight: overrides.minHeight || 260,
     isVisible: overrides.isVisible !== false,
     isGenerating: overrides.isGenerating === true,
+    includeInBriefingDefault: overrides.includeInBriefingDefault === true,
+    includeInBriefingOverride: overrides.includeInBriefingOverride ?? null,
+    includeInBriefing: overrides.includeInBriefing === true,
     sortOrder: overrides.sortOrder || 1,
     config: overrides.config || {},
     data: overrides.data || {},

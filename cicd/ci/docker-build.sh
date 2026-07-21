@@ -9,12 +9,12 @@ FRONTEND_IMAGE_TAG="${FRONTEND_IMAGE_TAG:-morning-briefing-frontend:local}"
 "${ROOT_DIR}/cicd/ci/build-backend.sh"
 "${ROOT_DIR}/cicd/ci/build-frontend.sh"
 
-docker build \
+docker buildx build --platform linux/arm64 --load \
   -f "${ROOT_DIR}/cicd/ci/Dockerfile.backend" \
   -t "${BACKEND_IMAGE_TAG}" \
   "${ROOT_DIR}"
 
-docker build \
+docker buildx build --platform linux/arm64 --load \
   -f "${ROOT_DIR}/cicd/ci/Dockerfile.frontend" \
   -t "${FRONTEND_IMAGE_TAG}" \
   "${ROOT_DIR}"

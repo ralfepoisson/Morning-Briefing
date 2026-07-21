@@ -3,11 +3,25 @@ import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import { registerMessageBrokerRoutes } from './message-broker-routes.js';
 
+type MessageBrokerRouteDependencies = NonNullable<Parameters<typeof registerMessageBrokerRoutes>[1]>;
+type JobCountInput = { where?: { status?: string; completedAt?: unknown } };
+type MessageBrokerPrismaFixture = {
+  $queryRaw(query?: unknown, ...values: unknown[]): Promise<unknown>;
+  snapshotGenerationJob: {
+    count(input?: JobCountInput): Promise<number>;
+    findMany(input?: unknown): Promise<unknown[]>;
+  };
+};
+
+function messageBrokerPrisma(fixture: MessageBrokerPrismaFixture): MessageBrokerRouteDependencies['prisma'] {
+  return fixture as unknown as MessageBrokerRouteDependencies['prisma'];
+}
+
 test('GET /api/v1/admin/message-broker returns queue metrics, chart data, and recent messages', async function () {
   const app = Fastify();
 
   await registerMessageBrokerRoutes(app, {
-    prisma: {
+    prisma: messageBrokerPrisma({
       $queryRaw: async function $queryRaw() {
         return [
           {
@@ -24,19 +38,19 @@ test('GET /api/v1/admin/message-broker returns queue metrics, chart data, and re
       },
       snapshotGenerationJob: {
         count: async function count(args) {
-          if (args.where.status === 'PENDING') {
+          if (args?.where?.status === 'PENDING') {
             return 2;
           }
 
-          if (args.where.status === 'PROCESSING') {
+          if (args?.where?.status === 'PROCESSING') {
             return 1;
           }
 
-          if (args.where.status === 'FAILED') {
+          if (args?.where?.status === 'FAILED') {
             return 1;
           }
 
-          if (args.where.completedAt) {
+          if (args?.where?.completedAt) {
             return 5;
           }
 
@@ -67,7 +81,7 @@ test('GET /api/v1/admin/message-broker returns queue metrics, chart data, and re
           ];
         }
       }
-    },
+    }),
     sqs: {
       async send() {
         return {
@@ -88,6 +102,8 @@ test('GET /api/v1/admin/message-broker returns queue metrics, chart data, and re
       awsEndpointUrl: 'http://localhost:4566',
       workerWaitTimeSeconds: 10,
       workerVisibilityTimeoutSeconds: 60,
+      workerVisibilityHeartbeatSeconds: 30,
+      jobLeaseSeconds: 300,
       workerMaxMessages: 5,
       workerPollIntervalMs: 1000,
       queueMaxReceiveCount: 5
@@ -176,7 +192,7 @@ test('GET /api/v1/admin/message-broker reports an unconfigured queue when no que
   const app = Fastify();
 
   await registerMessageBrokerRoutes(app, {
-    prisma: {
+    prisma: messageBrokerPrisma({
       $queryRaw: async function $queryRaw() {
         return [];
       },
@@ -188,7 +204,7 @@ test('GET /api/v1/admin/message-broker reports an unconfigured queue when no que
           return [];
         }
       }
-    },
+    }),
     sqs: null,
     queueConfig: {
       enabled: true,
@@ -199,6 +215,8 @@ test('GET /api/v1/admin/message-broker reports an unconfigured queue when no que
       awsEndpointUrl: null,
       workerWaitTimeSeconds: 10,
       workerVisibilityTimeoutSeconds: 60,
+      workerVisibilityHeartbeatSeconds: 30,
+      jobLeaseSeconds: 300,
       workerMaxMessages: 5,
       workerPollIntervalMs: 1000,
       queueMaxReceiveCount: 5

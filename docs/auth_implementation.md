@@ -18,6 +18,26 @@ Instead:
 8. The SPA adds the JWT to backend API requests as `Authorization: Bearer <token>`.
 9. The backend validates the JWT for protected API requests and derives the current app user from it.
 
+## Production Routing and Cutover Contract
+
+The target production route is:
+
+```text
+browser -> shared ALB TLS/WAF -> Apache :8080 -> loopback frontend/backend containers
+```
+
+Apache sends `/api/*` to the backend and all other paths to the static frontend. The following contracts must remain exact through the migration:
+
+- SPA Life2 callback: `https://briefing.ralfepoisson.com/#/auth/callback`
+- Google Calendar callback: `https://briefing.ralfepoisson.com/api/v1/connections/google-calendar/oauth/callback`
+- Gmail callback: `https://briefing.ralfepoisson.com/api/v1/connections/gmail/oauth/callback`
+
+The Life2 application ID, sign-in/sign-out URLs, JWT verification material, allowed redirect, and public app base URL are release inputs. They must be validated before switching traffic. The backend and SPA must use the same public origin even though Apache talks to containers over loopback HTTP.
+
+Life2 Auth is a separate dependency with its own migration lifecycle. Morning Briefing must not cut over authentication until the selected Life2 Auth endpoint is reachable and its application record accepts the production callback. Preserve the old path as a rollback target until an end-to-end sign-in, token refresh/restore, sign-out, and protected API request all pass through the shared ALB.
+
+Production must configure cryptographic JWT verification with `LIFE2_JWT_SECRET` or `LIFE2_JWT_PUBLIC_KEY`. The code's shape-and-expiry-only fallback is development compatibility behavior and is not an acceptable production posture.
+
 ## Required Redirect Contract
 
 Browser-facing sign-in must use a public application identifier in the URL. The SPA now sends users to:
@@ -88,14 +108,11 @@ That token is missing the user/account identity claims the app requires.
 
 ## Frontend Implementation
 
-Frontend code lives under `src/web/`.
+Frontend code lives under `src/web/src/`. It is a framework-free strict TypeScript SPA built with Vite 8; authentication and routing use browser APIs directly.
 
 ### Runtime configuration
 
-Runtime config is assembled from:
-
-- [`src/web/config.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/config.js)
-- [`cicd/ci/build-frontend.sh`](/Users/ralfe/Dev/Morning-Briefing/cicd/ci/build-frontend.sh)
+Runtime config is read by [`src/web/src/main.ts`](/Users/ralfe/Dev/Morning-Briefing/src/web/src/main.ts) from `window.__MORNING_BRIEFING_CONFIG__`. The production build creates `dist/config.js` with [`cicd/ci/render-frontend-config.mjs`](/Users/ralfe/Dev/Morning-Briefing/cicd/ci/render-frontend-config.mjs) after Vite bundles the application.
 
 Supported settings:
 
@@ -105,11 +122,11 @@ Supported settings:
 - `authServiceSignOutUrl`
 - `appBaseUrl`
 
-Local development defaults currently use:
+Local development falls back to equivalent typed defaults in `main.ts`. A generated runtime file has this shape:
 
 ```js
 window.__MORNING_BRIEFING_CONFIG__ = Object.assign({
-  apiBaseUrl: window.location.protocol + '//' + morningBriefingApiHost + ':3000/api/v1',
+  apiBaseUrl: '/api/v1',
   authServiceSignInUrl: 'http://auth-service.localhost:46138/signIn',
   authServiceApplicationId: '4b396734eb3f182551e23f4069e4a7a6b15baf46231393cf',
   authServiceSignOutUrl: 'http://auth-service.localhost:46138/logout',
@@ -123,11 +140,7 @@ Production frontend builds currently default `authServiceSignInUrl` to:
 https://auth.life-sqrd.com/signIn
 ```
 
-That default is emitted from:
-
-- [`cicd/ci/build-frontend.sh`](/Users/ralfe/Dev/Morning-Briefing/cicd/ci/build-frontend.sh)
-
-and can still be overridden with `FRONTEND_AUTH_SERVICE_SIGN_IN_URL`.
+That default is emitted by the runtime-config renderer and can still be overridden with `FRONTEND_AUTH_SERVICE_SIGN_IN_URL`.
 
 Production frontend builds currently default `authServiceApplicationId` to:
 
@@ -135,26 +148,27 @@ Production frontend builds currently default `authServiceApplicationId` to:
 39863fc2-c2b9-4b5f-82ee-04841b2e9980
 ```
 
-That default is emitted from the same build step and can still be overridden with `FRONTEND_AUTH_SERVICE_APPLICATION_ID`.
+That default is emitted by the same renderer and can still be overridden with `FRONTEND_AUTH_SERVICE_APPLICATION_ID`.
 
 ### Callback route
 
-The AngularJS route is defined in:
+The browser-native hash router is defined in:
 
-- [`src/web/app/app.routes.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/app/app.routes.js)
+- [`src/web/src/main.ts`](/Users/ralfe/Dev/Morning-Briefing/src/web/src/main.ts)
 
 Relevant auth routes:
 
 - `/#/auth/callback`
 - `/#/signed-out`
 
-### Early token capture before Angular routing
+### Early token capture before routing
 
-The most important reliability detail is that token capture happens before Angular bootstraps:
+The most important reliability detail is that token capture happens before the initial route is rendered:
 
-- [`src/web/app/bootstrap-auth.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/app/bootstrap-auth.js)
+- [`src/web/src/main.ts`](/Users/ralfe/Dev/Morning-Briefing/src/web/src/main.ts)
+- [`src/web/src/auth.ts`](/Users/ralfe/Dev/Morning-Briefing/src/web/src/auth.ts)
 
-This script:
+This startup path:
 
 - reads `token` from the URL immediately
 - validates the decoded payload shape
@@ -162,13 +176,11 @@ This script:
 - strips `token` from the URL
 - purges expired stored tokens during startup
 
-This avoids route-guard races where Angular could redirect away before the token was persisted.
+This avoids router races where the SPA could redirect away before the token was persisted.
 
 ### Frontend auth service
 
-Main frontend auth logic lives in:
-
-- [`src/web/app/core/services/auth.service.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/app/core/services/auth.service.js)
+Main frontend auth logic lives in `src/web/src/main.ts`, with token parsing and sign-in URL construction isolated in `src/web/src/auth.ts`.
 
 Responsibilities:
 
@@ -190,9 +202,7 @@ Current local storage keys:
 
 ### HTTP auth header injection
 
-All API requests include the JWT through:
-
-- [`src/web/app/core/services/auth-http.interceptor.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/app/core/services/auth-http.interceptor.js)
+The typed API helper in `src/web/src/main.ts` adds the JWT to protected requests.
 
 Behavior:
 
@@ -201,9 +211,7 @@ Behavior:
 
 ### App startup and route guard behavior
 
-Startup behavior is implemented in:
-
-- [`src/web/app/app.run.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/app/app.run.js)
+Startup and hash-route behavior are implemented in `src/web/src/main.ts`.
 
 Behavior:
 
@@ -214,12 +222,7 @@ Behavior:
 - normalizes post-login routing so users do not get stuck on `#/signed-out`
 - preserves `oauthConnectionId` and `oauthProvider` query parameters for connector-related OAuth flows
 
-### Auth UI pages
-
-Files:
-
-- [`src/web/app/features/auth/auth-callback-page.component.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/app/features/auth/auth-callback-page.component.js)
-- [`src/web/app/features/auth/auth-status-page.component.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/app/features/auth/auth-status-page.component.js)
+### Auth UI routes
 
 Behavior:
 
@@ -227,22 +230,7 @@ Behavior:
 - signed-out page shows the latest auth failure reason
 - signed-out page self-heals by redirecting into the app if a valid session already exists
 
-### Current debug logging
-
-There are temporary console logs in the auth flow to make callback failures easier to debug:
-
-- callback token detection
-- token acceptance/rejection
-- redirect branch decisions
-- signed-out page initialization
-
-These logs live primarily in:
-
-- [`src/web/app/core/services/auth.service.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/app/core/services/auth.service.js)
-- [`src/web/app/features/auth/auth-callback-page.component.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/app/features/auth/auth-callback-page.component.js)
-- [`src/web/app/features/auth/auth-status-page.component.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/app/features/auth/auth-status-page.component.js)
-
-If you reuse this integration in another project, these logs can be helpful during rollout and then removed afterward.
+Authentication failures are persisted under the documented error key and rendered on `/#/signed-out`; the production bundle does not depend on temporary framework debug logging.
 
 ## Backend Implementation
 
@@ -409,7 +397,7 @@ Fix:
 
 - standardize on `/#/auth/callback?token=...`
 
-### 3. Angular route guard race
+### 3. Router startup race
 
 Symptom:
 
@@ -417,11 +405,11 @@ Symptom:
 
 Cause:
 
-- route guards ran before the token had been persisted
+- the initial route rendered before the token had been persisted
 
 Fix:
 
-- capture/store the token before Angular boot in `bootstrap-auth.js`
+- capture/store the token in `main.ts` before the first route render
 
 ### 4. Stale `#/signed-out` hash after successful login
 
@@ -476,13 +464,11 @@ Use this checklist when integrating the Life2 auth service into another SPA proj
 
 Frontend:
 
-- [`src/web/app/bootstrap-auth.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/app/bootstrap-auth.js)
-- [`src/web/app/core/services/auth.service.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/app/core/services/auth.service.js)
-- [`src/web/app/core/services/auth-http.interceptor.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/app/core/services/auth-http.interceptor.js)
-- [`src/web/app/app.run.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/app/app.run.js)
-- [`src/web/app/app.routes.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/app/app.routes.js)
-- [`src/web/app/features/auth/auth-callback-page.component.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/app/features/auth/auth-callback-page.component.js)
-- [`src/web/app/features/auth/auth-status-page.component.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/app/features/auth/auth-status-page.component.js)
+- [`src/web/src/main.ts`](/Users/ralfe/Dev/Morning-Briefing/src/web/src/main.ts)
+- [`src/web/src/auth.ts`](/Users/ralfe/Dev/Morning-Briefing/src/web/src/auth.ts)
+- [`src/web/src/auth.test.ts`](/Users/ralfe/Dev/Morning-Briefing/src/web/src/auth.test.ts)
+- [`src/web/index.html`](/Users/ralfe/Dev/Morning-Briefing/src/web/index.html)
+- [`src/web/vite.config.ts`](/Users/ralfe/Dev/Morning-Briefing/src/web/vite.config.ts)
 
 Backend:
 
@@ -491,8 +477,8 @@ Backend:
 
 Build/runtime config:
 
-- [`src/web/config.js`](/Users/ralfe/Dev/Morning-Briefing/src/web/config.js)
-- [`cicd/ci/build-frontend.sh`](/Users/ralfe/Dev/Morning-Briefing/cicd/ci/build-frontend.sh)
+- [`cicd/ci/render-frontend-config.mjs`](/Users/ralfe/Dev/Morning-Briefing/cicd/ci/render-frontend-config.mjs)
+- [`cicd/ci/Dockerfile.frontend`](/Users/ralfe/Dev/Morning-Briefing/cicd/ci/Dockerfile.frontend)
 
 ## Final Recommendation
 

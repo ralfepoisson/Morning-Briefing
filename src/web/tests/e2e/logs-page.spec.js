@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./playwright-fixtures');
 
 const dashboards = [
   {
@@ -52,7 +52,23 @@ const logEntries = [
 
 test.describe('Admin logs page', function () {
   test.beforeEach(async function ({ page }) {
-    await page.route('http://127.0.0.1:3000/api/v1/dashboards', async function (route) {
+    const token = createToken({
+      userid: 'ralfepoisson@gmail.com',
+      accountId: 'playwright-logs',
+      email: 'ralfepoisson@gmail.com',
+      exp: Math.floor(Date.now() / 1000) + 3600
+    });
+
+    await page.addInitScript(([tokenKey, sessionKey, authToken]) => {
+      window.localStorage.setItem(tokenKey, authToken);
+      window.localStorage.setItem(sessionKey, JSON.stringify({
+        userid: 'ralfepoisson@gmail.com',
+        accountId: 'playwright-logs',
+        email: 'ralfepoisson@gmail.com'
+      }));
+    }, ['morningBriefing.auth.token', 'morningBriefing.auth.session', token]);
+
+    await page.route('**/api/v1/dashboards', async function (route) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -62,7 +78,7 @@ test.describe('Admin logs page', function () {
       });
     });
 
-    await page.route('http://127.0.0.1:3000/api/v1/admin/logs**', async function (route) {
+    await page.route('**/api/v1/admin/logs**', async function (route) {
       const url = new URL(route.request().url());
       await route.fulfill({
         status: 200,
@@ -99,6 +115,19 @@ test.describe('Admin logs page', function () {
     await expect(page.getByText('Google Calendar request failed with status 403.')).toBeVisible();
   });
 });
+
+function createToken(payload) {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  return `${encodeSegment(header)}.${encodeSegment(payload)}.signature`;
+}
+
+function encodeSegment(value) {
+  return Buffer.from(JSON.stringify(value), 'utf8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
 
 function buildLogResponse(searchParams) {
   const q = (searchParams.get('q') || '').trim().toLowerCase();

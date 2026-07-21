@@ -14,9 +14,11 @@ export class SqsDashboardBriefingJobPublisher implements DashboardBriefingJobPub
     input: PublishDashboardAudioBriefingJobInput
   ): Promise<GenerateDashboardAudioBriefingRequested> {
     const requestedAt = input.requestedAt || new Date();
+    const jobId = createSnapshotJobId();
     const payload: GenerateDashboardAudioBriefingRequested = {
       schemaVersion: 1,
-      jobId: createSnapshotJobId(),
+      jobId,
+      idempotencyKey: input.idempotencyKey || jobId,
       dashboardId: input.dashboardId,
       tenantId: input.tenantId,
       ownerUserId: input.ownerUserId,

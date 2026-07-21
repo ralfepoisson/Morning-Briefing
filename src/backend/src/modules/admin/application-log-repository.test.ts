@@ -5,10 +5,22 @@ import {
   summarizePersistedApplicationLogs
 } from './application-log-repository.js';
 
+type ApplicationLogPrisma = NonNullable<Parameters<typeof listPersistedApplicationLogs>[1]>;
+type ApplicationLogPrismaFixture = {
+  applicationLogEvent: {
+    findMany?(input?: unknown): Promise<unknown[]>;
+    groupBy?(input?: unknown): Promise<unknown[]>;
+  };
+};
+
+function applicationLogPrisma(fixture: ApplicationLogPrismaFixture): ApplicationLogPrisma {
+  return fixture as unknown as ApplicationLogPrisma;
+}
+
 test('application log repository maps persisted rows into API log entries', async function () {
   const logs = await listPersistedApplicationLogs({
     levels: ['error', 'info']
-  }, {
+  }, applicationLogPrisma({
     applicationLogEvent: {
       async findMany() {
         return [
@@ -53,7 +65,7 @@ test('application log repository maps persisted rows into API log entries', asyn
         ];
       }
     }
-  });
+  }));
 
   assert.equal(logs.length, 2);
   assert.equal(logs[0].id, 'log-1');
@@ -61,7 +73,7 @@ test('application log repository maps persisted rows into API log entries', asyn
 });
 
 test('application log repository summarizes persisted log levels', async function () {
-  const summary = await summarizePersistedApplicationLogs({
+  const summary = await summarizePersistedApplicationLogs(applicationLogPrisma({
     applicationLogEvent: {
       async groupBy() {
         return [
@@ -80,7 +92,7 @@ test('application log repository summarizes persisted log levels', async functio
         ];
       }
     }
-  } as never);
+  }));
 
   assert.deepEqual(summary, {
     info: 3,

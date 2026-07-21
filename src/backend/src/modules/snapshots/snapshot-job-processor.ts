@@ -2,6 +2,7 @@ import { logSnapshotJob } from './snapshot-job-logger.js';
 import type { SnapshotRepository } from './snapshot-repository.js';
 import type { SnapshotService } from './snapshot-service.js';
 import type { GenerateWidgetSnapshotEnvelope, GenerateWidgetSnapshotRequested } from './snapshot-job-types.js';
+import { getSnapshotQueueConfig } from './snapshot-queue-config.js';
 
 export type SnapshotQueueMessage = {
   body: string;
@@ -18,7 +19,7 @@ export class SnapshotJobProcessor {
     private readonly snapshotService: Pick<SnapshotService, 'generateForWidget'>
   ) {}
 
-  async process(message: SnapshotQueueMessage): Promise<'processed' | 'skipped'> {
+  async process(message: SnapshotQueueMessage): Promise<'processed' | 'skipped' | 'retry'> {
     const payload = parseGenerateWidgetSnapshotMessage(message.body);
 
     logSnapshotJob('info', 'snapshot_job_dequeued', {
@@ -31,7 +32,12 @@ export class SnapshotJobProcessor {
       sqsMessageId: message.messageId || null
     });
 
-    const claim = await this.repository.claimSnapshotJob(payload, message.messageId || message.receiptHandle || null);
+    const leaseExpiresAt = new Date(Date.now() + getSnapshotQueueConfig().jobLeaseSeconds * 1000);
+    const claim = await this.repository.claimSnapshotJob(
+      payload,
+      message.messageId || message.receiptHandle || null,
+      leaseExpiresAt
+    );
 
     if (claim.status !== 'claimed') {
       logSnapshotJob('info', 'snapshot_job_duplicate_skipped', {
@@ -44,7 +50,7 @@ export class SnapshotJobProcessor {
         reason: claim.status
       });
 
-      return 'skipped';
+      return claim.status === 'already_processing' ? 'retry' : 'skipped';
     }
 
     logSnapshotJob('info', 'snapshot_job_processing_started', {

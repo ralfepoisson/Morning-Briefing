@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./playwright-fixtures');
 
 const TOKEN_KEY = 'morningBriefing.auth.token';
 const SESSION_KEY = 'morningBriefing.auth.session';

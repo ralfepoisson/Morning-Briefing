@@ -200,16 +200,16 @@ The technology stack should balance speed of delivery, familiarity, and future e
 
 ### Front end
 
-Because the initial preferred stack is Bootstrap plus AngularJS-style SPA development, a practical starting point is:
+The implemented frontend is a framework-free strict TypeScript SPA:
 
-- HTML
-- CSS
-- Bootstrap
-- JavaScript or TypeScript
-- Angular (preferred modern path) or AngularJS if continuing from an existing comfort zone
-- Grid layout / widget library for drag-drop and resize behaviour
+- TypeScript with strict compiler settings
+- Vite 8 for development and production bundling
+- browser-native DOM, routing, state, drag, and resize behavior
+- Bootstrap for layout and base UI primitives
+- Font Awesome Free for icons
+- Vitest for focused unit tests and Playwright for browser flows
 
-For the widget layout capability, a grid-based dashboard library is recommended rather than implementing drag-and-drop from scratch.
+The current implementation uses browser-native pointer interactions for dashboard drag and resize behavior; any future grid library must preserve the persisted layout contract.
 
 ### Back end
 
@@ -244,7 +244,11 @@ Why PostgreSQL:
 
 ### Hosting
 
-- Containerised deployment with Docker running locally for Dev and in AWS ECS for Test & Prod.
+- Local development uses containerised dependencies and local application processes.
+- The production target is immutable ARM64 Docker Compose releases on the private consolidated personal-projects EC2 host, with Apache behind the shared TLS/WAF-protected ALB.
+- Backend and worker remain separate processes, PostgreSQL joins an external protected Docker network, and durable SQS/DLQ job handling is retained.
+- The current ECS/Fargate deployment and drifted CloudFormation stack are legacy rollback surfaces until an explicitly approved cutover and retirement phase.
+- See `docs/deployment_approach.md` for the release, migration, health, and rollback gates.
 
 ### Television display
 
@@ -263,7 +267,8 @@ Implementation status for the current frontend can be tracked in `docs/ui-status
 ### Front-end stack
 
 - Use Bootstrap for layout and base UI primitives
-- Use AngularJS for the SPA structure
+- Use framework-free strict TypeScript for the SPA structure
+- Use Vite 8 for local development and production builds
 - Use Font Awesome Free for UI icons
 
 ### General visual direction

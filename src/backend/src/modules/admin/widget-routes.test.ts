@@ -3,12 +3,28 @@ import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import { registerAdminWidgetRoutes } from './widget-routes.js';
 import { formatSnapshotDateForTimezone } from '../snapshots/snapshot-date.js';
+import type { PublishWidgetSnapshotJobInput } from '../snapshots/snapshot-job-publisher.js';
+import type { GenerateWidgetSnapshotRequested } from '../snapshots/snapshot-job-types.js';
+
+type WidgetRouteDependencies = NonNullable<Parameters<typeof registerAdminWidgetRoutes>[1]>;
+type WidgetUpdateInput = { where: { id: string }; data: { isGenerating: boolean } };
+type WidgetPrismaFixture = {
+  dashboardWidget: {
+    findMany(input?: { select?: unknown }): Promise<unknown[]>;
+    findFirst(input?: unknown): Promise<unknown>;
+    update?(input: WidgetUpdateInput): Promise<unknown>;
+  };
+};
+
+function widgetPrisma(fixture: WidgetPrismaFixture): WidgetRouteDependencies['prisma'] {
+  return fixture as unknown as WidgetRouteDependencies['prisma'];
+}
 
 test('GET /api/v1/admin/widgets returns widgets with latest snapshot state', async function () {
   const app = Fastify();
 
   await registerAdminWidgetRoutes(app, {
-    prisma: {
+    prisma: widgetPrisma({
       dashboardWidget: {
         findMany: async function findMany() {
           return [
@@ -79,7 +95,7 @@ test('GET /api/v1/admin/widgets returns widgets with latest snapshot state', asy
           return null;
         }
       }
-    } as never,
+    }),
     defaultUserService: {
       async getDefaultUser() {
         return {
@@ -166,12 +182,12 @@ test('GET /api/v1/admin/widgets returns widgets with latest snapshot state', asy
 
 test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual refresh', async function () {
   const app = Fastify();
-  let publishedInput = null;
-  const widgetUpdates = [];
+  const publishedInputs: PublishWidgetSnapshotJobInput[] = [];
+  const widgetUpdates: WidgetUpdateInput[] = [];
   const expectedSnapshotDate = formatSnapshotDateForTimezone(new Date(), 'Europe/Paris');
 
   await registerAdminWidgetRoutes(app, {
-    prisma: {
+    prisma: widgetPrisma({
       dashboardWidget: {
         findMany: async function findMany() {
           return [];
@@ -197,7 +213,7 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual
           };
         }
       }
-    } as never,
+    }),
     defaultUserService: {
       async getDefaultUser() {
         return {
@@ -213,7 +229,7 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual
     },
     snapshotJobPublisher: {
       async publishGenerateWidgetSnapshot(input) {
-        publishedInput = input;
+        publishedInputs.push(input);
 
         return {
           schemaVersion: 1,
@@ -253,10 +269,10 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual
 
     assert.equal(response.statusCode, 202);
     assert.equal(widgetUpdates.length, 1);
-    assert.equal((widgetUpdates[0] as { data: { isGenerating: boolean } }).data.isGenerating, true);
-    assert.equal((publishedInput as { triggerSource: string }).triggerSource, 'manual_refresh');
-    assert.equal((publishedInput as { bypassDuplicateCheck: boolean }).bypassDuplicateCheck, true);
-    assert.equal((publishedInput as { snapshotDate: string }).snapshotDate, expectedSnapshotDate);
+    assert.equal(widgetUpdates[0]?.data.isGenerating, true);
+    assert.equal(publishedInputs[0]?.triggerSource, 'manual_refresh');
+    assert.equal(publishedInputs[0]?.bypassDuplicateCheck, true);
+    assert.equal(publishedInputs[0]?.snapshotDate, expectedSnapshotDate);
     assert.deepEqual(response.json(), {
       status: 'queued',
       job: {
@@ -274,12 +290,12 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot enqueues a manual
 
 test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot falls back to direct generation when queue publishing fails', async function () {
   const app = Fastify();
-  let generatedInput = null;
-  const widgetUpdates = [];
+  const generatedInputs: GenerateWidgetSnapshotRequested[] = [];
+  const widgetUpdates: WidgetUpdateInput[] = [];
   const expectedSnapshotDate = formatSnapshotDateForTimezone(new Date(), 'Europe/Paris');
 
   await registerAdminWidgetRoutes(app, {
-    prisma: {
+    prisma: widgetPrisma({
       dashboardWidget: {
         findMany: async function findMany() {
           return [];
@@ -305,7 +321,7 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot falls back to dir
           };
         }
       }
-    } as never,
+    }),
     defaultUserService: {
       async getDefaultUser() {
         return {
@@ -326,7 +342,7 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot falls back to dir
     },
     snapshotService: {
       async generateForWidget(input) {
-        generatedInput = input;
+        generatedInputs.push(input);
 
         return {
           status: 'generated'
@@ -346,10 +362,10 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot falls back to dir
 
     assert.equal(response.statusCode, 200);
     assert.deepEqual(widgetUpdates.map(function mapUpdate(item) {
-      return (item as { data: { isGenerating: boolean } }).data.isGenerating;
+      return item.data.isGenerating;
     }), [true, false]);
-    assert.equal((generatedInput as { triggerSource: string }).triggerSource, 'manual_refresh');
-    assert.equal((generatedInput as { snapshotDate: string }).snapshotDate, expectedSnapshotDate);
+    assert.equal(generatedInputs[0]?.triggerSource, 'manual_refresh');
+    assert.equal(generatedInputs[0]?.snapshotDate, expectedSnapshotDate);
     assert.deepEqual(response.json(), {
       status: 'generated',
       mode: 'direct',
@@ -368,12 +384,12 @@ test('POST /api/v1/admin/widgets/:widgetId/regenerate-snapshot falls back to dir
 
 test('POST /api/v1/admin/widgets/regenerate-all-snapshots enqueues manual refreshes for all snapshot-backed widgets', async function () {
   const app = Fastify();
-  const widgetUpdates = [];
-  const publishedInputs = [];
+  const widgetUpdates: WidgetUpdateInput[] = [];
+  const publishedInputs: PublishWidgetSnapshotJobInput[] = [];
   const expectedSnapshotDate = formatSnapshotDateForTimezone(new Date(), 'Europe/Paris');
 
   await registerAdminWidgetRoutes(app, {
-    prisma: {
+    prisma: widgetPrisma({
       dashboardWidget: {
         findMany: async function findMany(input) {
           if (input && input.select) {
@@ -419,7 +435,7 @@ test('POST /api/v1/admin/widgets/regenerate-all-snapshots enqueues manual refres
           return null;
         }
       }
-    } as never,
+    }),
     defaultUserService: {
       async getDefaultUser() {
         return {
@@ -476,7 +492,7 @@ test('POST /api/v1/admin/widgets/regenerate-all-snapshots enqueues manual refres
     assert.equal(response.statusCode, 202);
     assert.equal(widgetUpdates.length, 2);
     assert.deepEqual(widgetUpdates.map(function mapUpdate(item) {
-      return (item as { where: { id: string }; data: { isGenerating: boolean } }).where.id;
+      return item.where.id;
     }), ['widget-1', 'widget-2']);
     assert.deepEqual(publishedInputs.map(function mapPublished(input) {
       return {
@@ -512,12 +528,12 @@ test('POST /api/v1/admin/widgets/regenerate-all-snapshots enqueues manual refres
 
 test('POST /api/v1/admin/widgets/regenerate-all-snapshots falls back to direct generation when queue publishing fails', async function () {
   const app = Fastify();
-  const widgetUpdates = [];
-  const generatedInputs = [];
+  const widgetUpdates: WidgetUpdateInput[] = [];
+  const generatedInputs: GenerateWidgetSnapshotRequested[] = [];
   const expectedSnapshotDate = formatSnapshotDateForTimezone(new Date(), 'Europe/Paris');
 
   await registerAdminWidgetRoutes(app, {
-    prisma: {
+    prisma: widgetPrisma({
       dashboardWidget: {
         findMany: async function findMany(input) {
           if (input && input.select) {
@@ -563,7 +579,7 @@ test('POST /api/v1/admin/widgets/regenerate-all-snapshots falls back to direct g
           return null;
         }
       }
-    } as never,
+    }),
     defaultUserService: {
       async getDefaultUser() {
         return {
@@ -605,8 +621,8 @@ test('POST /api/v1/admin/widgets/regenerate-all-snapshots falls back to direct g
     assert.equal(response.statusCode, 200);
     assert.deepEqual(widgetUpdates.map(function mapUpdate(item) {
       return {
-        id: (item as { where: { id: string } }).where.id,
-        isGenerating: (item as { data: { isGenerating: boolean } }).data.isGenerating
+        id: item.where.id,
+        isGenerating: item.data.isGenerating
       };
     }), [
       { id: 'widget-1', isGenerating: true },

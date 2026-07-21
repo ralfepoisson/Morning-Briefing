@@ -49,7 +49,7 @@ test('ScheduledDashboardBriefingRefreshService enqueues one job per eligible das
           isGenerating: true,
           hasReadySnapshot: true,
           latestBriefing: {
-            status: 'GENERATING',
+            status: 'GENERATING' as const,
             updatedAt: new Date('2026-03-26T04:50:00.000Z')
           },
           owner: {
@@ -95,6 +95,7 @@ test('ScheduledDashboardBriefingRefreshService enqueues one job per eligible das
     ownerEmail: 'owner-1@example.com',
     ownerIsAdmin: false,
     force: true,
+    idempotencyKey: 'dash-1:scheduled:2026-03-26',
     requestedAt: new Date('2026-03-26T05:00:00.000Z'),
     correlationId: null,
     causationId: null
@@ -156,7 +157,7 @@ test('ScheduledDashboardBriefingRefreshService recovers a stale generating dashb
           isGenerating: true,
           hasReadySnapshot: true,
           latestBriefing: {
-            status: 'GENERATING',
+            status: 'GENERATING' as const,
             updatedAt: new Date('2026-03-30T04:00:00.000Z')
           },
           owner: {
@@ -209,6 +210,7 @@ class InMemoryPublisher implements DashboardBriefingJobPublisher {
     return {
       schemaVersion: 1 as const,
       jobId: 'job-1',
+      idempotencyKey: input.idempotencyKey || `${input.dashboardId}:manual`,
       dashboardId: input.dashboardId,
       tenantId: input.tenantId,
       ownerUserId: input.ownerUserId,

@@ -49,7 +49,12 @@ export interface SnapshotRepository {
   upsertDashboardSnapshot(input: UpsertDashboardSnapshotInput): Promise<DashboardSnapshotRecord>;
   findWidgetForSnapshotGeneration(widgetId: string): Promise<DashboardWidgetRecord | null>;
   listWidgetsForScheduledRefresh(): Promise<DashboardWidgetRecord[]>;
-  claimSnapshotJob(message: GenerateWidgetSnapshotRequested, messageReceiptId: string | null): Promise<ClaimSnapshotJobResult>;
+  claimSnapshotJob(
+    message: GenerateWidgetSnapshotRequested,
+    messageReceiptId: string | null,
+    leaseExpiresAt: Date,
+    now?: Date
+  ): Promise<ClaimSnapshotJobResult>;
   setWidgetGenerating(widgetId: string, isGenerating: boolean): Promise<void>;
   completeSnapshotJob(idempotencyKey: string): Promise<void>;
   skipSnapshotJob(idempotencyKey: string, reason: string): Promise<void>;

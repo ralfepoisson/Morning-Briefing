@@ -193,7 +193,7 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
       },
       update: {
         generationStatus: input.generationStatus,
-        summaryJson: input.summary,
+        summaryJson: input.summary as Prisma.InputJsonObject,
         generatedAt: new Date()
       },
       create: {
@@ -202,7 +202,7 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
         dashboardId: input.dashboardId,
         snapshotDate: input.snapshotDate,
         generationStatus: input.generationStatus,
-        summaryJson: input.summary
+        summaryJson: input.summary as Prisma.InputJsonObject
       }
     });
 
@@ -221,7 +221,7 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
           widgetType: widget.widgetType,
           title: widget.title,
           status: widget.status,
-          contentJson: widget.content,
+          contentJson: widget.content as Prisma.InputJsonObject,
           contentHash,
           errorMessage: widget.errorMessage,
           generatedAt: widget.generatedAt
@@ -232,7 +232,7 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
           widgetType: widget.widgetType,
           title: widget.title,
           status: widget.status,
-          contentJson: widget.content,
+          contentJson: widget.content as Prisma.InputJsonObject,
           contentHash,
           errorMessage: widget.errorMessage,
           generatedAt: widget.generatedAt
@@ -329,10 +329,10 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
 
   async claimSnapshotJob(
     message: GenerateWidgetSnapshotRequested,
-    messageReceiptId: string | null
+    messageReceiptId: string | null,
+    leaseExpiresAt: Date,
+    now: Date = new Date()
   ): Promise<ClaimSnapshotJobResult> {
-    const now = new Date();
-
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const existing = await this.prisma.snapshotGenerationJob.findUnique({
         where: {
@@ -361,7 +361,11 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
           };
         }
 
-        if (existing.status === 'PROCESSING') {
+        if (
+          existing.status === 'PROCESSING' &&
+          existing.leaseExpiresAt &&
+          existing.leaseExpiresAt.getTime() > now.getTime()
+        ) {
           await this.prisma.snapshotGenerationJob.update({
             where: {
               id: existing.id
@@ -381,9 +385,14 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
           };
         }
 
-        const updated = await this.prisma.snapshotGenerationJob.update({
+        const claimUpdate = await this.prisma.snapshotGenerationJob.updateMany({
           where: {
-            id: existing.id
+            id: existing.id,
+            OR: [
+              { status: { not: 'PROCESSING' } },
+              { leaseExpiresAt: null },
+              { leaseExpiresAt: { lte: now } }
+            ]
           },
           data: {
             status: 'PROCESSING',
@@ -393,15 +402,23 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
             lastMessageId: messageReceiptId,
             lastError: null,
             startedAt: now,
-            completedAt: null
+            completedAt: null,
+            leaseExpiresAt
           }
         });
 
-        return {
-          status: 'claimed',
-          jobId: updated.id,
-          attemptCount: updated.attemptCount
-        };
+        if (claimUpdate.count === 0) {
+          return {
+            status: 'already_processing',
+            jobId: existing.id
+          };
+        }
+
+        const updated = await this.prisma.snapshotGenerationJob.findUniqueOrThrow({
+          where: { id: existing.id }
+        });
+
+        return { status: 'claimed', jobId: updated.id, attemptCount: updated.attemptCount };
       }
 
       try {
@@ -419,7 +436,8 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
             status: 'PROCESSING',
             attemptCount: 1,
             lastMessageId: messageReceiptId,
-            startedAt: now
+            startedAt: now,
+            leaseExpiresAt
           }
         });
 
@@ -468,7 +486,8 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
       data: {
         status: 'COMPLETED',
         completedAt: new Date(),
-        lastError: null
+        lastError: null,
+        leaseExpiresAt: null
       }
     });
   }
@@ -481,7 +500,8 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
       data: {
         status: 'SKIPPED',
         completedAt: new Date(),
-        lastError: reason
+        lastError: reason,
+        leaseExpiresAt: null
       }
     });
   }
@@ -494,7 +514,8 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
       data: {
         status: 'FAILED',
         completedAt: new Date(),
-        lastError: reason
+        lastError: reason,
+        leaseExpiresAt: null
       }
     });
   }
@@ -613,7 +634,7 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
           widgetType: input.widgetSnapshot.widgetType,
           title: input.widgetSnapshot.title,
           status: input.widgetSnapshot.status,
-          contentJson: input.widgetSnapshot.content,
+          contentJson: input.widgetSnapshot.content as Prisma.InputJsonObject,
           contentHash,
           errorMessage: input.widgetSnapshot.errorMessage,
           generatedAt: input.widgetSnapshot.generatedAt
@@ -624,7 +645,7 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
           widgetType: input.widgetSnapshot.widgetType,
           title: input.widgetSnapshot.title,
           status: input.widgetSnapshot.status,
-          contentJson: input.widgetSnapshot.content,
+          contentJson: input.widgetSnapshot.content as Prisma.InputJsonObject,
           contentHash,
           errorMessage: input.widgetSnapshot.errorMessage,
           generatedAt: input.widgetSnapshot.generatedAt
@@ -674,7 +695,7 @@ export class PrismaSnapshotRepository implements SnapshotRepository {
         },
         data: {
           generationStatus: snapshotStatus,
-          summaryJson: summary,
+          summaryJson: summary as Prisma.InputJsonObject,
           generatedAt: input.widgetSnapshot.generatedAt
         }
       });
@@ -835,6 +856,7 @@ function mapDashboardWidgetRecord(widget: {
   minWidth: number;
   minHeight: number;
   isVisible: boolean;
+  isGenerating?: boolean;
   refreshMode: 'SNAPSHOT' | 'LIVE' | 'HYBRID';
   sortOrder: number;
   version: number;
@@ -878,11 +900,15 @@ function mapDashboardWidgetRecord(widget: {
     minWidth: widget.minWidth,
     minHeight: widget.minHeight,
     isVisible: widget.isVisible,
+    isGenerating: Boolean(widget.isGenerating),
     sortOrder: widget.sortOrder,
     refreshMode: widget.refreshMode,
     version: widget.version,
     config,
     configHash: widget.configHash || hashWidgetConfig(config),
+    includeInBriefingDefault: definition ? definition.briefingDefaultIncluded : false,
+    includeInBriefingOverride: null,
+    includeInBriefing: definition ? definition.briefingDefaultIncluded : false,
     data: definition ? definition.createMockData(config) : {},
     connections: (widget.connectors || []).map(mapWidgetConnection),
     createdAt: widget.createdAt,

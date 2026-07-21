@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim AS build
+FROM node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS build
 
 WORKDIR /app/src/backend
 
@@ -12,32 +12,36 @@ RUN npm ci
 COPY src/backend/ ./
 RUN npm run build
 
-FROM node:20-bookworm-slim AS runtime
+FROM node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS runtime
 
 WORKDIR /app/src/backend
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000
-ENV DB_PORT=5432
-ENV DB_ADMIN_NAME=postgres
-ENV DB_SCHEMA=public
-ENV DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/morning_briefing?schema=public
+ENV NPM_CONFIG_CACHE=/tmp/npm
 
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 COPY src/backend/package*.json ./
 RUN npm ci
 
-COPY src/backend/ ./
-RUN npx prisma generate
-
 COPY --from=build /app/src/backend/dist ./dist
+COPY --from=build /app/src/backend/node_modules/.prisma ./node_modules/.prisma
+COPY src/backend/prisma ./prisma
+COPY src/backend/prisma.config.ts ./prisma.config.ts
 COPY cicd/ci/backend-entrypoint.sh /usr/local/bin/backend-entrypoint.sh
 
-RUN sed -i 's/\r$//' /usr/local/bin/backend-entrypoint.sh && chmod +x /usr/local/bin/backend-entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/backend-entrypoint.sh \
+  && chmod +x /usr/local/bin/backend-entrypoint.sh \
+  && groupadd --gid 10001 morning-briefing \
+  && useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin morning-briefing
 
 EXPOSE 3000
+
+USER 10001:10001
+HEALTHCHECK --interval=15s --timeout=8s --start-period=20s --retries=5 \
+  CMD node -e "fetch('http://127.0.0.1:3000/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
 ENTRYPOINT ["/bin/bash", "/usr/local/bin/backend-entrypoint.sh"]
 CMD ["npm", "run", "start:prod"]

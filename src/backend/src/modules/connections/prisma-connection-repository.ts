@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 import type { ConnectionRepository } from './connection-repository.js';
 import type {
   ConnectionRecord,
@@ -107,13 +107,13 @@ function mapConnectionRecord(connector: {
   };
 }
 
-function normalizeConfig(config: Record<string, unknown>): Record<string, unknown> {
-  return Object.keys(config).reduce<Record<string, unknown>>(function build(next, key) {
+function normalizeConfig(config: Record<string, unknown>): Prisma.InputJsonObject {
+  return Object.keys(config).reduce<Record<string, Prisma.InputJsonValue>>(function build(next, key) {
     if (typeof config[key] === 'undefined') {
       return next;
     }
 
-    next[key] = config[key];
+    next[key] = config[key] as Prisma.InputJsonValue;
     return next;
   }, {});
 }

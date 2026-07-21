@@ -177,7 +177,7 @@ test('GET /api/v1/admin/logs returns newest entries first in the response', asyn
     });
 
     assert.equal(response.statusCode, 200);
-    assert.deepEqual(response.json().entries.map(function mapEntry(entry) {
+    assert.deepEqual(response.json().entries.map(function mapEntry(entry: { id: string }) {
       return entry.id;
     }), ['log-3', 'log-2', 'log-1']);
   } finally {

@@ -56,6 +56,7 @@ export class ScheduledDashboardBriefingRefreshService {
                 ownerEmail: dashboard.owner.email,
                 ownerIsAdmin: dashboard.owner.isAdmin,
                 force: true,
+                idempotencyKey: buildScheduledDashboardBriefingIdempotencyKey(dashboard.id, now),
                 requestedAt: now,
                 correlationId: null,
                 causationId: null
@@ -84,6 +85,9 @@ export class ScheduledDashboardBriefingRefreshService {
             recoveredStaleGeneratingCount
         };
     }
+}
+function buildScheduledDashboardBriefingIdempotencyKey(dashboardId, now) {
+    return `${dashboardId}:scheduled:${now.toISOString().slice(0, 10)}`;
 }
 function isStaleGeneratingDashboard(dashboard, now) {
     if (!dashboard.latestBriefing) {

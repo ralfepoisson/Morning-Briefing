@@ -45,7 +45,9 @@ Default values assume:
 - Queue type: SQS Standard
 - Idempotency key: `widgetId:snapshotDate:widgetConfigHash`
 - Stale detection: compare the message's `widgetConfigVersion` and `widgetConfigHash` against the current widget row at processing time
-- Persisted job state: `snapshot_generation_jobs`
+- Persisted widget job state: `snapshot_generation_jobs`
+- Persisted dashboard-audio job state: `dashboard_briefing_generation_jobs`
+- Processing leases allow abandoned `PROCESSING` work to be recovered after a worker failure
 - Deleted or hidden widgets: worker marks the job as skipped
 - Retry policy: infrastructure or unexpected failures throw so SQS retries; domain/config/provider failures are persisted as failed snapshots and the job is marked completed
 
@@ -122,7 +124,8 @@ Current structured logs cover:
 
 - Scheduled refresh currently targets the current UTC snapshot date; per-user timezone scheduling can be added later.
 - Provider errors currently produce failed snapshots instead of retry-specific classification.
-- Lambda/EventBridge infrastructure wiring is represented in code and docs, but deployment IaC is not part of this repo yet.
+- The legacy ECS/EventBridge deployment is still live and its CloudFormation stack is drifted after the RDS instance was removed. It is not the target architecture and must not be updated or deleted before resource ownership is reconciled.
+- The target EC2 Compose release, Apache route, shared-ALB rule, host IAM grants, and systemd timers require a separately approved live phase.
 
 ## Audio Briefing
 
@@ -134,7 +137,7 @@ Audio Briefing is a dashboard-level derived artifact. It is not stored as a widg
 2. The dashboard briefing aggregation service loads the latest eligible widget snapshots for the dashboard.
 3. Structured widget-specific transforms normalize those snapshots into one dashboard briefing input payload.
 4. An LLM provider generates structured JSON for the spoken script.
-5. A TTS provider converts the script into audio and stores the generated file under the backend data directory by default.
+5. A TTS provider converts the script into audio and stores the generated file under `AUDIO_BRIEFING_STORAGE_DIR` (the backend data directory is only a local-development default).
 6. The dashboard UI loads the latest saved briefing and plays the stored audio file through a backend playback endpoint.
 
 ### Widget inclusion rules
@@ -160,6 +163,8 @@ That shared OpenAI configuration is used by:
 - the dashboard briefing script generation flow
 
 Audio synthesis now uses AWS Polly and stores the generated audio artifact before playback.
+
+In production, `AUDIO_BRIEFING_STORAGE_DIR` must point to one protected host directory mounted into both backend and worker containers. The database stores only metadata and the relative storage key. The directory must be included in backup/restore checks and audio must survive replacement of either container.
 
 Environment variables:
 
@@ -217,3 +222,16 @@ Current Alexa behavior:
 - `POST /api/v1/dashboards/:dashboardId/widgets`
 - `PATCH /api/v1/dashboards/:dashboardId/widgets/:widgetId`
 - `GET /api/v1/reference/cities?q=<query>`
+
+## Target Production Runtime
+
+The approved target topology is Docker Compose on the private ARM64 personal-projects EC2 host:
+
+- backend and worker use the same immutable image digest but separate commands, health/restart state, and resource limits
+- the worker runs `npm run snapshot:worker:prod`
+- systemd timers invoke `npm run snapshot:refresh:nightly:prod` at `01:00` UTC and `npm run dashboard-briefing:refresh:scheduled:prod` at `05:00` UTC as one-shot Compose services
+- PostgreSQL 18.4 is external to the application Compose project on Docker network `personal-projects-postgresql`
+- the API and frontend bind only to loopback-facing host ports; Apache exposes them through host port `8080` behind the shared ALB/WAF
+- migrations run as an explicit one-shot `npm run db:deploy`; normal releases never run the production seed
+
+The production worker and timers must stay disabled until the corresponding ECS worker and EventBridge schedules have been stopped during an approved writer handoff. See `docs/deployment_approach.md` for release, health, and rollback gates.

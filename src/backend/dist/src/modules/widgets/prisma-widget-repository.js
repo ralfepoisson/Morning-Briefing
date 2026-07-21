@@ -17,6 +17,11 @@ export class PrismaWidgetRepository {
                     }
                 },
                 include: {
+                    dashboard: {
+                        select: {
+                            ownerUserId: true
+                        }
+                    },
                     connectors: {
                         include: {
                             connector: true

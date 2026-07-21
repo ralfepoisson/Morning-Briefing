@@ -3,6 +3,13 @@ import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import { registerAdminConnectorRoutes } from './connector-routes.js';
 
+type ConnectorRouteDependencies = NonNullable<Parameters<typeof registerAdminConnectorRoutes>[1]>;
+type ConnectorPrismaFixture = { connector: { findMany(input?: unknown): Promise<unknown[]> } };
+
+function connectorPrisma(fixture: ConnectorPrismaFixture): ConnectorRouteDependencies['prisma'] {
+  return fixture as unknown as ConnectorRouteDependencies['prisma'];
+}
+
 test('GET /api/v1/admin/connectors returns safe connector details, owner, and widget usage', async function () {
   const app = Fastify();
 
@@ -20,7 +27,7 @@ test('GET /api/v1/admin/connectors returns safe connector details, owner, and wi
         };
       }
     },
-    prisma: {
+    prisma: connectorPrisma({
       connector: {
         async findMany() {
           return [
@@ -69,7 +76,7 @@ test('GET /api/v1/admin/connectors returns safe connector details, owner, and wi
           ];
         }
       }
-    }
+    })
   });
 
   try {
@@ -141,13 +148,13 @@ test('GET /api/v1/admin/connectors requires admin access', async function () {
         };
       }
     },
-    prisma: {
+    prisma: connectorPrisma({
       connector: {
         async findMany() {
           throw new Error('not used');
         }
       }
-    }
+    })
   });
 
   try {

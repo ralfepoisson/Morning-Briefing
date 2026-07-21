@@ -19,9 +19,9 @@ import { DashboardBriefingTtsService } from './dashboard-briefing-tts-service.js
 export class DashboardBriefingService {
   constructor(
     private readonly repository: DashboardBriefingRepository,
-    private readonly aggregationService: DashboardBriefingAggregationService,
-    private readonly llmService: DashboardBriefingLlmService,
-    private readonly ttsService: DashboardBriefingTtsService,
+    private readonly aggregationService: Pick<DashboardBriefingAggregationService, 'buildInput'>,
+    private readonly llmService: Pick<DashboardBriefingLlmService, 'getModelName' | 'generateScript'>,
+    private readonly ttsService: Pick<DashboardBriefingTtsService, 'getProviderName' | 'generateAndStore' | 'resolveStoragePath'>,
     private readonly deliveryService: Pick<DashboardBriefingDeliveryService, 'deliverGeneratedAudio'>
   ) {}
 

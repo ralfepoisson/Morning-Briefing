@@ -14,7 +14,10 @@ test('GET /api/v1/me returns the default user profile', async function () {
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -61,7 +64,10 @@ test('GET /api/v1/me passes the incoming request to the user service', async fun
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -112,7 +118,10 @@ test('GET /api/v1/dashboards returns dashboards for the default user', async fun
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -158,7 +167,10 @@ test('PATCH /api/v1/dashboards/:dashboardId updates a dashboard', async function
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -218,7 +230,10 @@ test('POST /api/v1/dashboards creates a dashboard', async function () {
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -275,7 +290,10 @@ test('POST /api/v1/dashboards rejects blank names', async function () {
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -323,7 +341,10 @@ test('DELETE /api/v1/dashboards/:dashboardId archives a dashboard', async functi
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -367,7 +388,10 @@ test('DELETE /api/v1/dashboards/:dashboardId returns 404 when dashboard is missi
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },

@@ -1,4 +1,5 @@
 import { logSnapshotJob } from './snapshot-job-logger.js';
+import { getSnapshotQueueConfig } from './snapshot-queue-config.js';
 export class SnapshotJobProcessor {
     repository;
     snapshotService;
@@ -17,7 +18,8 @@ export class SnapshotJobProcessor {
             triggerSource: payload.triggerSource,
             sqsMessageId: message.messageId || null
         });
-        const claim = await this.repository.claimSnapshotJob(payload, message.messageId || message.receiptHandle || null);
+        const leaseExpiresAt = new Date(Date.now() + getSnapshotQueueConfig().jobLeaseSeconds * 1000);
+        const claim = await this.repository.claimSnapshotJob(payload, message.messageId || message.receiptHandle || null, leaseExpiresAt);
         if (claim.status !== 'claimed') {
             logSnapshotJob('info', 'snapshot_job_duplicate_skipped', {
                 jobId: payload.jobId,
@@ -28,7 +30,7 @@ export class SnapshotJobProcessor {
                 triggerSource: payload.triggerSource,
                 reason: claim.status
             });
-            return 'skipped';
+            return claim.status === 'already_processing' ? 'retry' : 'skipped';
         }
         logSnapshotJob('info', 'snapshot_job_processing_started', {
             jobId: payload.jobId,

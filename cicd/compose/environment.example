@@ -1,0 +1,33 @@
+# Values only; never copy real secrets into Git.
+# shared/config/backend.env (0644, no secrets)
+NODE_ENV=production
+FRONTEND_BASE_URL=https://briefing.ralfepoisson.com/
+SNAPSHOT_QUEUE_ENABLED=true
+SNAPSHOT_QUEUE_URL=https://sqs.eu-west-1.amazonaws.com/154596858576/morning-briefing-prod-snapshot-jobs
+SNAPSHOT_QUEUE_NAME=morning-briefing-prod-snapshot-jobs
+SNAPSHOT_DLQ_NAME=morning-briefing-prod-snapshot-jobs-dlq
+SNAPSHOT_WORKER_WAIT_TIME_SECONDS=10
+SNAPSHOT_WORKER_VISIBILITY_TIMEOUT_SECONDS=120
+SNAPSHOT_WORKER_MAX_MESSAGES=5
+SNAPSHOT_WORKER_POLL_INTERVAL_MS=1000
+CONTACT_DELIVERY_PROVIDER=ses
+CONTACT_AWS_REGION=eu-west-1
+
+# shared/config/worker.env (0644, no secrets)
+NODE_ENV=production
+SNAPSHOT_QUEUE_ENABLED=true
+SNAPSHOT_QUEUE_URL=https://sqs.eu-west-1.amazonaws.com/154596858576/morning-briefing-prod-snapshot-jobs
+SNAPSHOT_QUEUE_NAME=morning-briefing-prod-snapshot-jobs
+SNAPSHOT_DLQ_NAME=morning-briefing-prod-snapshot-jobs-dlq
+SNAPSHOT_WORKER_WAIT_TIME_SECONDS=10
+SNAPSHOT_WORKER_VISIBILITY_TIMEOUT_SECONDS=120
+SNAPSHOT_WORKER_MAX_MESSAGES=5
+SNAPSHOT_WORKER_POLL_INTERVAL_MS=1000
+GOOGLE_OAUTH_REDIRECT_URI=https://briefing.ralfepoisson.com/api/v1/connections/google-calendar/oauth/callback
+GOOGLE_GMAIL_OAUTH_REDIRECT_URI=https://briefing.ralfepoisson.com/api/v1/connections/gmail/oauth/callback
+
+# secrets/backend.env and secrets/worker.env must each be mode 0600.
+# Both require DATABASE_URL and Life2 JWT verification material.
+# Worker also requires Google OAuth client ID/secret/state, Telegram and any
+# connector credentials used during queued processing. Backend requires the
+# corresponding callback credentials and contact-provider secrets.

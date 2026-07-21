@@ -1,0 +1,11 @@
+[Unit]
+Description=Morning Briefing widget snapshot enqueue
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=ralfe
+Group=ralfe
+ExecStart=/srv/apps/morning-briefing/current/cicd/host/run-scheduled-job.sh snapshot-refresh
+TimeoutStartSec=30min

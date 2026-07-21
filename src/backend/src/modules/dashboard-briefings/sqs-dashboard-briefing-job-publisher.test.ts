@@ -7,7 +7,8 @@ test('SqsDashboardBriefingJobPublisher sends the expected dashboard audio comman
   const commands: SendMessageCommand[] = [];
   const publisher = new SqsDashboardBriefingJobPublisher({
     async send(command) {
-      commands.push(command as SendMessageCommand);
+      assert.ok(command instanceof SendMessageCommand);
+      commands.push(command);
       return {};
     }
   }, 'https://example.com/queue');
@@ -23,6 +24,7 @@ test('SqsDashboardBriefingJobPublisher sends the expected dashboard audio comman
     ownerEmail: 'ralfe@example.com',
     ownerIsAdmin: false,
     force: true,
+    idempotencyKey: 'dash-1:scheduled:2026-03-26',
     correlationId: 'req-1',
     causationId: 'req-1',
     requestedAt: new Date('2026-03-26T08:00:00.000Z')
@@ -38,5 +40,6 @@ test('SqsDashboardBriefingJobPublisher sends the expected dashboard audio comman
   assert.equal(body.payload.ownerUserId, 'user-1');
   assert.equal(body.payload.ownerPhoneticName, 'Ralf');
   assert.equal(body.payload.force, true);
+  assert.equal(body.payload.idempotencyKey, 'dash-1:scheduled:2026-03-26');
   assert.equal(body.payload.jobId, payload.jobId);
 });

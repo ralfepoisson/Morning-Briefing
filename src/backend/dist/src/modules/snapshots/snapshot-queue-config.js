@@ -8,6 +8,8 @@ export function getSnapshotQueueConfig(env = process.env) {
         awsEndpointUrl: trimToNull(env.AWS_ENDPOINT_URL_SQS),
         workerWaitTimeSeconds: clampNumber(env.SNAPSHOT_WORKER_WAIT_TIME_SECONDS, 10),
         workerVisibilityTimeoutSeconds: clampNumber(env.SNAPSHOT_WORKER_VISIBILITY_TIMEOUT_SECONDS, 60),
+        workerVisibilityHeartbeatSeconds: clampNumber(env.SNAPSHOT_WORKER_VISIBILITY_HEARTBEAT_SECONDS, Math.max(1, Math.floor(clampNumber(env.SNAPSHOT_WORKER_VISIBILITY_TIMEOUT_SECONDS, 60) / 2))),
+        jobLeaseSeconds: clampNumber(env.SNAPSHOT_JOB_LEASE_SECONDS, 300),
         workerMaxMessages: clampNumber(env.SNAPSHOT_WORKER_MAX_MESSAGES, 5),
         workerPollIntervalMs: clampNumber(env.SNAPSHOT_WORKER_POLL_INTERVAL_MS, 1000),
         queueMaxReceiveCount: clampNumber(env.SNAPSHOT_QUEUE_MAX_RECEIVE_COUNT, 5)

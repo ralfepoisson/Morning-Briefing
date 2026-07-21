@@ -151,7 +151,7 @@ function mapDashboardRecord(dashboard) {
         name: dashboard.name,
         description: dashboard.description || '',
         theme: getThemeKey(dashboard.themeJson),
-        isGenerating: 'isGenerating' in dashboard ? Boolean(dashboard.isGenerating) : false,
+        isGenerating: Boolean(dashboard.isGenerating),
         createdAt: dashboard.createdAt,
         updatedAt: dashboard.updatedAt
     };

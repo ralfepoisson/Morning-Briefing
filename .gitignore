@@ -1,6 +1,7 @@
 node_modules/
 src/backend/node_modules/
 src/web/node_modules/
+src/web/dist/
 
 .DS_Store
 
@@ -10,6 +11,7 @@ src/web/node_modules/
 
 cicd/export_credentials.sh
 cicd/serverless/.serverless/
+release-artifacts/
 
 # Generated audio briefing artifacts
 src/backend/data/audio-briefings/

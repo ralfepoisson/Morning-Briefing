@@ -66,17 +66,25 @@ type TodoistTaskListResponse = {
 };
 
 function mapTask(item: Record<string, unknown>): TodoistTask {
+  const due = asObject(item.due);
+
   return {
     id: typeof item.id === 'string' ? item.id : String(item.id),
     content: typeof item.content === 'string' ? item.content : 'Untitled task',
     description: typeof item.description === 'string' ? item.description : '',
     url: typeof item.url === 'string' ? item.url : '',
-    due: item && typeof item === 'object' && item.due && typeof item.due === 'object'
+    due: due
       ? {
-          date: typeof item.due.date === 'string' ? item.due.date : '',
-          string: typeof item.due.string === 'string' ? item.due.string : '',
-          isRecurring: Boolean(item.due.is_recurring ?? item.due.isRecurring)
+          date: typeof due.date === 'string' ? due.date : '',
+          string: typeof due.string === 'string' ? due.string : '',
+          isRecurring: Boolean(due.is_recurring ?? due.isRecurring)
         }
       : null
   };
+}
+
+function asObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
 }

@@ -2,12 +2,28 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import { registerAdminDashboardRoutes } from './dashboard-routes.js';
+import type { PublishDashboardAudioBriefingJobInput } from '../dashboard-briefings/dashboard-briefing-job-publisher.js';
+
+type DashboardRouteDependencies = NonNullable<Parameters<typeof registerAdminDashboardRoutes>[1]>;
+type DashboardUpdateInput = { where: { id: string }; data: { isGenerating: boolean } };
+type DashboardPrismaFixture = {
+  dashboard: {
+    findMany(input?: unknown): Promise<unknown[]>;
+    update?(input: DashboardUpdateInput): Promise<unknown>;
+    findFirst?(input?: unknown): Promise<unknown>;
+  };
+  dashboardBriefing: { findMany(input?: unknown): Promise<unknown[]> };
+};
+
+function dashboardPrisma(fixture: DashboardPrismaFixture): DashboardRouteDependencies['prisma'] {
+  return fixture as unknown as DashboardRouteDependencies['prisma'];
+}
 
 test('GET /api/v1/admin/dashboards returns dashboards, owners, widgets, and latest audio briefing state', async function () {
   const app = Fastify();
 
   await registerAdminDashboardRoutes(app, {
-    prisma: {
+    prisma: dashboardPrisma({
       dashboard: {
         async findMany() {
           return [
@@ -21,6 +37,7 @@ test('GET /api/v1/admin/dashboards returns dashboards, owners, widgets, and late
               owner: {
                 id: 'user-1',
                 displayName: 'Ralfe',
+                phoneticName: null,
                 email: 'ralfe@example.com'
               },
               widgets: [
@@ -67,7 +84,7 @@ test('GET /api/v1/admin/dashboards returns dashboards, owners, widgets, and late
           ];
         }
       }
-    },
+    }),
     defaultUserService: {
       async getDefaultUser() {
         return {
@@ -154,7 +171,7 @@ test('GET /api/v1/admin/dashboards falls back when dashboard generating schema i
   let callCount = 0;
 
   await registerAdminDashboardRoutes(app, {
-    prisma: {
+    prisma: dashboardPrisma({
       dashboard: {
         async findMany() {
           callCount += 1;
@@ -173,6 +190,7 @@ test('GET /api/v1/admin/dashboards falls back when dashboard generating schema i
               owner: {
                 id: 'user-1',
                 displayName: 'Ralfe',
+                phoneticName: null,
                 email: 'ralfe@example.com'
               },
               widgets: []
@@ -185,7 +203,7 @@ test('GET /api/v1/admin/dashboards falls back when dashboard generating schema i
           return [];
         }
       }
-    },
+    }),
     defaultUserService: {
       async getDefaultUser() {
         return {
@@ -222,11 +240,11 @@ test('GET /api/v1/admin/dashboards falls back when dashboard generating schema i
 
 test('POST /api/v1/admin/dashboards/:dashboardId/regenerate-audio-briefing queues async generation as the dashboard owner', async function () {
   const app = Fastify();
-  let publishedInput = null;
-  const dashboardUpdates = [];
+  const publishedInputs: PublishDashboardAudioBriefingJobInput[] = [];
+  const dashboardUpdates: DashboardUpdateInput[] = [];
 
   await registerAdminDashboardRoutes(app, {
-    prisma: {
+    prisma: dashboardPrisma({
       dashboard: {
         async findMany() {
           throw new Error('not used');
@@ -243,6 +261,7 @@ test('POST /api/v1/admin/dashboards/:dashboardId/regenerate-audio-briefing queue
               id: 'owner-1',
               tenantId: 'tenant-1',
               displayName: 'Ralfe',
+              phoneticName: null,
               timezone: 'Europe/Paris',
               locale: 'en-GB',
               email: 'ralfe@example.com',
@@ -256,7 +275,7 @@ test('POST /api/v1/admin/dashboards/:dashboardId/regenerate-audio-briefing queue
           throw new Error('not used');
         }
       }
-    },
+    }),
     defaultUserService: {
       async getDefaultUser() {
         return {
@@ -272,14 +291,16 @@ test('POST /api/v1/admin/dashboards/:dashboardId/regenerate-audio-briefing queue
     },
     dashboardBriefingJobPublisher: {
       async publishGenerateDashboardAudioBriefing(input) {
-        publishedInput = input;
+        publishedInputs.push(input);
         return {
           schemaVersion: 1,
           jobId: 'job-1',
+          idempotencyKey: input.idempotencyKey || 'dashboard-audio:dash-1:forced',
           dashboardId: input.dashboardId,
           tenantId: input.tenantId,
           ownerUserId: input.ownerUserId,
           ownerDisplayName: input.ownerDisplayName,
+          ownerPhoneticName: input.ownerPhoneticName,
           ownerTimezone: input.ownerTimezone,
           ownerLocale: input.ownerLocale,
           ownerEmail: input.ownerEmail,
@@ -300,10 +321,10 @@ test('POST /api/v1/admin/dashboards/:dashboardId/regenerate-audio-briefing queue
     });
 
     assert.equal(response.statusCode, 202);
-    assert.equal((publishedInput as { ownerUserId: string }).ownerUserId, 'owner-1');
-    assert.equal((publishedInput as { ownerEmail: string }).ownerEmail, 'ralfe@example.com');
+    assert.equal(publishedInputs[0]?.ownerUserId, 'owner-1');
+    assert.equal(publishedInputs[0]?.ownerEmail, 'ralfe@example.com');
     assert.deepEqual(dashboardUpdates.map(function mapUpdate(item) {
-      return (item as { data: { isGenerating: boolean } }).data.isGenerating;
+      return item.data.isGenerating;
     }), [true]);
     assert.deepEqual(response.json(), {
       status: 'queued',

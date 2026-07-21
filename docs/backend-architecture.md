@@ -1,6 +1,6 @@
 # Backend Architecture
 
-This document defines the proposed backend architecture for the Morning Briefing application before implementation begins. The backend will live under `src/backend`, expose a REST-only API to the UI, and persist data in PostgreSQL for local development and AWS RDS PostgreSQL in test and production.
+This document describes the implemented modular backend and its approved target architecture. The backend lives under `src/backend`, exposes a REST-only API to the UI, and persists data in PostgreSQL. Production is being re-architected from a drifted ECS/Fargate stack to Docker Compose on the consolidated personal-projects EC2 host; this document does not authorize the live cutover.
 
 ## Goals
 
@@ -10,20 +10,20 @@ This document defines the proposed backend architecture for the Morning Briefing
 - Make local development simple while staying compatible with AWS deployment patterns.
 - Leave room for asynchronous data ingestion and briefing generation as more widget types and connectors are added.
 
-## Proposed Stack
+## Stack
 
-- Runtime: Node.js 22 LTS
+- Runtime: Node.js 24 LTS, pinned by base-image digest and compatibility-tested on ARM64
 - Language: TypeScript
 - Web framework: Fastify
 - Validation and contracts: JSON Schema with Fastify request/response schemas
 - Database: PostgreSQL
-- Migrations: Prisma Migrate or Knex migrations
+- Migrations: Prisma Migrate
 - Query layer: Prisma ORM
-- Background jobs: a small in-process job runner for local development, with a clean abstraction so it can move to SQS/EventBridge/worker processes later
+- Background jobs: Amazon SQS plus a dedicated worker process; local development can embed the scheduler and worker
 - Configuration: environment variables with typed config loading
 - Logging: structured JSON logs with request IDs
 
-TypeScript is recommended here even though the frontend is currently plain JavaScript. The backend will benefit from typed DTOs, schema-driven validation, and stronger refactoring support as the number of widget types and connector integrations grows.
+The frontend is also strict TypeScript, but the REST contract remains the boundary between the independently built browser bundle and backend. Typed DTOs, schema-driven validation, and focused tests strengthen refactoring as widget types and connector integrations grow.
 
 ## Architectural Style
 
@@ -83,7 +83,7 @@ The UI should communicate with the backend only through REST over HTTP/JSON. No 
 
 ## How The Current UI Maps To The Backend
 
-The existing AngularJS UI already implies a few important backend requirements:
+The framework-free TypeScript UI implies a few important backend requirements:
 
 - Dashboards are user-facing named containers with description and theme metadata.
 - Widgets are dashboard-scoped instances, not abstract widget definitions.
@@ -95,7 +95,7 @@ The existing AngularJS UI already implies a few important backend requirements:
 
 That last point is the main reason to keep both `dashboard_widget.config_json` and `widget_snapshot.content_json`. One stores configuration; the other stores rendered content for a specific briefing run.
 
-## Proposed Backend Module Layout
+## Backend Module Layout
 
 The initial backend structure should look like this:
 
@@ -140,18 +140,9 @@ src/backend/
 
 This structure keeps domain logic close to each module while still allowing shared platform concerns to stay centralized.
 
-## Data Model Guidance
+## Data Model
 
-The existing model in `docs/diagrams/data-model.puml` is a solid start, but it benefits from a few changes:
-
-### Recommended adjustments
-
-- Rename `Widget` to `DashboardWidget` to distinguish persisted widget instances from code-defined widget types.
-- Keep widget type definitions out of the database for now; the frontend already models them as a registry owned by application code.
-- Add a `version` field to `Dashboard` and `DashboardWidget` for optimistic concurrency and safe edit/save flows.
-- Keep connector secrets outside Postgres; store only a `secret_ref` that points to local secret storage in development and AWS Secrets Manager or SSM in cloud environments.
-- Treat `BriefingSnapshot` and `WidgetSnapshot` as generated, mostly immutable records.
-- Add uniqueness around one daily snapshot per `(user_id, dashboard_id, snapshot_date)`.
+`docs/diagrams/data-model.puml` reflects the current Prisma schema. `DashboardWidget` distinguishes persisted instances from code-owned widget definitions. Dashboard and widget versions support safe edit/save flows; generated snapshot and briefing records remain separate from configuration. The schema enforces one daily briefing snapshot per `(user_id, dashboard_id, snapshot_date)` and an idempotency key per snapshot-generation job.
 
 ### PostgreSQL conventions
 
@@ -201,14 +192,14 @@ This model keeps the dashboard editor fast and independent from the timing of da
 
 ### Current queue-based implementation
 
-The codebase now uses an AWS-managed, serverless-first generation pipeline:
+The codebase uses a queue-backed generation pipeline:
 
 - widget configuration changes enqueue `GenerateWidgetSnapshotRequested` messages to SQS Standard
 - admin widget operations can queue one widget or all eligible widgets for manual snapshot regeneration through the same job pipeline
 - admin dashboard audio regeneration enqueues `GenerateDashboardAudioBriefingRequested` messages to the same queue
-- EventBridge Scheduler is intended to trigger a nightly enqueue function that lists eligible widgets and enqueues one message per widget
-- Lambda is the initial worker runtime, but the consumer logic is written as a transport-agnostic processor so it can move to ECS/Fargate later
-- `snapshot_generation_jobs` persists idempotency, attempt counts, and skip/failure state
+- a dedicated worker process long-polls SQS and handles both widget-snapshot and dashboard-audio commands
+- in the target production deployment, systemd timers invoke one-shot Compose services that enqueue widget refresh work at `01:00` UTC and dashboard audio work at `05:00` UTC
+- `snapshot_generation_jobs` and `dashboard_briefing_generation_jobs` persist independent idempotency, attempt, duplicate, lease, and failure state
 - workers detect stale widget jobs by comparing the queued widget config version/hash with the current widget row before generating anything
 - a DLQ receives messages that exhaust SQS retries
 
@@ -270,11 +261,12 @@ Secrets should be abstracted behind a `SecretStore` interface:
 
 The existing data model is tenant-aware, so the backend should preserve that boundary from the start even if MVP auth is simple.
 
-Recommended approach:
+Implemented approach:
 
-- Introduce an authentication middleware that resolves a current user and tenant context.
-- Use that context in every repository query.
-- Start with a development-friendly auth stub if needed, but keep the interface compatible with future JWT or OIDC integration.
+- Fastify authentication middleware resolves the Life2 JWT into current user and tenant context.
+- Protected `/api/v1/*` routes use that context in tenant-scoped queries.
+- Signature verification must be configured in production with `LIFE2_JWT_SECRET` or `LIFE2_JWT_PUBLIC_KEY`; shape-only validation is not an acceptable production configuration.
+- The SPA callback `/#/auth/callback` and Google/Gmail OAuth callbacks must survive Apache and ALB routing unchanged.
 
 ## Operational Approach
 
@@ -287,20 +279,49 @@ Recommended approach:
 
 ### Test and production
 
-- Stateless Node.js app instances
-- PostgreSQL on AWS RDS
+- one stateless backend container and a separately restartable worker using the same immutable ARM64 image digest
+- static frontend bundle in a minimal Nginx container
+- PostgreSQL 18.4 on the existing external Docker network `personal-projects-postgresql`
 - Secrets outside the database
-- Background execution moved behind a queue or scheduled runner when needed
+- SQS and DLQ for durable job separation
+- one-shot Compose commands driven by persistent, non-overlapping systemd timers
+- Apache on host port `8080` proxies `/api/*` to a loopback backend port and all other paths to a loopback frontend port behind the shared ALB/WAF
+- a protected host audio directory mounted into backend and worker at `AUDIO_BRIEFING_STORAGE_DIR`
+
+The production database is not owned by the application Compose project and must not publish port 5432 publicly. The restored database was independently verified at 19 tables and 92,767 rows. Migrations run as an explicit one-shot release gate; normal deployment never runs the production seed.
+
+## Production Process Boundaries
+
+- `backend`: API traffic, OAuth callbacks, audio playback, queue publication, and readiness
+- `worker`: SQS long polling, idempotency/staleness checks, connector/provider work, snapshot persistence, audio generation, and delivery fan-out
+- `widget-refresh`: one-shot enqueue command `npm run snapshot:refresh:nightly:prod`
+- `dashboard-audio-refresh`: one-shot enqueue command `npm run dashboard-briefing:refresh:scheduled:prod`
+- `migrate`: one-shot `npm run db:deploy`
+
+Candidate workers and timers stay disabled until the legacy ECS worker and EventBridge schedules have completed a deliberate writer handoff. Running both sides against the production queue/database risks duplicate external effects.
+
+## Reliability and Storage
+
+- SQS Standard delivery is at least once; the widget and dashboard-audio generation-job tables supply separate idempotency, processing leases, attempt state, duplicate accounting, and stale-config detection.
+- Failed deliveries remain visible for retry and are redriven to the DLQ after the configured receive limit.
+- Backend readiness must check PostgreSQL and required runtime configuration; process liveness alone is insufficient.
+- Audio bytes live in the protected persistent host mount, while PostgreSQL stores their metadata and relative storage key.
+- Audio storage is backed up and must survive replacement of either application container.
+- Releases use digest-pinned ARM64 images and retain prior manifests/digests for rollback.
+
+## Legacy Deployment Status
+
+The material under `cicd/serverless` and the CloudFormation stack `morning-briefing-platform-prod` describe the legacy ECS deployment. Live discovery found three running Fargate services, two enabled EventBridge schedules, and healthy shallow ALB checks, but backend and worker still point to the deleted RDS endpoint. The stack is drifted and must not be updated or removed until its database deletion and retained ECR/SQS/ALB/ECS ownership are reconciled.
 
 ## Non-Functional Requirements
 
 - Every endpoint validates inputs and outputs.
 - All writes are auditable through timestamps and request logging.
-- API responses should be stable enough for the AngularJS UI to consume without extra mapping complexity.
+- API responses should be stable enough for the TypeScript SPA to consume without unnecessary mapping complexity.
 - The backend should degrade gracefully when connector sync fails by returning the last successful snapshot where possible.
 - Database migrations must be the only supported path for schema changes.
 
-## Recommended First Development Sequence
+## Historical Development Sequence
 
 1. Create the `src/backend` scaffold with Fastify bootstrapping and config loading.
 2. Add PostgreSQL connectivity, migrations, and seed data.
@@ -311,7 +332,7 @@ Recommended approach:
 
 ## Implemented So Far
 
-- `GET /api/v1/me` resolves a temporary default local user named `Ralfe`
+- `GET /api/v1/me` resolves the current Life2-authenticated application user
 - `GET /api/v1/users/me` returns the persisted current-user profile, including avatar data, preferred language, and audio delivery preferences
 - `PATCH /api/v1/users/me` updates the persisted current-user profile, including preferred language and Telegram delivery settings
 - Dashboard audio briefing generation now personalizes the opening greeting from the persisted user profile, preferring phonetic name over first name

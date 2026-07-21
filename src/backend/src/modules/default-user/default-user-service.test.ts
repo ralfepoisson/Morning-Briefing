@@ -12,7 +12,7 @@ test('DefaultUserService preserves saved profile values for the local default us
       }
     },
     appUser: {
-      async findUnique(input) {
+      async findUnique(input: { where?: { tenantId_email?: unknown } }) {
         if (input && 'where' in input && input.where && 'tenantId_email' in input.where) {
           return {
             id: 'user-1',

@@ -1,6 +1,7 @@
 export type GenerateDashboardAudioBriefingRequested = {
   schemaVersion: 1;
   jobId: string;
+  idempotencyKey: string;
   dashboardId: string;
   tenantId: string;
   ownerUserId: string;

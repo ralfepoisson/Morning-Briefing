@@ -94,11 +94,12 @@ function parseStructuredSummary(content) {
             const categoryName = typeof category?.name === 'string' ? category.name.trim() : '';
             const bullets = Array.isArray(category?.bullets)
                 ? category.bullets.map(function mapBullet(bullet) {
+                    const item = asObject(bullet);
                     return {
-                        headline: typeof bullet?.headline === 'string' ? bullet.headline.trim() : '',
-                        summary: typeof bullet?.summary === 'string' ? bullet.summary.trim() : '',
-                        url: typeof bullet?.url === 'string' ? bullet.url.trim() : '',
-                        sourceName: typeof bullet?.sourceName === 'string' ? bullet.sourceName.trim() : ''
+                        headline: typeof item.headline === 'string' ? item.headline.trim() : '',
+                        summary: typeof item.summary === 'string' ? item.summary.trim() : '',
+                        url: typeof item.url === 'string' ? item.url.trim() : '',
+                        sourceName: typeof item.sourceName === 'string' ? item.sourceName.trim() : ''
                     };
                 }).filter(function filterBullet(bullet) {
                     return bullet.headline && bullet.url;
@@ -118,6 +119,11 @@ function parseStructuredSummary(content) {
             : 'Top stories from your RSS feeds.',
         categories
     };
+}
+function asObject(value) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? value
+        : {};
 }
 function getProcessEnv() {
     const processLike = globalThis;

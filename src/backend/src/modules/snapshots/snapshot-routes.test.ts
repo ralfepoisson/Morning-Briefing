@@ -15,7 +15,10 @@ test('GET /api/v1/dashboards/:dashboardId/snapshots/latest returns the latest sn
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -56,7 +59,10 @@ test('GET /api/v1/dashboards/:dashboardId/snapshots/latest returns 404 when dash
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -97,7 +103,10 @@ test('GET /api/v1/dashboards/:dashboardId/snapshots/latest returns null when the
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     },
@@ -109,6 +118,7 @@ test('GET /api/v1/dashboards/:dashboardId/snapshots/latest returns null when the
             name: 'Morning Briefing',
             description: '',
             theme: 'aurora',
+            isGenerating: false,
             createdAt: '2026-03-23T10:00:00.000Z',
             updatedAt: '2026-03-23T10:00:00.000Z'
           }

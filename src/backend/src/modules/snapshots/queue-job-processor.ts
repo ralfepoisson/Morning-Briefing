@@ -7,7 +7,7 @@ export class QueueJobProcessor {
     private readonly dashboardBriefingJobProcessor: DashboardBriefingJobProcessor
   ) {}
 
-  async process(message: SnapshotQueueMessage): Promise<'processed' | 'skipped'> {
+  async process(message: SnapshotQueueMessage): Promise<'processed' | 'skipped' | 'retry'> {
     const type = parseQueueMessageType(message.body);
 
     if (type === 'GenerateWidgetSnapshotRequested') {
@@ -15,8 +15,7 @@ export class QueueJobProcessor {
     }
 
     if (type === 'GenerateDashboardAudioBriefingRequested') {
-      await this.dashboardBriefingJobProcessor.process(message);
-      return 'processed';
+      return this.dashboardBriefingJobProcessor.process(message);
     }
 
     throw new Error('Queue message type is invalid.');

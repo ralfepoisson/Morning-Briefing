@@ -1,11 +1,19 @@
 import { logApplicationEvent, toLogErrorContext } from '../admin/application-logger.js';
+import { getSnapshotQueueConfig } from '../snapshots/snapshot-queue-config.js';
 export class DashboardBriefingJobProcessor {
+    repository;
     service;
-    constructor(service) {
+    constructor(repository, service) {
+        this.repository = repository;
         this.service = service;
     }
     async process(message) {
         const payload = parseGenerateDashboardAudioBriefingMessage(message.body);
+        const leaseExpiresAt = new Date(Date.now() + getSnapshotQueueConfig().jobLeaseSeconds * 1000);
+        const claim = await this.repository.claimDashboardBriefingJob(payload, message.messageId || message.receiptHandle || null, leaseExpiresAt);
+        if (claim.status !== 'claimed') {
+            return claim.status === 'already_processing' ? 'retry' : 'skipped';
+        }
         logApplicationEvent({
             level: 'info',
             scope: 'dashboard-briefing',
@@ -33,6 +41,7 @@ export class DashboardBriefingJobProcessor {
                 force: payload.force,
                 jobId: payload.jobId
             });
+            await this.repository.completeDashboardBriefingJob(payload.idempotencyKey);
             logApplicationEvent({
                 level: 'info',
                 scope: 'dashboard-briefing',
@@ -47,6 +56,7 @@ export class DashboardBriefingJobProcessor {
             return 'processed';
         }
         catch (error) {
+            await this.repository.failDashboardBriefingJob(payload.idempotencyKey, error instanceof Error ? error.message : 'Dashboard audio briefing job failed.');
             logApplicationEvent({
                 level: 'error',
                 scope: 'dashboard-briefing',
@@ -71,6 +81,7 @@ export function parseGenerateDashboardAudioBriefingMessage(body) {
     const payload = parsed.payload;
     if (payload.schemaVersion !== 1 ||
         typeof payload.jobId !== 'string' ||
+        (typeof payload.idempotencyKey !== 'undefined' && typeof payload.idempotencyKey !== 'string') ||
         typeof payload.dashboardId !== 'string' ||
         typeof payload.tenantId !== 'string' ||
         typeof payload.ownerUserId !== 'string' ||
@@ -84,5 +95,8 @@ export function parseGenerateDashboardAudioBriefingMessage(body) {
         typeof payload.requestedAt !== 'string') {
         throw new Error('Dashboard briefing queue message payload is invalid.');
     }
-    return payload;
+    return {
+        ...payload,
+        idempotencyKey: payload.idempotencyKey || payload.jobId
+    };
 }

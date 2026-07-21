@@ -5,7 +5,7 @@
   "description": "Backend and database tooling for Morning Briefing",
   "type": "module",
   "scripts": {
-    "build": "prisma generate && tsc -p tsconfig.build.json --noCheck",
+    "build": "prisma generate && tsc -p tsconfig.build.json",
     "dev": "tsx watch src/app/server.ts",
     "start": "tsx src/app/server.ts",
     "start:prod": "node dist/src/app/server.js",
@@ -29,24 +29,33 @@
     "scheduler:local": "tsx scripts/run-local-scheduler.ts",
     "prisma:studio": "prisma studio",
     "test": "node --test --import tsx",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck:full": "tsc --noEmit -p tsconfig.json",
     "watch": "watch 'npm run build' ./"
   },
   "dependencies": {
-    "@aws-sdk/client-polly": "^3.1017.0",
-    "@aws-sdk/client-sesv2": "^3.1022.0",
-    "@aws-sdk/client-sqs": "^3.1012.0",
+    "@aws-sdk/client-polly": "^3.1091.0",
+    "@aws-sdk/client-sesv2": "^3.1091.0",
+    "@aws-sdk/client-sqs": "^3.1091.0",
     "@fastify/cors": "^11.2.0",
     "@prisma/client": "^6.6.0",
-    "adm-zip": "^0.5.16",
+    "adm-zip": "^0.6.0",
     "dotenv": "^17.2.3",
-    "fastify": "^5.8.2",
-    "nodemailer": "^7.0.13",
+    "fastify": "^5.10.0",
+    "nodemailer": "^9.0.3",
     "pg": "^8.16.3"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
+    "@types/node": "^26.1.1",
+    "@types/nodemailer": "^8.0.1",
+    "@types/pg": "^8.20.0",
     "nodemon": "^3.1.14",
     "prisma": "^6.6.0",
     "tsx": "^4.20.6",
     "typescript": "^5.8.3"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
   }
 }

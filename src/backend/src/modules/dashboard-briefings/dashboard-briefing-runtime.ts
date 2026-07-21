@@ -50,7 +50,11 @@ export function createDashboardBriefingJobPublisherFromEnvironment(): DashboardB
 }
 
 export function createDashboardBriefingJobProcessor(): DashboardBriefingJobProcessor {
-  return new DashboardBriefingJobProcessor(createDashboardBriefingService());
+  const prisma = getPrismaClient();
+  return new DashboardBriefingJobProcessor(
+    new PrismaDashboardBriefingRepository(prisma),
+    createDashboardBriefingService()
+  );
 }
 
 export function createScheduledDashboardBriefingRefreshService(): ScheduledDashboardBriefingRefreshService | null {

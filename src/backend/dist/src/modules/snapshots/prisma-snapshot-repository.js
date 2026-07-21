@@ -286,8 +286,7 @@ export class PrismaSnapshotRepository {
         });
         return widgets.map(mapDashboardWidgetRecord);
     }
-    async claimSnapshotJob(message, messageReceiptId) {
-        const now = new Date();
+    async claimSnapshotJob(message, messageReceiptId, leaseExpiresAt, now = new Date()) {
         for (let attempt = 0; attempt < 2; attempt += 1) {
             const existing = await this.prisma.snapshotGenerationJob.findUnique({
                 where: {
@@ -313,7 +312,9 @@ export class PrismaSnapshotRepository {
                         jobId: existing.id
                     };
                 }
-                if (existing.status === 'PROCESSING') {
+                if (existing.status === 'PROCESSING' &&
+                    existing.leaseExpiresAt &&
+                    existing.leaseExpiresAt.getTime() > now.getTime()) {
                     await this.prisma.snapshotGenerationJob.update({
                         where: {
                             id: existing.id
@@ -331,9 +332,14 @@ export class PrismaSnapshotRepository {
                         jobId: existing.id
                     };
                 }
-                const updated = await this.prisma.snapshotGenerationJob.update({
+                const claimUpdate = await this.prisma.snapshotGenerationJob.updateMany({
                     where: {
-                        id: existing.id
+                        id: existing.id,
+                        OR: [
+                            { status: { not: 'PROCESSING' } },
+                            { leaseExpiresAt: null },
+                            { leaseExpiresAt: { lte: now } }
+                        ]
                     },
                     data: {
                         status: 'PROCESSING',
@@ -343,14 +349,20 @@ export class PrismaSnapshotRepository {
                         lastMessageId: messageReceiptId,
                         lastError: null,
                         startedAt: now,
-                        completedAt: null
+                        completedAt: null,
+                        leaseExpiresAt
                     }
                 });
-                return {
-                    status: 'claimed',
-                    jobId: updated.id,
-                    attemptCount: updated.attemptCount
-                };
+                if (claimUpdate.count === 0) {
+                    return {
+                        status: 'already_processing',
+                        jobId: existing.id
+                    };
+                }
+                const updated = await this.prisma.snapshotGenerationJob.findUniqueOrThrow({
+                    where: { id: existing.id }
+                });
+                return { status: 'claimed', jobId: updated.id, attemptCount: updated.attemptCount };
             }
             try {
                 const created = await this.prisma.snapshotGenerationJob.create({
@@ -367,7 +379,8 @@ export class PrismaSnapshotRepository {
                         status: 'PROCESSING',
                         attemptCount: 1,
                         lastMessageId: messageReceiptId,
-                        startedAt: now
+                        startedAt: now,
+                        leaseExpiresAt
                     }
                 });
                 return {
@@ -411,7 +424,8 @@ export class PrismaSnapshotRepository {
             data: {
                 status: 'COMPLETED',
                 completedAt: new Date(),
-                lastError: null
+                lastError: null,
+                leaseExpiresAt: null
             }
         });
     }
@@ -423,7 +437,8 @@ export class PrismaSnapshotRepository {
             data: {
                 status: 'SKIPPED',
                 completedAt: new Date(),
-                lastError: reason
+                lastError: reason,
+                leaseExpiresAt: null
             }
         });
     }
@@ -435,7 +450,8 @@ export class PrismaSnapshotRepository {
             data: {
                 status: 'FAILED',
                 completedAt: new Date(),
-                lastError: reason
+                lastError: reason,
+                leaseExpiresAt: null
             }
         });
     }
@@ -715,11 +731,15 @@ function mapDashboardWidgetRecord(widget) {
         minWidth: widget.minWidth,
         minHeight: widget.minHeight,
         isVisible: widget.isVisible,
+        isGenerating: Boolean(widget.isGenerating),
         sortOrder: widget.sortOrder,
         refreshMode: widget.refreshMode,
         version: widget.version,
         config,
         configHash: widget.configHash || hashWidgetConfig(config),
+        includeInBriefingDefault: definition ? definition.briefingDefaultIncluded : false,
+        includeInBriefingOverride: null,
+        includeInBriefing: definition ? definition.briefingDefaultIncluded : false,
         data: definition ? definition.createMockData(config) : {},
         connections: (widget.connectors || []).map(mapWidgetConnection),
         createdAt: widget.createdAt,

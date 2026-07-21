@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./playwright-fixtures');
 
 const TOKEN_KEY = 'morningBriefing.auth.token';
 const SESSION_KEY = 'morningBriefing.auth.session';
@@ -10,7 +10,7 @@ test.describe('Life2 auth callback', () => {
       window.__MORNING_BRIEFING_CONFIG__ = {
         authServiceSignInUrl: '/signIn?applicationToken=legacy-secret',
         authServiceApplicationId: '39863fc2-c2b9-4b5f-82ee-04841b2e9980',
-        appBaseUrl: 'http://127.0.0.1:8080/'
+        appBaseUrl: window.location.origin + '/'
       };
     });
 
@@ -21,7 +21,7 @@ test.describe('Life2 auth callback', () => {
     const signInUrl = new URL(page.url());
 
     expect(signInUrl.searchParams.get('applicationId')).toBe(AUTH_SERVICE_APPLICATION_ID);
-    expect(signInUrl.searchParams.get('redirect')).toBe('http://127.0.0.1:8080/#/auth/callback');
+    expect(signInUrl.searchParams.get('redirect')).toBe(new URL('/#/auth/callback', page.url()).href);
     expect(signInUrl.searchParams.get('applicationToken')).toBeNull();
   });
 

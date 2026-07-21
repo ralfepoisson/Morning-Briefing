@@ -1,17 +1,20 @@
 {
   "name": "morning-briefing-web",
   "version": "1.0.0",
-  "description": "AngularJS frontend for the Morning Briefing dashboard MVP",
+  "description": "Strict TypeScript frontend for the Morning Briefing dashboard",
   "private": true,
   "scripts": {
-    "start": "http-server . -p 8080 -c-1",
-    "dev": "http-server . -p 8080 -c-1",
+    "start": "vite --host 127.0.0.1 --port 8080",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && cp -R assets dist/assets && cp favicon.ico dist/favicon.ico && node ../../cicd/ci/render-frontend-config.mjs dist/config.js",
+    "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:install": "playwright install chromium"
+    "test:e2e:install": "playwright install chromium",
+    "test:container-config": "node --test ../../cicd/ci/render-frontend-config.test.mjs ../../cicd/ci/frontend-container.test.mjs"
   },
   "keywords": [
-    "angularjs",
+    "typescript",
     "bootstrap",
     "dashboard"
   ],
@@ -19,17 +22,13 @@
   "license": "UNLICENSED",
   "type": "commonjs",
   "dependencies": {
-    "@fortawesome/fontawesome-free": "^7.2.0",
-    "angular": "^1.8.3",
-    "angular-animate": "^1.8.3",
-    "angular-route": "^1.8.3",
-    "angularjs-toaster": "^3.0.0",
-    "bootstrap": "^5.3.8",
-    "interactjs": "^1.10.27",
-    "watch": "^1.0.2"
+    "@fortawesome/fontawesome-free": "7.3.1",
+    "bootstrap": "5.3.8"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
-    "http-server": "^14.1.1"
+    "typescript": "7.0.2",
+    "vite": "8.1.5",
+    "vitest": "4.1.10"
   }
 }

@@ -84,6 +84,25 @@ test('SnapshotJobProcessor clears the generating flag when work is skipped', asy
   ]);
 });
 
+test('SnapshotJobProcessor leaves an active duplicate available for retry', async function () {
+  const repository = new InMemoryJobRepository({
+    status: 'already_processing',
+    jobId: 'job-1'
+  });
+  const processor = new SnapshotJobProcessor(repository, new InMemorySnapshotService({ status: 'generated' }));
+
+  const result = await processor.process({
+    body: JSON.stringify({
+      type: 'GenerateWidgetSnapshotRequested',
+      payload: createMessage()
+    }),
+    messageId: 'sqs-1'
+  });
+
+  assert.equal(result, 'retry');
+  assert.deepEqual(repository.completed, []);
+});
+
 test('parseGenerateWidgetSnapshotMessage accepts the legacy top-level payload shape', function () {
   const payload = parseGenerateWidgetSnapshotMessage(JSON.stringify({
     type: 'GenerateWidgetSnapshotRequested',

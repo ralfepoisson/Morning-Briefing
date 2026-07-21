@@ -16,6 +16,12 @@ Frontend:
 ./cicd/ci/build-frontend.sh
 ```
 
+The frontend command installs the locked dependencies and runs the strict TypeScript/Vite 8 production build. Focused unit tests are run separately with:
+
+```bash
+npm --prefix src/web test
+```
+
 Both Docker images:
 
 ```bash
@@ -33,5 +39,7 @@ Push pre-built images:
 ## Image behavior
 
 - `Dockerfile.backend` builds the TypeScript backend, keeps Prisma CLI available for migrations, and exposes port `3000`.
-- `Dockerfile.frontend` produces a static bundle and serves it with Nginx on port `8080`.
-- The frontend bundle writes `config.js` with `apiBaseUrl: '/api/v1'`, which works behind the AWS Application Load Balancer path rule defined in `cicd/serverless/serverless.yml`.
+- `Dockerfile.frontend` builds the framework-free TypeScript SPA with Vite 8, then serves only the generated static bundle from an unprivileged Nginx process on port `8080`.
+- `render-frontend-config.mjs` writes `dist/config.js` after bundling. The default `apiBaseUrl` is `/api/v1`; on the consolidated host, Apache proxies that path to the loopback backend and all other paths to the frontend container.
+- The frontend container exposes `/healthz`, serves SPA routes through the `index.html` fallback, and deliberately does not answer `/api/*` as application content.
+- `cicd/serverless` is legacy deployment material and is not the routing authority for the consolidated-host release.

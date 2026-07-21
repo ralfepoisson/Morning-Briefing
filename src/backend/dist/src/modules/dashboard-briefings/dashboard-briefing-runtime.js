@@ -34,7 +34,8 @@ export function createDashboardBriefingJobPublisherFromEnvironment() {
     return new SqsDashboardBriefingJobPublisher(createSnapshotSqsClient(), config.queueUrl);
 }
 export function createDashboardBriefingJobProcessor() {
-    return new DashboardBriefingJobProcessor(createDashboardBriefingService());
+    const prisma = getPrismaClient();
+    return new DashboardBriefingJobProcessor(new PrismaDashboardBriefingRepository(prisma), createDashboardBriefingService());
 }
 export function createScheduledDashboardBriefingRefreshService() {
     const publisher = createDashboardBriefingJobPublisherFromEnvironment();

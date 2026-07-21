@@ -20,6 +20,52 @@ test('GET /health returns ok', async function () {
   }
 });
 
+test('GET /health/ready returns ready after the database check succeeds', async function () {
+  let checks = 0;
+  const app = await buildApp({
+    async readinessCheck() {
+      checks += 1;
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/health/ready'
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json(), {
+      status: 'ready'
+    });
+    assert.equal(checks, 1);
+  } finally {
+    await app.close();
+  }
+});
+
+test('GET /health/ready returns unavailable when the database check fails', async function () {
+  const app = await buildApp({
+    async readinessCheck() {
+      throw new Error('database unavailable');
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/health/ready'
+    });
+
+    assert.equal(response.statusCode, 503);
+    assert.deepEqual(response.json(), {
+      status: 'unavailable'
+    });
+  } finally {
+    await app.close();
+  }
+});
+
 test('buildApp registers dashboard archive route', async function () {
   const app = await buildApp();
 

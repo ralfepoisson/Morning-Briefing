@@ -148,13 +148,13 @@ test('Telegram delivery logs Telegram response details on failure', async functi
 });
 
 function createInput(overrides: Partial<{
-  audio: ReturnType<typeof createAudio>;
+  audio: ReturnType<typeof createAudio> | null;
   storagePath: string;
 }> = {}) {
   return {
     user: createUser(),
     briefing: createBriefing(),
-    audio: overrides.audio === undefined ? createAudio() : overrides.audio,
+    audio: Object.hasOwn(overrides, 'audio') ? (overrides.audio ?? null) : createAudio(),
     storagePath: overrides.storagePath || path.join(os.tmpdir(), 'missing-audio.mp3'),
     deliveryContext: {
       jobId: 'job-1'

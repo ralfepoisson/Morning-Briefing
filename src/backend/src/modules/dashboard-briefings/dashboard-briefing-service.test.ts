@@ -24,12 +24,13 @@ test('DashboardBriefingService reuses latest ready briefing when source hash is 
             preferredLanguage: 'fr-FR',
             tone: 'calm, concise, professional',
             targetDurationSeconds: 75,
+            listener: { greetingName: 'Ralf' },
             sections: [
               {
                 widgetId: 'weather-1',
                 widgetType: 'weather',
                 title: 'Weather Outlook',
-                importance: 'high',
+                importance: 'high' as const,
                 content: {
                   summary: 'Sunny'
                 }
@@ -104,12 +105,13 @@ test('DashboardBriefingService toggles dashboard generating state around fresh g
             preferredLanguage: 'fr-FR',
             tone: 'calm, concise, professional',
             targetDurationSeconds: 75,
+            listener: { greetingName: 'Ralf' },
             sections: [
               {
                 widgetId: 'weather-1',
                 widgetType: 'weather',
                 title: 'Weather Outlook',
-                importance: 'high',
+                importance: 'high' as const,
                 content: {
                   summary: 'Sunny'
                 }
@@ -196,12 +198,13 @@ test('DashboardBriefingService delivers generated audio after the briefing is re
             preferredLanguage: 'fr-FR',
             tone: 'calm, concise, professional',
             targetDurationSeconds: 75,
+            listener: { greetingName: 'Ralf' },
             sections: [
               {
                 widgetId: 'weather-1',
                 widgetType: 'weather',
                 title: 'Weather Outlook',
-                importance: 'high',
+                importance: 'high' as const,
                 content: {
                   summary: 'Sunny'
                 }
@@ -268,6 +271,14 @@ test('DashboardBriefingService delivers generated audio after the briefing is re
 
 function createRepository(calls = { generating: [] as Array<{ dashboardId: string; ownerUserId: string; isGenerating: boolean }> }): DashboardBriefingRepository {
   return {
+    async listDashboardsForScheduledGeneration() {
+      return [];
+    },
+    async claimDashboardBriefingJob() {
+      return { status: 'claimed', jobId: 'job-1', attemptCount: 1 };
+    },
+    async completeDashboardBriefingJob() {},
+    async failDashboardBriefingJob() {},
     async findDashboardAggregationContext() {
       return {
         id: 'dash-1',

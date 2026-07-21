@@ -51,7 +51,10 @@ test('GET /api/v1/rss-feeds returns feed categories', async function () {
           tenantId: 'tenant-1',
           userId: 'user-1',
           displayName: 'Ralfe',
-          timezone: 'Europe/Paris'
+          timezone: 'Europe/Paris',
+        locale: 'en-GB',
+        email: 'test-user@example.com',
+        isAdmin: false
         };
       }
     }

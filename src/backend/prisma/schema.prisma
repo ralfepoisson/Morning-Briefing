@@ -153,6 +153,7 @@ model AppUser {
   dashboards   Dashboard[]
   ownedConnectors Connector[]      @relation("ConnectorOwner")
   snapshots    BriefingSnapshot[]
+  dashboardBriefingJobs DashboardBriefingGenerationJob[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -181,6 +182,7 @@ model Dashboard {
   snapshots          BriefingSnapshot[]
   briefingPreferences DashboardBriefingPreference?
   dashboardBriefings DashboardBriefing[]
+  briefingGenerationJobs DashboardBriefingGenerationJob[]
 
   @@index([tenantId])
   @@index([ownerUserId])
@@ -381,6 +383,7 @@ model SnapshotGenerationJob {
   lastError             String?           @map("last_error")
   startedAt             DateTime?         @map("started_at") @db.Timestamptz(6)
   completedAt           DateTime?         @map("completed_at") @db.Timestamptz(6)
+  leaseExpiresAt        DateTime?         @map("lease_expires_at") @db.Timestamptz(6)
   lastDuplicateAt       DateTime?         @map("last_duplicate_at") @db.Timestamptz(6)
   createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -390,6 +393,31 @@ model SnapshotGenerationJob {
   @@index([dashboardId, snapshotDate])
   @@index([userId, snapshotDate])
   @@map("snapshot_generation_jobs")
+}
+
+model DashboardBriefingGenerationJob {
+  id                 String            @id @default(uuid()) @db.Uuid
+  dashboardId        String            @map("dashboard_id") @db.Uuid
+  tenantId           String            @map("tenant_id") @db.Uuid
+  ownerUserId        String            @map("owner_user_id") @db.Uuid
+  idempotencyKey     String            @unique @map("idempotency_key")
+  status             SnapshotJobStatus @default(PENDING)
+  attemptCount       Int               @default(0) @map("attempt_count")
+  duplicateSkipCount Int               @default(0) @map("duplicate_skip_count")
+  lastMessageId      String?           @map("last_message_id")
+  lastError          String?           @map("last_error")
+  startedAt          DateTime?         @map("started_at") @db.Timestamptz(6)
+  completedAt        DateTime?         @map("completed_at") @db.Timestamptz(6)
+  leaseExpiresAt     DateTime?         @map("lease_expires_at") @db.Timestamptz(6)
+  lastDuplicateAt    DateTime?         @map("last_duplicate_at") @db.Timestamptz(6)
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  dashboard          Dashboard         @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  owner              AppUser           @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@index([dashboardId, createdAt])
+  @@index([ownerUserId, createdAt])
+  @@map("dashboard_briefing_generation_jobs")
 }
 
 model DashboardBriefingPreference {

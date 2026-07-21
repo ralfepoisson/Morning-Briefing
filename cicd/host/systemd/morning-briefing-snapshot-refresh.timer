@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Morning Briefing widget refresh at 01:00 UTC
+
+[Timer]
+OnCalendar=*-*-* 01:00:00 UTC
+Persistent=true
+RandomizedDelaySec=0
+Unit=morning-briefing-snapshot-refresh.service
+
+[Install]
+WantedBy=timers.target

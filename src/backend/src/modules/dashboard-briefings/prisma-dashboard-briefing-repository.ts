@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 import type {
   DashboardBriefingAudioRecord,
   DashboardBriefingPreferenceRecord,
@@ -6,12 +6,140 @@ import type {
 } from './dashboard-briefing-types.js';
 import type {
   DashboardBriefingAggregationDashboard,
+  ClaimDashboardBriefingJobResult,
   DashboardBriefingRepository,
   DashboardBriefingWidgetSnapshotSource
 } from './dashboard-briefing-repository.js';
+import type { GenerateDashboardAudioBriefingRequested } from './dashboard-briefing-job-types.js';
 
 export class PrismaDashboardBriefingRepository implements DashboardBriefingRepository {
   constructor(private readonly prisma: PrismaClient) {}
+
+  async claimDashboardBriefingJob(
+    message: GenerateDashboardAudioBriefingRequested,
+    messageReceiptId: string | null,
+    leaseExpiresAt: Date,
+    now: Date = new Date()
+  ): Promise<ClaimDashboardBriefingJobResult> {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const existing = await this.prisma.dashboardBriefingGenerationJob.findUnique({
+        where: {
+          idempotencyKey: message.idempotencyKey
+        }
+      });
+
+      if (existing) {
+        if (existing.status === 'COMPLETED' || existing.status === 'SKIPPED') {
+          await this.prisma.dashboardBriefingGenerationJob.update({
+            where: { id: existing.id },
+            data: {
+              duplicateSkipCount: { increment: 1 },
+              lastDuplicateAt: now,
+              lastMessageId: messageReceiptId
+            }
+          });
+          return { status: 'already_processed' as const, jobId: existing.id };
+        }
+
+        if (
+          existing.status === 'PROCESSING' &&
+          existing.leaseExpiresAt &&
+          existing.leaseExpiresAt.getTime() > now.getTime()
+        ) {
+          await this.prisma.dashboardBriefingGenerationJob.update({
+            where: { id: existing.id },
+            data: {
+              duplicateSkipCount: { increment: 1 },
+              lastDuplicateAt: now,
+              lastMessageId: messageReceiptId
+            }
+          });
+          return { status: 'already_processing' as const, jobId: existing.id };
+        }
+
+        const claimUpdate = await this.prisma.dashboardBriefingGenerationJob.updateMany({
+          where: {
+            id: existing.id,
+            OR: [
+              { status: { not: 'PROCESSING' } },
+              { leaseExpiresAt: null },
+              { leaseExpiresAt: { lte: now } }
+            ]
+          },
+          data: {
+            status: 'PROCESSING',
+            attemptCount: { increment: 1 },
+            lastMessageId: messageReceiptId,
+            lastError: null,
+            startedAt: now,
+            completedAt: null,
+            leaseExpiresAt
+          }
+        });
+        if (claimUpdate.count === 0) {
+          return { status: 'already_processing' as const, jobId: existing.id };
+        }
+        const updated = await this.prisma.dashboardBriefingGenerationJob.findUniqueOrThrow({
+          where: { id: existing.id }
+        });
+        return { status: 'claimed' as const, jobId: updated.id, attemptCount: updated.attemptCount };
+      }
+
+      try {
+        const created = await this.prisma.dashboardBriefingGenerationJob.create({
+          data: {
+            dashboardId: message.dashboardId,
+            tenantId: message.tenantId,
+            ownerUserId: message.ownerUserId,
+            idempotencyKey: message.idempotencyKey,
+            status: 'PROCESSING',
+            attemptCount: 1,
+            lastMessageId: messageReceiptId,
+            startedAt: now,
+            leaseExpiresAt
+          }
+        });
+        return { status: 'claimed' as const, jobId: created.id, attemptCount: created.attemptCount };
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    const existing = await this.prisma.dashboardBriefingGenerationJob.findUniqueOrThrow({
+      where: { idempotencyKey: message.idempotencyKey }
+    });
+    return {
+      status: existing.status === 'PROCESSING' ? 'already_processing' as const : 'already_processed' as const,
+      jobId: existing.id
+    };
+  }
+
+  async completeDashboardBriefingJob(idempotencyKey: string): Promise<void> {
+    await this.prisma.dashboardBriefingGenerationJob.update({
+      where: { idempotencyKey },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        lastError: null,
+        leaseExpiresAt: null
+      }
+    });
+  }
+
+  async failDashboardBriefingJob(idempotencyKey: string, reason: string): Promise<void> {
+    await this.prisma.dashboardBriefingGenerationJob.update({
+      where: { idempotencyKey },
+      data: {
+        status: 'FAILED',
+        completedAt: new Date(),
+        lastError: reason,
+        leaseExpiresAt: null
+      }
+    });
+  }
 
   async listDashboardsForScheduledGeneration() {
     try {

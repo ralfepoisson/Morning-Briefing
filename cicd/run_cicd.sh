@@ -1,27 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Configuration
-export STAGE=prod
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Build the backend
-echo "==================================================="
-echo "BUILDING BACKEND"
-echo "==================================================="
-./ci/build-backend.sh
-
-# Build the frontend
-echo "==================================================="
-echo "BUILDING FRONTEND"
-echo "==================================================="
-./ci/build-frontend.sh
-
-# Deploy the application
-echo "==================================================="
-echo "DEPLOYING APPLICATION"
-echo "==================================================="
-source ./export_credentials.sh
-echo "Deploying to ${AWS_REGION}"
-printf '<%s>\n' "$AWS_ACCESS_KEY_ID"
-printf '<%s>\n' "$AWS_SECRET_ACCESS_KEY"
-printf '<%s>\n' "$AWS_SESSION_TOKEN"
-./serverless/scripts/deploy.sh
+echo "The legacy Serverless deploy path is retired. Running secret-safe CI only."
+echo "Use scripts/publish-release.sh after CI and explicit live-phase approval."
+exec "${ROOT_DIR}/scripts/ci.sh"

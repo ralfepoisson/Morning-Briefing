@@ -25,7 +25,7 @@ export type ScheduledDashboardBriefingRecord = {
 };
 
 export class ScheduledDashboardBriefingRefreshService {
-  private static readonly STALE_GENERATING_THRESHOLD_MS = 30 * 60 * 1000;
+  static readonly STALE_GENERATING_THRESHOLD_MS = 30 * 60 * 1000;
 
   constructor(
     private readonly repository: {
@@ -93,6 +93,7 @@ export class ScheduledDashboardBriefingRefreshService {
         ownerEmail: dashboard.owner.email,
         ownerIsAdmin: dashboard.owner.isAdmin,
         force: true,
+        idempotencyKey: buildScheduledDashboardBriefingIdempotencyKey(dashboard.id, now),
         requestedAt: now,
         correlationId: null,
         causationId: null
@@ -124,6 +125,10 @@ export class ScheduledDashboardBriefingRefreshService {
       recoveredStaleGeneratingCount
     };
   }
+}
+
+function buildScheduledDashboardBriefingIdempotencyKey(dashboardId: string, now: Date): string {
+  return `${dashboardId}:scheduled:${now.toISOString().slice(0, 10)}`;
 }
 
 function isStaleGeneratingDashboard(

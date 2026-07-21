@@ -76,6 +76,7 @@ export async function registerAdminDashboardRoutes(app, dependencies = createAdm
                 tenantId: dashboard.owner.tenantId,
                 ownerUserId: dashboard.owner.id,
                 ownerDisplayName: dashboard.owner.displayName,
+                ownerPhoneticName: dashboard.owner.phoneticName,
                 ownerTimezone: dashboard.owner.timezone,
                 ownerLocale: dashboard.owner.locale,
                 ownerEmail: dashboard.owner.email,
@@ -144,6 +145,7 @@ async function listAdminDashboards(prisma, tenantId) {
                     select: {
                         id: true,
                         displayName: true,
+                        phoneticName: true,
                         email: true
                     }
                 },
@@ -196,6 +198,7 @@ async function listAdminDashboards(prisma, tenantId) {
                     select: {
                         id: true,
                         displayName: true,
+                        phoneticName: true,
                         email: true
                     }
                 },
@@ -252,6 +255,7 @@ async function findDashboardForRegeneration(prisma, dashboardId, tenantId) {
                         id: true,
                         tenantId: true,
                         displayName: true,
+                        phoneticName: true,
                         timezone: true,
                         locale: true,
                         email: true,
@@ -278,6 +282,7 @@ async function findDashboardForRegeneration(prisma, dashboardId, tenantId) {
                         id: true,
                         tenantId: true,
                         displayName: true,
+                        phoneticName: true,
                         timezone: true,
                         locale: true,
                         email: true,

@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 import type { WidgetRepository } from './widget-repository.js';
 import type {
   ArchiveDashboardWidgetInput,
@@ -24,6 +24,11 @@ export class PrismaWidgetRepository implements WidgetRepository {
           }
         },
         include: {
+          dashboard: {
+            select: {
+              ownerUserId: true
+            }
+          },
           connectors: {
             include: {
               connector: true
@@ -92,7 +97,7 @@ export class PrismaWidgetRepository implements WidgetRepository {
           minHeight: definition.minSize.height,
           refreshMode: definition.refreshMode,
           sortOrder: nextSortOrder,
-          configJson: defaultConfig,
+          configJson: defaultConfig as Prisma.InputJsonObject,
           configHash: hashWidgetConfig(defaultConfig),
           includeInBriefingOverride: null
         }
@@ -131,7 +136,7 @@ export class PrismaWidgetRepository implements WidgetRepository {
           minHeight: definition.minSize.height,
           refreshMode: definition.refreshMode,
           sortOrder: nextSortOrder,
-          configJson: defaultConfig,
+          configJson: defaultConfig as Prisma.InputJsonObject,
           configHash: hashWidgetConfig(defaultConfig)
         }
       });
@@ -185,7 +190,7 @@ export class PrismaWidgetRepository implements WidgetRepository {
             positionY: Math.max(0, Math.round(input.y)),
             width: Math.max(1, Math.round(input.width)),
             height: Math.max(widget.minHeight, Math.round(input.height)),
-            configJson: normalizedConfig,
+            configJson: normalizedConfig as Prisma.InputJsonObject,
             configHash: nextConfigHash,
             includeInBriefingOverride: nextIncludeInBriefingOverride,
             version: {
@@ -264,7 +269,7 @@ export class PrismaWidgetRepository implements WidgetRepository {
             positionY: Math.max(0, Math.round(input.y)),
             width: Math.max(1, Math.round(input.width)),
             height: Math.max(widget.minHeight, Math.round(input.height)),
-            configJson: normalizedConfig,
+            configJson: normalizedConfig as Prisma.InputJsonObject,
             configHash: nextConfigHash,
             version: {
               increment: 1
@@ -473,7 +478,6 @@ function mapDashboardWidgetRecord(widget: {
   id: string;
   tenantId?: string;
   dashboardId: string;
-  tenantId?: string;
   dashboard: { ownerUserId: string } | undefined;
   widgetType: string;
   title: string;

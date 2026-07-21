@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { PollyClient, SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
+import { PollyClient, SynthesizeSpeechCommand, type VoiceId } from '@aws-sdk/client-polly';
 import { defaultProvider } from '@aws-sdk/credential-provider-node';
 import { logApplicationEvent, toLogErrorContext } from '../admin/application-logger.js';
 
@@ -103,6 +103,7 @@ export class StubDashboardBriefingTtsProvider implements DashboardBriefingTtsPro
 
   async synthesize(input: {
     script: string;
+    voiceName: string;
     targetDurationSeconds: number | null;
   }): Promise<{
     audio: Buffer;
@@ -179,7 +180,7 @@ export class AwsPollyDashboardBriefingTtsProvider implements DashboardBriefingTt
         SampleRate: '16000',
         Text: input.script,
         TextType: 'text',
-        VoiceId: voiceId
+        VoiceId: voiceId as VoiceId
       }));
 
       if (!response.AudioStream) {

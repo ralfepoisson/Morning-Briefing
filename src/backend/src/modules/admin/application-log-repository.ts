@@ -1,4 +1,4 @@
-import type { ApplicationLogLevel as PrismaApplicationLogLevel, PrismaClient } from '@prisma/client';
+import type { ApplicationLogLevel as PrismaApplicationLogLevel, Prisma, PrismaClient } from '@prisma/client';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
 import {
   filterApplicationLogs,
@@ -26,7 +26,7 @@ export async function persistApplicationLog(
       scope: entry.scope,
       event: entry.event,
       message: entry.message,
-      contextJson: entry.context
+      contextJson: entry.context as Prisma.InputJsonValue
     }
   });
 }

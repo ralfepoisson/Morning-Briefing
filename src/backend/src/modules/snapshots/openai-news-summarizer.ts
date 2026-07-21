@@ -154,11 +154,12 @@ function parseStructuredSummary(content: string): {
       const categoryName = typeof category?.name === 'string' ? category.name.trim() : '';
       const bullets = Array.isArray(category?.bullets)
         ? category.bullets.map(function mapBullet(bullet: unknown) {
+          const item = asObject(bullet);
           return {
-            headline: typeof bullet?.headline === 'string' ? bullet.headline.trim() : '',
-            summary: typeof bullet?.summary === 'string' ? bullet.summary.trim() : '',
-            url: typeof bullet?.url === 'string' ? bullet.url.trim() : '',
-            sourceName: typeof bullet?.sourceName === 'string' ? bullet.sourceName.trim() : ''
+            headline: typeof item.headline === 'string' ? item.headline.trim() : '',
+            summary: typeof item.summary === 'string' ? item.summary.trim() : '',
+            url: typeof item.url === 'string' ? item.url.trim() : '',
+            sourceName: typeof item.sourceName === 'string' ? item.sourceName.trim() : ''
           };
         }).filter(function filterBullet(bullet: {
           headline: string;
@@ -185,6 +186,12 @@ function parseStructuredSummary(content: string): {
       : 'Top stories from your RSS feeds.',
     categories
   };
+}
+
+function asObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 }
 
 function extractJsonObject(content: string): string {

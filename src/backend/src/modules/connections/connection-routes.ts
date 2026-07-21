@@ -523,7 +523,7 @@ async function buildGmailAuthorizationUrl(
     connectionId?: string;
   },
   defaultUserService: ConnectionRouteDependencies['defaultUserService'],
-  gmailOAuthClient: ConnectionRouteDependencies['gmailOAuthClient']
+  gmailOAuthClient: NonNullable<ConnectionRouteDependencies['gmailOAuthClient']>
 ): Promise<string> {
   const user = await defaultUserService.getDefaultUser(request);
   const returnTo = gmailOAuthClient.normalizeReturnTo(input.returnTo);

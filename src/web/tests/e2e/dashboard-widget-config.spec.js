@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./playwright-fixtures');
 
 const TOKEN_KEY = 'morningBriefing.auth.token';
 const SESSION_KEY = 'morningBriefing.auth.session';
@@ -200,15 +200,21 @@ test.describe('Dashboard widget configuration flows', function () {
 
     await page.getByRole('button', { name: 'Edit Dashboard' }).click();
 
-    await page.evaluate(function mutateWidgetLayout() {
-      var injector = window.angular.element(document.body).injector();
-      var widgetService = injector.get('WidgetService');
-      var $rootScope = injector.get('$rootScope');
+    const widgetCard = page.locator('.widget-card').first();
+    const cardBox = await widgetCard.boundingBox();
+    if (!cardBox) throw new Error('Widget card was not measurable.');
+    await page.mouse.move(cardBox.x + 100, cardBox.y + 100);
+    await page.mouse.down();
+    await page.mouse.move(cardBox.x + 240, cardBox.y + 280);
+    await page.mouse.up();
 
-      widgetService.updatePosition('dashboard-1', 'widget-weather-1', 140, 180);
-      widgetService.updateSize('dashboard-1', 'widget-weather-1', 420, 310);
-      $rootScope.$applyAsync();
-    });
+    const resizeHandle = widgetCard.locator('.widget-resize-handle');
+    const resizeBox = await resizeHandle.boundingBox();
+    if (!resizeBox) throw new Error('Widget resize handle was not measurable.');
+    await page.mouse.move(resizeBox.x + 4, resizeBox.y + 4);
+    await page.mouse.down();
+    await page.mouse.move(resizeBox.x + 64, resizeBox.y + 54);
+    await page.mouse.up();
 
     await expect(page.locator('.widget-card').first()).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 140, 180)');
     await expect(page.locator('.widget-card').first()).toHaveCSS('width', '420px');
@@ -457,7 +463,7 @@ async function mockDashboardApis(page, options) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        authorizationUrl: 'http://127.0.0.1:8080/oauth-popup'
+        authorizationUrl: new URL('/oauth-popup', route.request().url()).href
       })
     });
   });

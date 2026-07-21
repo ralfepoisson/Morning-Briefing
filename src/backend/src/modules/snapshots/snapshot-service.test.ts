@@ -46,6 +46,10 @@ test('SnapshotService generates and persists a weather snapshot for the dashboar
         minWidth: 320,
         minHeight: 360,
         isVisible: true,
+        isGenerating: false,
+        includeInBriefingDefault: false,
+        includeInBriefingOverride: null,
+        includeInBriefing: false,
         sortOrder: 1,
         refreshMode: 'SNAPSHOT',
         version: 1,
@@ -103,7 +107,10 @@ test('SnapshotService generates and persists a weather snapshot for the dashboar
     tenantId: 'tenant-1',
     userId: 'user-1',
     displayName: 'Ralfe',
-    timezone: 'Europe/Paris'
+    timezone: 'Europe/Paris',
+    locale: 'en-GB',
+    email: 'ralfe@example.com',
+    isAdmin: false
   });
 
   assert.ok(snapshot);
@@ -144,6 +151,10 @@ test('SnapshotService returns a failed weather widget snapshot when location con
         minWidth: 320,
         minHeight: 360,
         isVisible: true,
+        isGenerating: false,
+        includeInBriefingDefault: false,
+        includeInBriefingOverride: null,
+        includeInBriefing: false,
         sortOrder: 1,
         refreshMode: 'SNAPSHOT',
         version: 1,
@@ -183,7 +194,10 @@ test('SnapshotService returns a failed weather widget snapshot when location con
     tenantId: 'tenant-1',
     userId: 'user-1',
     displayName: 'Ralfe',
-    timezone: 'Europe/Paris'
+    timezone: 'Europe/Paris',
+    locale: 'en-GB',
+    email: 'ralfe@example.com',
+    isAdmin: false
   });
 
   assert.ok(snapshot);
@@ -216,6 +230,10 @@ test('SnapshotService generates a Todoist task snapshot for the dashboard', asyn
         minWidth: 360,
         minHeight: 260,
         isVisible: true,
+        isGenerating: false,
+        includeInBriefingDefault: false,
+        includeInBriefingOverride: null,
+        includeInBriefing: false,
         sortOrder: 2,
         refreshMode: 'SNAPSHOT',
         version: 1,
@@ -304,7 +322,10 @@ test('SnapshotService generates a Todoist task snapshot for the dashboard', asyn
     tenantId: 'tenant-1',
     userId: 'user-1',
     displayName: 'Ralfe',
-    timezone: 'Europe/Paris'
+    timezone: 'Europe/Paris',
+    locale: 'en-GB',
+    email: 'ralfe@example.com',
+    isAdmin: false
   });
 
   assert.ok(snapshot);
@@ -379,6 +400,10 @@ test('SnapshotService can hide undated Todoist tasks when the widget disables th
         minWidth: 360,
         minHeight: 260,
         isVisible: true,
+        isGenerating: false,
+        includeInBriefingDefault: false,
+        includeInBriefingOverride: null,
+        includeInBriefing: false,
         sortOrder: 2,
         refreshMode: 'SNAPSHOT',
         version: 1,
@@ -461,7 +486,10 @@ test('SnapshotService can hide undated Todoist tasks when the widget disables th
     tenantId: 'tenant-1',
     userId: 'user-1',
     displayName: 'Ralfe',
-    timezone: 'Europe/Paris'
+    timezone: 'Europe/Paris',
+    locale: 'en-GB',
+    email: 'ralfe@example.com',
+    isAdmin: false
   });
 
   assert.ok(snapshot);
@@ -521,6 +549,10 @@ test('SnapshotService generates a news snapshot from RSS feeds and the tenant Op
         minWidth: 360,
         minHeight: 320,
         isVisible: true,
+        isGenerating: false,
+        includeInBriefingDefault: false,
+        includeInBriefingOverride: null,
+        includeInBriefing: false,
         sortOrder: 1,
         refreshMode: 'SNAPSHOT',
         version: 1,
@@ -645,13 +677,17 @@ test('SnapshotService generates a news snapshot from RSS feeds and the tenant Op
     tenantId: 'tenant-1',
     userId: 'user-1',
     displayName: 'Ralfe',
-    timezone: 'Europe/Paris'
+    timezone: 'Europe/Paris',
+    locale: 'en-GB',
+    email: 'ralfe@example.com',
+    isAdmin: false
   });
 
   assert.ok(snapshot);
   assert.equal(snapshot && snapshot.widgets[0].status, 'READY');
   assert.equal(snapshot && snapshot.widgets[0].content.headline, 'Local AI tooling leads the morning briefing.');
-  assert.equal(snapshot && snapshot.widgets[0].content.categories[0].bullets.length, 1);
+  const categories = snapshot && snapshot.widgets[0].content.categories as Array<{ bullets: unknown[] }>;
+  assert.equal(categories[0].bullets.length, 1);
 });
 
 test('SnapshotService excludes previously considered news articles from a new day', async function () {
@@ -737,7 +773,10 @@ test('SnapshotService excludes previously considered news articles from a new da
     tenantId: 'tenant-1',
     userId: 'user-1',
     displayName: 'Ralfe',
-    timezone: 'Europe/Paris'
+    timezone: 'Europe/Paris',
+    locale: 'en-GB',
+    email: 'ralfe@example.com',
+    isAdmin: false
   });
 
   assert.ok(snapshot);
@@ -811,7 +850,10 @@ test('SnapshotService reuses the same considered news article pool within a day'
     tenantId: 'tenant-1',
     userId: 'user-1',
     displayName: 'Ralfe',
-    timezone: 'Europe/Paris'
+    timezone: 'Europe/Paris',
+    locale: 'en-GB',
+    email: 'ralfe@example.com',
+    isAdmin: false
   });
 
   assert.ok(snapshot);
@@ -843,6 +885,10 @@ test('SnapshotService generates an xkcd snapshot for the dashboard', async funct
         minWidth: 360,
         minHeight: 320,
         isVisible: true,
+        isGenerating: false,
+        includeInBriefingDefault: false,
+        includeInBriefingOverride: null,
+        includeInBriefing: false,
         sortOrder: 1,
         refreshMode: 'SNAPSHOT',
         version: 1,
@@ -884,7 +930,10 @@ test('SnapshotService generates an xkcd snapshot for the dashboard', async funct
     tenantId: 'tenant-1',
     userId: 'user-1',
     displayName: 'Ralfe',
-    timezone: 'Europe/Paris'
+    timezone: 'Europe/Paris',
+    locale: 'en-GB',
+    email: 'ralfe@example.com',
+    isAdmin: false
   });
 
   assert.ok(snapshot);
@@ -925,6 +974,10 @@ test('SnapshotService returns a failed xkcd snapshot when the upstream request f
         minWidth: 360,
         minHeight: 320,
         isVisible: true,
+        isGenerating: false,
+        includeInBriefingDefault: false,
+        includeInBriefingOverride: null,
+        includeInBriefing: false,
         sortOrder: 1,
         refreshMode: 'SNAPSHOT',
         version: 1,
@@ -959,7 +1012,10 @@ test('SnapshotService returns a failed xkcd snapshot when the upstream request f
     tenantId: 'tenant-1',
     userId: 'user-1',
     displayName: 'Ralfe',
-    timezone: 'Europe/Paris'
+    timezone: 'Europe/Paris',
+    locale: 'en-GB',
+    email: 'ralfe@example.com',
+    isAdmin: false
   });
   const logs = listApplicationLogs({
     levels: ['warn', 'error']
@@ -1004,6 +1060,10 @@ test('SnapshotService generates a NatGeo Daily Photo snapshot for the dashboard'
         minWidth: 360,
         minHeight: 320,
         isVisible: true,
+        isGenerating: false,
+        includeInBriefingDefault: false,
+        includeInBriefingOverride: null,
+        includeInBriefing: false,
         sortOrder: 1,
         refreshMode: 'SNAPSHOT',
         version: 1,
@@ -1047,7 +1107,10 @@ test('SnapshotService generates a NatGeo Daily Photo snapshot for the dashboard'
     tenantId: 'tenant-1',
     userId: 'user-1',
     displayName: 'Ralfe',
-    timezone: 'Europe/Paris'
+    timezone: 'Europe/Paris',
+    locale: 'en-GB',
+    email: 'ralfe@example.com',
+    isAdmin: false
   });
 
   assert.ok(snapshot);
@@ -1088,6 +1151,10 @@ test('SnapshotService returns a failed NatGeo Daily Photo snapshot when the upst
         minWidth: 360,
         minHeight: 320,
         isVisible: true,
+        isGenerating: false,
+        includeInBriefingDefault: false,
+        includeInBriefingOverride: null,
+        includeInBriefing: false,
         sortOrder: 1,
         refreshMode: 'SNAPSHOT',
         version: 1,
@@ -1124,7 +1191,10 @@ test('SnapshotService returns a failed NatGeo Daily Photo snapshot when the upst
     tenantId: 'tenant-1',
     userId: 'user-1',
     displayName: 'Ralfe',
-    timezone: 'Europe/Paris'
+    timezone: 'Europe/Paris',
+    locale: 'en-GB',
+    email: 'ralfe@example.com',
+    isAdmin: false
   });
   const logs = listApplicationLogs({
     levels: ['warn', 'error']
@@ -1169,6 +1239,10 @@ test('SnapshotService generates a Google Calendar snapshot for the dashboard', a
         minWidth: 360,
         minHeight: 260,
         isVisible: true,
+        isGenerating: false,
+        includeInBriefingDefault: false,
+        includeInBriefingOverride: null,
+        includeInBriefing: false,
         sortOrder: 3,
         refreshMode: 'SNAPSHOT',
         version: 1,
@@ -1261,6 +1335,8 @@ test('SnapshotService generates a Google Calendar snapshot for the dashboard', a
     todoistTaskClient,
     googleCalendarClient,
     googleCalendarOAuthClient,
+    unusedGmailClient(),
+    unusedGmailOAuthClient(),
     unusedRssFeedClient(),
     unusedOpenAiNewsSummarizer()
   );
@@ -1269,7 +1345,10 @@ test('SnapshotService generates a Google Calendar snapshot for the dashboard', a
     tenantId: 'tenant-1',
     userId: 'user-1',
     displayName: 'Ralfe',
-    timezone: 'Europe/Paris'
+    timezone: 'Europe/Paris',
+    locale: 'en-GB',
+    email: 'ralfe@example.com',
+    isAdmin: false
   });
 
   assert.ok(snapshot);
@@ -1325,6 +1404,10 @@ test('SnapshotService logs Google Calendar snapshot failures for troubleshooting
         minWidth: 360,
         minHeight: 260,
         isVisible: true,
+        isGenerating: false,
+        includeInBriefingDefault: false,
+        includeInBriefingOverride: null,
+        includeInBriefing: false,
         sortOrder: 3,
         refreshMode: 'SNAPSHOT',
         version: 1,
@@ -1382,6 +1465,8 @@ test('SnapshotService logs Google Calendar snapshot failures for troubleshooting
         };
       }
     },
+    unusedGmailClient(),
+    unusedGmailOAuthClient(),
     unusedRssFeedClient(),
     unusedOpenAiNewsSummarizer()
   );
@@ -1390,7 +1475,10 @@ test('SnapshotService logs Google Calendar snapshot failures for troubleshooting
     tenantId: 'tenant-1',
     userId: 'user-1',
     displayName: 'Ralfe',
-    timezone: 'Europe/Paris'
+    timezone: 'Europe/Paris',
+    locale: 'en-GB',
+    email: 'ralfe@example.com',
+    isAdmin: false
   });
   const logs = listApplicationLogs({
     levels: ['error']
@@ -1441,6 +1529,10 @@ test('SnapshotService generates a Gmail email snapshot for the dashboard', async
         minWidth: 360,
         minHeight: 260,
         isVisible: true,
+        isGenerating: false,
+        includeInBriefingDefault: false,
+        includeInBriefingOverride: null,
+        includeInBriefing: false,
         sortOrder: 4,
         refreshMode: 'SNAPSHOT',
         version: 1,
@@ -1540,7 +1632,10 @@ test('SnapshotService generates a Gmail email snapshot for the dashboard', async
     tenantId: 'tenant-1',
     userId: 'user-1',
     displayName: 'Ralfe',
-    timezone: 'Europe/Paris'
+    timezone: 'Europe/Paris',
+    locale: 'en-GB',
+    email: 'ralfe@example.com',
+    isAdmin: false
   });
 
   assert.ok(snapshot);
@@ -1662,7 +1757,10 @@ test('SnapshotService returns the latest persisted dashboard snapshot without re
     tenantId: 'tenant-1',
     userId: 'user-1',
     displayName: 'Ralfe',
-    timezone: 'Europe/Paris'
+    timezone: 'Europe/Paris',
+    locale: 'en-GB',
+    email: 'ralfe@example.com',
+    isAdmin: false
   });
 
   assert.deepEqual(snapshot, {
@@ -1874,6 +1972,10 @@ function createNewsDashboardRecord(): SnapshotDashboardRecord {
         minWidth: 360,
         minHeight: 320,
         isVisible: true,
+        isGenerating: false,
+        includeInBriefingDefault: false,
+        includeInBriefingOverride: null,
+        includeInBriefing: false,
         sortOrder: 1,
         refreshMode: 'SNAPSHOT',
         version: 1,
@@ -1963,8 +2065,12 @@ function createWeatherWidget(overrides: Record<string, unknown> = {}) {
     minWidth: 320,
     minHeight: 360,
     isVisible: true,
+    isGenerating: false,
+    includeInBriefingDefault: false,
+    includeInBriefingOverride: null,
+    includeInBriefing: false,
     sortOrder: 1,
-    refreshMode: 'SNAPSHOT',
+    refreshMode: 'SNAPSHOT' as const,
     version: 1,
     config: {
       location: {

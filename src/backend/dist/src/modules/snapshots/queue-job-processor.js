@@ -11,8 +11,7 @@ export class QueueJobProcessor {
             return this.snapshotJobProcessor.process(message);
         }
         if (type === 'GenerateDashboardAudioBriefingRequested') {
-            await this.dashboardBriefingJobProcessor.process(message);
-            return 'processed';
+            return this.dashboardBriefingJobProcessor.process(message);
         }
         throw new Error('Queue message type is invalid.');
     }

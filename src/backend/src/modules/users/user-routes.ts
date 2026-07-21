@@ -347,6 +347,9 @@ function isValidTimezone(value: unknown): value is string {
   }
 }
 
+function normalizeOptionalString(value: unknown, fallback: null): string | null;
+function normalizeOptionalString(value: unknown, fallback: undefined): string | undefined;
+function normalizeOptionalString(value: unknown, fallback: string): string;
 function normalizeOptionalString(value: unknown, fallback: string | undefined | null): string | undefined | null {
   if (typeof value === 'undefined') {
     return fallback;

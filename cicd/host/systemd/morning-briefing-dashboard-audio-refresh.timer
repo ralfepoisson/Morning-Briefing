@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Morning Briefing dashboard audio refresh at 05:00 UTC
+
+[Timer]
+OnCalendar=*-*-* 05:00:00 UTC
+Persistent=true
+RandomizedDelaySec=0
+Unit=morning-briefing-dashboard-audio-refresh.service
+
+[Install]
+WantedBy=timers.target

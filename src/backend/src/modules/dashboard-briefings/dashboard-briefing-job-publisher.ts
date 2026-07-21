@@ -11,6 +11,7 @@ export type PublishDashboardAudioBriefingJobInput = {
   ownerEmail: string;
   ownerIsAdmin: boolean;
   force: boolean;
+  idempotencyKey?: string;
   correlationId?: string | null;
   causationId?: string | null;
   requestedAt?: Date;

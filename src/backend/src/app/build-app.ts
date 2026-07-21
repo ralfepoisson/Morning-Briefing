@@ -17,8 +17,13 @@ import { registerRssFeedRoutes } from '../modules/rss-feeds/rss-feed-routes.js';
 import { registerSnapshotRoutes } from '../modules/snapshots/snapshot-routes.js';
 import { registerUserRoutes } from '../modules/users/user-routes.js';
 import { registerWidgetRoutes } from '../modules/widgets/widget-routes.js';
+import { getPrismaClient } from '../infrastructure/prisma/prisma-client.js';
 
-export async function buildApp() {
+export type BuildAppOptions = {
+  readinessCheck?: () => Promise<void>;
+};
+
+export async function buildApp(options: BuildAppOptions = {}) {
   const app = Fastify({
     logger: false
   });
@@ -33,6 +38,20 @@ export async function buildApp() {
     return {
       status: 'ok'
     };
+  });
+
+  app.get('/health/ready', async function handleReadiness(_request, reply) {
+    try {
+      await (options.readinessCheck || checkDatabaseReadiness)();
+      return {
+        status: 'ready'
+      };
+    } catch {
+      reply.code(503);
+      return {
+        status: 'unavailable'
+      };
+    }
   });
 
   app.addHook('onRequest', async function authenticateApiRequests(request, reply) {
@@ -72,6 +91,10 @@ export async function buildApp() {
   await registerWidgetRoutes(app);
 
   return app;
+}
+
+async function checkDatabaseReadiness(): Promise<void> {
+  await getPrismaClient().$queryRaw`SELECT 1`;
 }
 
 function isProtectedApiRoute(url: string): boolean {

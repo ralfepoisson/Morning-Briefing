@@ -3,6 +3,23 @@ import type {
   DashboardBriefingPreferenceRecord,
   DashboardBriefingRecord
 } from './dashboard-briefing-types.js';
+import type { GenerateDashboardAudioBriefingRequested } from './dashboard-briefing-job-types.js';
+
+export type ClaimDashboardBriefingJobResult =
+  | { status: 'claimed'; jobId: string; attemptCount: number }
+  | { status: 'already_processed'; jobId: string }
+  | { status: 'already_processing'; jobId: string };
+
+export interface DashboardBriefingJobRepository {
+  claimDashboardBriefingJob(
+    message: GenerateDashboardAudioBriefingRequested,
+    messageReceiptId: string | null,
+    leaseExpiresAt: Date,
+    now?: Date
+  ): Promise<ClaimDashboardBriefingJobResult>;
+  completeDashboardBriefingJob(idempotencyKey: string): Promise<void>;
+  failDashboardBriefingJob(idempotencyKey: string, reason: string): Promise<void>;
+}
 
 export type DashboardBriefingWidgetSnapshotSource = {
   id: string;
@@ -34,7 +51,7 @@ export interface DashboardBriefingAggregationRepository {
   ): Promise<DashboardBriefingAggregationDashboard | null>;
 }
 
-export interface DashboardBriefingRepository extends DashboardBriefingAggregationRepository {
+export interface DashboardBriefingRepository extends DashboardBriefingAggregationRepository, DashboardBriefingJobRepository {
   listDashboardsForScheduledGeneration(): Promise<Array<{
     id: string;
     tenantId: string;

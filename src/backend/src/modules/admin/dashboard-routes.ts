@@ -22,6 +22,7 @@ type AdminDashboardListRecord = {
   owner: {
     id: string;
     displayName: string;
+    phoneticName: string | null;
     email: string;
   };
   widgets: Array<{
@@ -141,6 +142,7 @@ export async function registerAdminDashboardRoutes(
         tenantId: dashboard.owner.tenantId,
         ownerUserId: dashboard.owner.id,
         ownerDisplayName: dashboard.owner.displayName,
+        ownerPhoneticName: dashboard.owner.phoneticName,
         ownerTimezone: dashboard.owner.timezone,
         ownerLocale: dashboard.owner.locale,
         ownerEmail: dashboard.owner.email,
@@ -214,6 +216,7 @@ async function listAdminDashboards(
           select: {
             id: true,
             displayName: true,
+            phoneticName: true,
             email: true
           }
         },
@@ -266,6 +269,7 @@ async function listAdminDashboards(
           select: {
             id: true,
             displayName: true,
+            phoneticName: true,
             email: true
           }
         },
@@ -319,6 +323,7 @@ async function findDashboardForRegeneration(
     id: string;
     tenantId: string;
     displayName: string;
+    phoneticName: string | null;
     timezone: string;
     locale: string;
     email: string;
@@ -340,6 +345,7 @@ async function findDashboardForRegeneration(
             id: true,
             tenantId: true,
             displayName: true,
+            phoneticName: true,
             timezone: true,
             locale: true,
             email: true,
@@ -366,6 +372,7 @@ async function findDashboardForRegeneration(
             id: true,
             tenantId: true,
             displayName: true,
+            phoneticName: true,
             timezone: true,
             locale: true,
             email: true,

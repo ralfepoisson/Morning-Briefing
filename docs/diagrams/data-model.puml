@@ -29,6 +29,7 @@ class AppUser {
   preferred_language : varchar
   telegram_chat_id : varchar?
   telegram_delivery_enabled : boolean
+  is_admin : boolean
   is_active : boolean
   created_at : timestamp
   updated_at : timestamp
@@ -44,6 +45,7 @@ class Dashboard {
   dashboard_type : varchar
   is_default : boolean
   is_active : boolean
+  archived_at : timestamp?
   is_generating : boolean
   version : int
   activation_rule_json : json
@@ -66,6 +68,7 @@ class DashboardWidget {
   min_width : int
   min_height : int
   is_visible : boolean
+  archived_at : timestamp?
   is_generating : boolean
   refresh_mode : varchar
   sort_order : int
@@ -87,6 +90,7 @@ class Connector {
   +connector_id : UUID
   --
   tenant_id : UUID
+  owner_user_id : UUID?
   connector_type : varchar
   name : varchar
   status : varchar
@@ -149,10 +153,33 @@ class SnapshotGenerationJob {
   requested_config_hash : varchar
   status : varchar
   attempt_count : int
+  duplicate_skip_count : int
   last_message_id : varchar
   last_error : varchar
   started_at : timestamp
   completed_at : timestamp
+  lease_expires_at : timestamp
+  last_duplicate_at : timestamp
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+class DashboardBriefingGenerationJob {
+  +dashboard_briefing_generation_job_id : UUID
+  --
+  dashboard_id : UUID
+  tenant_id : UUID
+  owner_user_id : UUID
+  idempotency_key : varchar
+  status : SnapshotJobStatus
+  attempt_count : int
+  duplicate_skip_count : int
+  last_message_id : varchar?
+  last_error : varchar?
+  started_at : timestamp?
+  completed_at : timestamp?
+  lease_expires_at : timestamp?
+  last_duplicate_at : timestamp?
   created_at : timestamp
   updated_at : timestamp
 }
@@ -213,14 +240,88 @@ class DashboardBriefingAudio {
   updated_at : timestamp
 }
 
+class ReferenceCity {
+  +reference_city_id : UUID
+  --
+  tenant_id : UUID?
+  geoname_id : int
+  name : varchar
+  ascii_name : varchar
+  country_code : varchar
+  admin_name_1 : varchar?
+  timezone : varchar?
+  latitude : decimal
+  longitude : decimal
+  population : bigint?
+  is_active : boolean
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+class RssFeedCategory {
+  +rss_feed_category_id : UUID
+  --
+  tenant_id : UUID
+  name : varchar
+  normalized_name : varchar
+  description : varchar
+  sort_order : int
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+class RssFeed {
+  +rss_feed_id : UUID
+  --
+  category_id : UUID
+  name : varchar
+  url : varchar
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+class NewsArticleSelection {
+  +news_article_selection_id : UUID
+  --
+  tenant_id : UUID
+  dashboard_widget_id : UUID
+  snapshot_date : date
+  article_key : varchar
+  category_name : varchar
+  category_description : varchar
+  title : varchar
+  article_url : varchar
+  summary : varchar
+  source_name : varchar
+  published_at : timestamp?
+  created_at : timestamp
+  updated_at : timestamp
+}
+
+class ApplicationLogEvent {
+  +application_log_event_id : varchar
+  --
+  timestamp : timestamp
+  level : ApplicationLogLevel
+  scope : varchar
+  event : varchar
+  message : varchar
+  context_json : json?
+  created_at : timestamp
+}
+
 Tenant "1" -- "0..*" AppUser : has >
 Tenant "1" -- "0..*" Dashboard : owns >
 Tenant "1" -- "0..*" Connector : provides >
+Tenant "0..1" -- "0..*" ReferenceCity : scopes >
+Tenant "1" -- "0..*" RssFeedCategory : owns >
+Tenant "1" -- "0..*" NewsArticleSelection : scopes >
 Tenant "1" -- "0..*" DashboardWidget : scopes >
 Tenant "1" -- "0..*" BriefingSnapshot : contains >
 Tenant "1" -- "0..1" TenantAiConfiguration : configures >
 
 AppUser "1" -- "0..*" Dashboard : owns >
+AppUser "0..1" -- "0..*" Connector : owns >
 Dashboard "1" -- "0..*" DashboardWidget : contains >
 
 DashboardWidget "1" -- "0..*" WidgetConnector : uses >
@@ -232,11 +333,13 @@ Dashboard "1" -- "0..*" BriefingSnapshot : rendered as >
 BriefingSnapshot "1" -- "0..*" WidgetSnapshot : includes >
 DashboardWidget "1" -- "0..*" WidgetSnapshot : materialised as >
 DashboardWidget "1" -- "0..*" SnapshotGenerationJob : requested as >
-AppUser "1" -- "0..*" SnapshotGenerationJob : requested for >
-Dashboard "1" -- "0..*" SnapshotGenerationJob : scoped to >
+DashboardWidget "1" -- "0..*" NewsArticleSelection : selects >
+AppUser "1" -- "0..*" DashboardBriefingGenerationJob : owns >
+Dashboard "1" -- "0..*" DashboardBriefingGenerationJob : queues >
 Dashboard "1" -- "0..1" DashboardBriefingPreference : configures >
 Dashboard "1" -- "0..*" DashboardBriefing : produces >
 DashboardBriefing "1" -- "0..*" DashboardBriefingAudio : renders >
+RssFeedCategory "1" -- "0..*" RssFeed : contains >
 
 note right of DashboardWidget
 Represents the configured widget instance
@@ -261,8 +364,21 @@ note right of SnapshotGenerationJob
 Tracks idempotent widget snapshot commands.
 Used to coalesce duplicate SQS deliveries,
 record retries, and mark stale jobs skipped.
+duplicate_skip_count and last_duplicate_at retain
+evidence of coalesced duplicate deliveries.
+lease_expires_at permits recovery of abandoned
+PROCESSING work after a worker failure.
 The logical key is widget_id + snapshot_date
 + requested_config_hash.
+dashboard_id, tenant_id, and user_id are retained
+scope identifiers without separate foreign keys in
+the current Prisma model.
+end note
+
+note right of DashboardBriefingGenerationJob
+Tracks dashboard-audio commands independently from
+widget jobs, including idempotency, retry evidence,
+duplicate accounting, and a recoverable processing lease.
 end note
 
 note bottom of Connector
@@ -304,9 +420,21 @@ which widgets contribute content.
 end note
 
 note right of TenantAiConfiguration
-Stores the tenant-scoped OpenAI API key
-and selected model used by shared
-AI summarization and briefing generation.
+The current Prisma model stores the tenant-scoped
+OpenAI API key and selected model. Production design
+should externalise the key and retain only a secret
+reference in PostgreSQL.
+end note
+
+note right of DashboardBriefingAudio
+storage_key is relative metadata. Audio bytes belong
+in the persistent AUDIO_BRIEFING_STORAGE_DIR mount
+shared by backend and worker, not inside a container layer.
+end note
+
+note bottom of ApplicationLogEvent
+Independent operational event table; it has no foreign key
+to tenant or user in the current Prisma schema.
 end note
 
 @enduml

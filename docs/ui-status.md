@@ -4,14 +4,18 @@ This document tracks the current state of the web UI MVP under `src/web/`.
 
 ## Current status
 
-The frontend currently exists as a Bootstrap + AngularJS single-page application. Dashboard list, widget CRUD, and weather widget configuration now target the backend REST API. Snapshot-based widgets now prefer explicit loading or failure states instead of seeded mock content while data is pending.
+The frontend is a framework-free strict TypeScript single-page application built with Vite 8. It uses browser-native routing and state management while retaining Bootstrap and Font Awesome. Dashboard list, widget CRUD, and weather widget configuration target the backend REST API. Snapshot-based widgets prefer explicit loading or failure states instead of seeded mock content while data is pending.
+
+The production target is a static bundle served by a minimal Nginx container on a loopback-only host port. Apache on the consolidated EC2 host will proxy all non-`/api/*` traffic to that container behind the shared ALB/WAF. The existing ECS frontend remains the live deployment until an explicitly approved cutover.
 
 ## Implemented
 
 ### Application shell
 
-- AngularJS app scaffold under `src/web/`
-- npm project initialised for the frontend
+- strict TypeScript SPA under `src/web/src/`
+- Vite 8 production build and development server
+- Vitest unit-test setup
+- browser-native hash routing that preserves existing callback URLs
 - Bootstrap styling integrated
 - Font Awesome Free integrated for UI icons
 - Theme-aware branding using `logo-dark.png` and `logo-light.png`
@@ -113,6 +117,8 @@ The frontend currently exists as a Bootstrap + AngularJS single-page application
 - Widget resizing is currently implemented only for calendar widgets
 - Weather, calendar, task, and email widgets expose meaningful configuration flows, while other widgets remain simpler
 - Telegram delivery still depends on server-side bot credentials being configured in the backend environment
+- Production cutover to the consolidated host is not complete: the target frontend container, Apache virtual host, shared-ALB rule, and pinned-host validation still need an approved live phase
+- The SPA and proxy configuration must preserve `/#/auth/callback` and must not rewrite the Google Calendar or Gmail backend OAuth callback paths to the frontend
 
 ## Next likely UI steps
 
