@@ -45,6 +45,25 @@ export function createScheduledDashboardBriefingRefreshService() {
     const prisma = getPrismaClient();
     return new ScheduledDashboardBriefingRefreshService(new PrismaDashboardBriefingRepository(prisma), publisher);
 }
+export function createScheduledDashboardBriefingRefreshRuntime() {
+    const config = getMessageBrokerConfig();
+    if (!config.enabled || !config.url) {
+        return null;
+    }
+    const prisma = getPrismaClient();
+    const broker = new ConnectedRabbitMqJobPublisher(config);
+    return {
+        service: new ScheduledDashboardBriefingRefreshService(new PrismaDashboardBriefingRepository(prisma), new RabbitMqDashboardBriefingJobPublisher(broker)),
+        async close() {
+            try {
+                await broker.close();
+            }
+            finally {
+                await prisma.$disconnect();
+            }
+        }
+    };
+}
 function createLlmProvider(tenantAiConfigurationService) {
     if (process.env.NODE_ENV === 'test') {
         return new StubDashboardBriefingLlmProvider();

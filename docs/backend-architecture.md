@@ -199,6 +199,7 @@ The target Compose deployment uses a RabbitMQ-backed generation pipeline:
 - admin dashboard audio regeneration enqueues `GenerateDashboardAudioBriefingRequested` messages to the same queue
 - a dedicated worker process consumes RabbitMQ deliveries and handles both widget-snapshot and dashboard-audio commands
 - in the target production deployment, systemd timers invoke one-shot Compose services that enqueue widget refresh work at `01:00` UTC and dashboard audio work at `05:00` UTC
+- each scheduled producer owns its AMQP confirm channel, broker connection, and database client for exactly one run and closes them in `finally` after success or failure; the long-lived worker retains its separate reconnecting consumer lifecycle
 - `snapshot_generation_jobs` and `dashboard_briefing_generation_jobs` persist independent idempotency, attempt, duplicate, lease, and failure state
 - workers detect stale widget jobs by comparing the queued widget config version/hash with the current widget row before generating anything
 - the durable topology consists of a quorum main queue, a quorum retry queue with TTL-based backoff, and a quorum terminal dead-letter queue
@@ -316,6 +317,7 @@ Candidate workers and timers stay disabled until the legacy ECS worker and Event
 - Retryable failures pass through a durable TTL retry queue for backoff. The consumer derives the bounded attempt count from trusted `x-death` headers and explicitly routes exhausted or invalid deliveries to the durable terminal DLQ; it never accepts a caller-supplied retry count as authority.
 - The widget and dashboard-audio generation-job tables remain unchanged and supply separate idempotency keys, processing leases, attempt state, duplicate accounting, stale-config detection, and recovery after a worker dies between an external side effect and acknowledgement.
 - Backend readiness must check PostgreSQL, required runtime configuration, and RabbitMQ connectivity/topology when publication is enabled. Worker health must prove a live broker channel and registered consumer rather than merely finding a process name. Process liveness alone is insufficient.
+- Real-broker integration starts both production scheduled-producer entrypoints with eligible PostgreSQL records and requires confirmed publication plus process exit within a bounded deadline.
 - Audio bytes live in the protected persistent host mount, while PostgreSQL stores their metadata and relative storage key.
 - RabbitMQ data also lives in a protected persistent host mount and survives container or application-release replacement. Application rollback must not delete or recreate that volume.
 - Audio storage is backed up and must survive replacement of either application container.

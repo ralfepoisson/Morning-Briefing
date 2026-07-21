@@ -54,6 +54,27 @@ export function createSnapshotJobPublisherFromEnvironment() {
     }
     return new RabbitMqSnapshotJobPublisher(new ConnectedRabbitMqJobPublisher(config));
 }
+export function createNightlyRefreshRuntime() {
+    const prisma = getPrismaClient();
+    const config = getMessageBrokerConfig();
+    const broker = config.enabled && config.url
+        ? new ConnectedRabbitMqJobPublisher(config)
+        : null;
+    const publisher = broker
+        ? new RabbitMqSnapshotJobPublisher(broker)
+        : new NoopSnapshotJobPublisher();
+    return {
+        service: new NightlyRefreshService(new PrismaSnapshotRepository(prisma), publisher),
+        async close() {
+            try {
+                await broker?.close();
+            }
+            finally {
+                await prisma.$disconnect();
+            }
+        }
+    };
+}
 export function createSnapshotJobProcessor() {
     const prisma = getPrismaClient();
     return new SnapshotJobProcessor(new PrismaSnapshotRepository(prisma), createSnapshotService());

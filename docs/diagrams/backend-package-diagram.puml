@@ -14,7 +14,7 @@ node "Consolidated ARM64 EC2\npersonal-projects" as Host {
     package "Backend image\nNode.js + Fastify" as BackendImage {
       component "Backend API\n/api/v1 + DB readiness\nBroker topology bootstrap/readiness" as Backend
       component "Worker\nmanual ack + bounded prefetch" as Worker
-      component "One-shot commands\nmigrate / widget refresh / audio refresh" as OneShots
+      component "One-shot commands\nmigrate / widget refresh / audio refresh\nbounded producer cleanup" as OneShots
     }
     folder "Persistent audio\nAUDIO_BRIEFING_STORAGE_DIR" as AudioStorage
     queue "RabbitMQ\ndurable quorum queues" as Rabbit
@@ -85,6 +85,7 @@ AppLayer --> DomainLayer
 AppLayer --> InfraLayer
 [Prisma Repositories] --> Postgres
 [Confirmed Job Publisher] --> Rabbit : persistent + mandatory\npublisher confirms
+OneShots --> Rabbit : confirm then close channel\nand connection in finally
 Rabbit --> MainQueue
 MainQueue --> Worker : at-least-once / manual ack
 Worker --> RetryQueue : retryable failure

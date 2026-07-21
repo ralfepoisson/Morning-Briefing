@@ -10,6 +10,8 @@ const TENANT_ID = '11111111-1111-4111-8111-111111111111';
 const USER_ID = '22222222-2222-4222-8222-222222222222';
 const DASHBOARD_ID = '33333333-3333-4333-8333-333333333333';
 const WIDGET_ID = '44444444-4444-4444-8444-444444444444';
+const BRIEFING_SNAPSHOT_ID = '55555555-5555-4555-8555-555555555555';
+const WIDGET_SNAPSHOT_ID = '66666666-6666-4666-8666-666666666666';
 const CONFIG_HASH = 'rabbitmq-integration-config-v1';
 const SNAPSHOT_DATE = '2026-07-21';
 const phase = process.argv[2];
@@ -21,6 +23,9 @@ try {
     switch (phase) {
         case 'fresh-readiness':
             await verifyFreshBrokerReadiness();
+            break;
+        case 'seed-scheduled-producers':
+            await seedScheduledProducers();
             break;
         case 'prepare-durability':
             await prepareDurability();
@@ -260,6 +265,57 @@ async function seedFixture() {
             configHash: CONFIG_HASH
         }
     });
+}
+async function seedScheduledProducers() {
+    await seedFixture();
+    const prisma = getPrismaClient();
+    await prisma.briefingSnapshot.upsert({
+        where: {
+            userId_dashboardId_snapshotDate: {
+                userId: USER_ID,
+                dashboardId: DASHBOARD_ID,
+                snapshotDate: new Date(`${SNAPSHOT_DATE}T00:00:00.000Z`)
+            }
+        },
+        update: { generationStatus: 'READY' },
+        create: {
+            id: BRIEFING_SNAPSHOT_ID,
+            tenantId: TENANT_ID,
+            userId: USER_ID,
+            dashboardId: DASHBOARD_ID,
+            snapshotDate: new Date(`${SNAPSHOT_DATE}T00:00:00.000Z`),
+            generationStatus: 'READY'
+        }
+    });
+    await prisma.widgetSnapshot.upsert({
+        where: {
+            snapshotId_dashboardWidgetId: {
+                snapshotId: BRIEFING_SNAPSHOT_ID,
+                dashboardWidgetId: WIDGET_ID
+            }
+        },
+        update: { status: 'READY' },
+        create: {
+            id: WIDGET_SNAPSHOT_ID,
+            snapshotId: BRIEFING_SNAPSHOT_ID,
+            dashboardWidgetId: WIDGET_ID,
+            widgetType: 'integration-static',
+            title: 'Integration Static Widget',
+            contentJson: { summary: 'Ready for scheduled audio.' },
+            contentHash: CONFIG_HASH,
+            status: 'READY'
+        }
+    });
+    await prisma.dashboardBriefingPreference.upsert({
+        where: { dashboardId: DASHBOARD_ID },
+        update: { enabled: true, autoGenerate: true },
+        create: {
+            dashboardId: DASHBOARD_ID,
+            enabled: true,
+            autoGenerate: true
+        }
+    });
+    console.log('ok - seeded eligible widget and dashboard-audio scheduled producers');
 }
 function envelopeFor(name) {
     const jobId = `integration-${name}`;

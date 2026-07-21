@@ -133,6 +133,9 @@ grep -Fq 'backend_ready="$(wait_for_http http://127.0.0.1:13000/health/ready)"' 
 grep -Fq 'wait_for_http http://127.0.0.1:18080/healthz >/dev/null' "${ROOT_DIR}/cicd/host/health-check.sh" || fail "frontend host-port readiness is not retried"
 grep -Fq 'run_broker_integration "${database_url}" fresh-readiness' "${ROOT_DIR}/scripts/integration-test.sh" || fail "release validation does not activate backend readiness against fresh broker storage"
 grep -Fq "test -z \"\$(find /integration-rabbitmq -mindepth 1 -maxdepth 1 -print -quit)\"" "${ROOT_DIR}/scripts/integration-test.sh" || fail "fresh broker activation is not proven from an empty persistent directory"
+grep -Fq 'run_scheduled_producer_with_deadline' "${ROOT_DIR}/scripts/integration-test.sh" || fail "scheduled producer lifecycle is not bounded against a real broker"
+grep -Fq 'dist/scripts/run-nightly-refresh.js' "${ROOT_DIR}/scripts/integration-test.sh" || fail "nightly producer exit is not integration tested"
+grep -Fq 'dist/scripts/run-scheduled-dashboard-briefings.js' "${ROOT_DIR}/scripts/integration-test.sh" || fail "dashboard-audio producer exit is not integration tested"
 echo "ok - host-port readiness probes are bounded and fresh broker activation is proven"
 
 awk '/^  frontend:/{inside=1} /^  backend:/{inside=0} inside && /- host-port/{found=1} END{exit !found}' "${ROOT_DIR}/cicd/compose/compose.yaml" || fail "frontend is not attached to the host-port bridge"

@@ -68,6 +68,46 @@ run_broker_integration() {
     node dist/scripts/run-message-broker-integration.js "$@"
 }
 
+run_scheduled_producer_with_deadline() {
+  local producer_name="$1"
+  local producer_script="$2"
+  local expected_event="$3"
+  local container_name="morning-briefing-ci-${producer_name}-${suffix}"
+
+  docker run -d --platform linux/arm64 --name "${container_name}" --network "${network}" \
+    -e DATABASE_URL="${database_url}" \
+    -e MESSAGE_BROKER_ENABLED=true \
+    -e MESSAGE_BROKER_URL="${broker_url}" \
+    -e MESSAGE_BROKER_EXCHANGE=morning-briefing.integration.jobs \
+    -e MESSAGE_BROKER_QUEUE=morning-briefing.integration.jobs \
+    -e MESSAGE_BROKER_RETRY_QUEUE=morning-briefing.integration.jobs.retry \
+    -e MESSAGE_BROKER_DLQ=morning-briefing.integration.jobs.dlq \
+    -e MESSAGE_BROKER_RETRY_DELAY_MS=500 \
+    -e MESSAGE_BROKER_MAX_ATTEMPTS=3 \
+    -e MESSAGE_BROKER_PREFETCH=1 \
+    "${backend_image}" node "${producer_script}" >/dev/null
+
+  for _ in $(seq 1 15); do
+    if [[ "$(docker inspect -f '{{.State.Running}}' "${container_name}")" == 'false' ]]; then
+      local exit_code
+      exit_code="$(docker inspect -f '{{.State.ExitCode}}' "${container_name}")"
+      local producer_logs
+      producer_logs="$(docker logs "${container_name}" 2>&1)"
+      docker rm "${container_name}" >/dev/null
+      [[ "${exit_code}" == '0' ]]
+      grep -Fq "\"event\":\"${expected_event}\"" <<<"${producer_logs}"
+      echo "ok - ${producer_name} producer published and exited within 15 seconds"
+      return
+    fi
+    sleep 1
+  done
+
+  docker logs "${container_name}" >&2
+  docker rm -f "${container_name}" >/dev/null
+  echo "${producer_name} producer did not exit after completed publication." >&2
+  return 1
+}
+
 docker network create "${network}" >/dev/null
 docker run --rm --platform linux/arm64 --user 0:0 \
   --volume "${rabbitmq_data_dir}:/integration-rabbitmq" \
@@ -108,6 +148,16 @@ docker run --rm --network "${network}" \
 table_count="$(docker exec "${postgres_container}" psql -U postgres -d morning_briefing -Atc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'")"
 [[ "${table_count}" -ge 19 ]]
 echo "PostgreSQL 18 migration integration passed with ${table_count} application tables."
+
+run_broker_integration "${database_url}" seed-scheduled-producers
+run_scheduled_producer_with_deadline \
+  snapshot-refresh \
+  dist/scripts/run-nightly-refresh.js \
+  nightly_refresh_run_completed
+run_scheduled_producer_with_deadline \
+  dashboard-audio-refresh \
+  dist/scripts/run-scheduled-dashboard-briefings.js \
+  scheduled_dashboard_briefing_run_completed
 
 run_broker_integration "${database_url}" prepare-durability
 docker stop "${rabbitmq_container}" >/dev/null

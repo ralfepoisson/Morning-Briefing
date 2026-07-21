@@ -89,6 +89,8 @@ The local scheduler keeps two UTC jobs alive:
 - widget snapshot refresh at `01:00` UTC
 - dashboard audio briefing refresh at `05:00` UTC
 
+Production timer entrypoints are deliberately different from the long-lived local scheduler and worker. Each scheduled one-shot owns and closes its RabbitMQ confirm channel/connection and Prisma client in `finally`, so both successful publication and failure terminate the container promptly.
+
 `./scripts/start_backend.sh` exports `LOCAL_SCHEDULER_ENABLED=true`, so the scheduler now starts inside the local backend dev process by default.
 `./scripts/start_backend.sh` also exports `LOCAL_SNAPSHOT_WORKER_ENABLED=true`, so the local queue worker runs inside that same backend dev process by default.
 

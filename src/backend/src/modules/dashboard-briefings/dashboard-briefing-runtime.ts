@@ -72,6 +72,33 @@ export function createScheduledDashboardBriefingRefreshService(): ScheduledDashb
   );
 }
 
+export function createScheduledDashboardBriefingRefreshRuntime(): {
+  service: ScheduledDashboardBriefingRefreshService;
+  close(): Promise<void>;
+} | null {
+  const config = getMessageBrokerConfig();
+
+  if (!config.enabled || !config.url) {
+    return null;
+  }
+
+  const prisma = getPrismaClient();
+  const broker = new ConnectedRabbitMqJobPublisher(config);
+  return {
+    service: new ScheduledDashboardBriefingRefreshService(
+      new PrismaDashboardBriefingRepository(prisma),
+      new RabbitMqDashboardBriefingJobPublisher(broker)
+    ),
+    async close() {
+      try {
+        await broker.close();
+      } finally {
+        await prisma.$disconnect();
+      }
+    }
+  };
+}
+
 function createLlmProvider(tenantAiConfigurationService: TenantAiConfigurationService) {
   if (process.env.NODE_ENV === 'test') {
     return new StubDashboardBriefingLlmProvider();
