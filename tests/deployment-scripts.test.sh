@@ -120,6 +120,9 @@ echo "ok - scheduled jobs use a deployment-preserved root oneshot boundary"
 grep -Fq 'Deployment must run through the root activation boundary.' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host deployment is not restricted to the root activation boundary"
 grep -Fq 'prepare_runtime_directory "${APP_ROOT}/data/audio" 10001 10001' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host audio directory is not prepared securely"
 grep -Fq 'prepare_runtime_directory "${APP_ROOT}/data/rabbitmq" 100 101' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host RabbitMQ directory is not prepared securely"
+if grep -Eq 'install[^[:cntrl:]]*-o[[:space:]]+"?\$\{?owner' "${ROOT_DIR}/scripts/lib/release-common.sh"; then
+  fail "numeric runtime ownership is passed through install account-name resolution"
+fi
 echo "ok - host data ownership uses validated numeric UID and GID boundaries"
 
 grep -Fq 'sudo -n /srv/apps/morning-briefing/current/cicd/host/rollback.sh' "${ROOT_DIR}/scripts/rollback.sh" || fail "rollback cannot traverse the root-owned application path"
@@ -171,10 +174,13 @@ for group_var in FRONTEND_AWSLOGS_GROUP BACKEND_AWSLOGS_GROUP WORKER_AWSLOGS_GRO
 done
 grep -Fq 'frontend_awslogs_group="${FRONTEND_AWSLOGS_GROUP:-/personal-projects/morning-briefing}"' "${ROOT_DIR}/scripts/publish-release.sh" \
   || fail "publisher does not permit safe log-group overrides"
-for stream_prefix in frontend backend worker rabbitmq migrate snapshot-refresh dashboard-audio-refresh; do
-  grep -Fq "awslogs-stream-prefix: ${stream_prefix}" "${compose_file}" || fail "Compose omits the ${stream_prefix} log stream prefix"
+for stream_name in backend rabbitmq frontend worker migrate snapshot-refresh dashboard-audio-refresh; do
+  grep -Fq "awslogs-stream: morning-briefing-${stream_name}" "${compose_file}" || fail "Compose omits the ${stream_name} log stream name"
 done
-echo "ok - Docker logging uses the configurable retained group with distinct streams"
+if grep -Fq 'awslogs-stream-prefix:' "${compose_file}"; then
+  fail "Compose uses the unsupported ECS awslogs-stream-prefix option"
+fi
+echo "ok - Docker logging uses the configurable retained group with valid distinct streams"
 
 if grep -Fq 'Type: AWS::Logs::LogGroup' "${infra_file}"; then
   fail "project infrastructure attempts to create the retained host log group"
@@ -240,6 +246,7 @@ echo "ok - CI enforces complete type, build, unit, configuration, and audit gate
 
 "${ROOT_DIR}/tests/systemd-permission-model.test.sh"
 "${ROOT_DIR}/tests/secret-file-permissions.test.sh"
+"${ROOT_DIR}/tests/awslogs-options.test.sh"
 "${ROOT_DIR}/tests/openai-secret-cutover.test.sh"
 "${ROOT_DIR}/tests/publish-transport.test.sh"
 "${ROOT_DIR}/tests/release-bundle-activation.test.sh"

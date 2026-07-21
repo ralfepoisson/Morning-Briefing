@@ -1,8 +1,8 @@
 # Values only; never copy real secrets into Git.
 # release.env should set FRONTEND_AWSLOGS_GROUP, BACKEND_AWSLOGS_GROUP,
 # WORKER_AWSLOGS_GROUP, and RABBITMQ_AWSLOGS_GROUP to the existing retained
-# seven-day group /personal-projects/morning-briefing. Stream prefixes keep
-# services distinct inside that shared group.
+# seven-day group /personal-projects/morning-briefing. Explicit deterministic
+# stream names keep services distinct inside that shared group.
 # shared/config/backend.env (0644, no secrets)
 NODE_ENV=production
 FRONTEND_BASE_URL=https://briefing.ralfepoisson.com/

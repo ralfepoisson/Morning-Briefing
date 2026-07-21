@@ -20,7 +20,7 @@ x-backend-common: &backend-common
     options:
       awslogs-region: ${AWSLOGS_REGION:-eu-west-1}
       awslogs-group: ${BACKEND_AWSLOGS_GROUP:?BACKEND_AWSLOGS_GROUP is required}
-      awslogs-stream-prefix: backend
+      awslogs-stream: morning-briefing-backend
       awslogs-create-group: "false"
   volumes:
     - ${APP_ROOT:-/srv/apps/morning-briefing}/data/audio:/var/lib/morning-briefing/audio
@@ -60,7 +60,7 @@ services:
       options:
         awslogs-region: ${AWSLOGS_REGION:-eu-west-1}
         awslogs-group: ${RABBITMQ_AWSLOGS_GROUP:?RABBITMQ_AWSLOGS_GROUP is required}
-        awslogs-stream-prefix: rabbitmq
+        awslogs-stream: morning-briefing-rabbitmq
         awslogs-create-group: "false"
 
   frontend:
@@ -93,7 +93,7 @@ services:
       options:
         awslogs-region: ${AWSLOGS_REGION:-eu-west-1}
         awslogs-group: ${FRONTEND_AWSLOGS_GROUP:?FRONTEND_AWSLOGS_GROUP is required}
-        awslogs-stream-prefix: frontend
+        awslogs-stream: morning-briefing-frontend
         awslogs-create-group: "false"
 
   backend:
@@ -144,7 +144,7 @@ services:
       options:
         awslogs-region: ${AWSLOGS_REGION:-eu-west-1}
         awslogs-group: ${WORKER_AWSLOGS_GROUP:?WORKER_AWSLOGS_GROUP is required}
-        awslogs-stream-prefix: worker
+        awslogs-stream: morning-briefing-worker
         awslogs-create-group: "false"
     healthcheck:
       test: ["CMD", "node", "-e", "if(!require('node:fs').existsSync('/tmp/morning-briefing-worker-ready'))process.exit(1)"]
@@ -169,7 +169,7 @@ services:
       options:
         awslogs-region: ${AWSLOGS_REGION:-eu-west-1}
         awslogs-group: ${BACKEND_AWSLOGS_GROUP:?BACKEND_AWSLOGS_GROUP is required}
-        awslogs-stream-prefix: migrate
+        awslogs-stream: morning-briefing-migrate
         awslogs-create-group: "false"
     mem_limit: 1g
     cpus: 1.00
@@ -193,7 +193,7 @@ services:
       options:
         awslogs-region: ${AWSLOGS_REGION:-eu-west-1}
         awslogs-group: ${WORKER_AWSLOGS_GROUP:?WORKER_AWSLOGS_GROUP is required}
-        awslogs-stream-prefix: snapshot-refresh
+        awslogs-stream: morning-briefing-snapshot-refresh
         awslogs-create-group: "false"
 
   dashboard-audio-refresh:
@@ -215,7 +215,7 @@ services:
       options:
         awslogs-region: ${AWSLOGS_REGION:-eu-west-1}
         awslogs-group: ${WORKER_AWSLOGS_GROUP:?WORKER_AWSLOGS_GROUP is required}
-        awslogs-stream-prefix: dashboard-audio-refresh
+        awslogs-stream: morning-briefing-dashboard-audio-refresh
         awslogs-create-group: "false"
 
 networks:

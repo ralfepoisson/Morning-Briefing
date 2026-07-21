@@ -75,7 +75,7 @@ The backend, worker, and broker environment manifests are separate. Their secret
 
 These files remain outside releases, images, Git, and generated artifacts. Backend and worker files contain only the credentials each process requires, including the database and broker connection material and relevant OAuth, JWT, delivery, or provider secrets. The broker file contains its bootstrap username, password, and Erlang cookie. Public URLs, regions, queue/exchange names, retry limits, ports, and log-group names belong in the non-secret shared configuration or secret-free `release.env`. Production uses the EC2 instance role rather than static AWS access keys. Secret values must never appear in release manifests, Compose command output, logs, shell traces, task definitions, or command output.
 
-Docker sends frontend, backend, worker, RabbitMQ, migration, and scheduled-job output through the `awslogs` driver to the existing retained seven-day group `/personal-projects/morning-briefing`. All four `*_AWSLOGS_GROUP` release variables should resolve to that same group. Distinct stream prefixes identify `frontend`, `backend`, `worker`, `rabbitmq`, `migrate`, `snapshot-refresh`, and `dashboard-audio-refresh`. The project infrastructure does not create or manage the group or its retention; the host role may create streams and publish events to its supplied ARN but must not create groups or alter retention. A missing group or insufficient logging permission is a deployment preflight failure, not a reason to fall back silently to local unbounded logs.
+Docker sends frontend, backend, worker, RabbitMQ, migration, and scheduled-job output through the `awslogs` driver to the existing retained seven-day group `/personal-projects/morning-briefing`. All four `*_AWSLOGS_GROUP` release variables should resolve to that same group. Native Docker uses explicit `awslogs-stream` values—not the ECS-only `awslogs-stream-prefix` option—with deterministic names `morning-briefing-frontend`, `morning-briefing-backend`, `morning-briefing-worker`, `morning-briefing-rabbitmq`, `morning-briefing-migrate`, `morning-briefing-snapshot-refresh`, and `morning-briefing-dashboard-audio-refresh`. The project infrastructure does not create or manage the group or its retention; the host role may create streams and publish events to its supplied ARN but must not create groups or alter retention. A missing group or insufficient logging permission is a deployment preflight failure, not a reason to fall back silently to local unbounded logs.
 
 ## CI and immutable build
 
@@ -112,7 +112,7 @@ Releases are immutable directories:
   locks/
 ```
 
-Keep at least two prior release manifests and their image digests. Secret files are not copied into release directories. The `current` symlink changes atomically only after all validation succeeds.
+Keep at least two prior release manifests and their image digests. Secret files are not copied into release directories. The `current` symlink changes atomically only after all validation succeeds. Runtime data directories are created first, then assigned their container numeric UID/GID and mode `0750`; no matching host passwd or group entry is required.
 
 ## Deployment transaction
 

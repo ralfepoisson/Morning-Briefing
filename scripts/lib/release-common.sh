@@ -123,7 +123,10 @@ prepare_runtime_directory() {
   [[ "$(id -u)" == "0" ]] || { die "Runtime directories must be prepared as root."; return 1; }
   [[ "${directory}" == /* && "${owner}" =~ ^[0-9]+$ && "${group}" =~ ^[0-9]+$ ]] \
     || { die "Runtime directory ownership input is invalid."; return 1; }
-  install -d -o "${owner}" -g "${group}" -m 0750 "${directory}"
+  [[ ! -L "${directory}" ]] || { die "Runtime directory must not be a symlink: ${directory}"; return 1; }
+  install -d -m 0750 "${directory}"
+  chown "${owner}:${group}" "${directory}"
+  chmod 0750 "${directory}"
   if stat -c '%a:%u:%g' "${directory}" >/dev/null 2>&1; then
     actual="$(stat -c '%a:%u:%g' "${directory}")"
   else

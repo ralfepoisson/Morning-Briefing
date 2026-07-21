@@ -29,6 +29,30 @@ assert_secret_file_mode /secrets/valid.env
 prepare_runtime_directory /srv/apps/morning-briefing/data/rabbitmq 100 101
 [[ "$(stat -c '%a:%u:%g' /srv/apps/morning-briefing/data/rabbitmq)" == '750:100:101' ]]
 
+if getent passwd 10001 >/dev/null || getent group 10001 >/dev/null; then
+  echo 'numeric runtime ownership fixture unexpectedly has a passwd or group entry' >&2
+  exit 1
+fi
+mkdir -p /strict-bin
+cat > /strict-bin/install <<'INSTALL_WRAPPER'
+#!/usr/bin/env bash
+for argument in "$@"; do
+  case "${argument}" in
+    -o|-g|--owner|--group|--owner=*|--group=*)
+      echo "install: invalid user: '10001'" >&2
+      exit 1
+      ;;
+  esac
+done
+exec /usr/bin/install "$@"
+INSTALL_WRAPPER
+chmod 0755 /strict-bin/install
+original_path="${PATH}"
+PATH="/strict-bin:${PATH}"
+prepare_runtime_directory /srv/apps/morning-briefing/data/audio 10001 10001
+PATH="${original_path}"
+[[ "$(stat -c '%a:%u:%g' /srv/apps/morning-briefing/data/audio)" == '750:10001:10001' ]]
+
 cp /secrets/valid.env /secrets/group-readable.env
 chmod 0640 /secrets/group-readable.env
 if assert_secret_file_mode /secrets/group-readable.env >/dev/null 2>&1; then
@@ -59,4 +83,4 @@ if assert_secret_file_mode /secrets/symlink.env >/dev/null 2>&1; then
 fi
 CONTAINER_TEST
 
-echo 'ok - Linux enforces root-only secrets and the RabbitMQ 0750 UID/GID runtime directory'
+echo 'ok - Linux enforces root-only secrets and account-independent numeric runtime ownership'
