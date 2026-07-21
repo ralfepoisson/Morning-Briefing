@@ -81,7 +81,7 @@ remote_stage="$(ssh personal-projects 'umask 077; mktemp -d "$HOME/.morning-brie
 [[ "${remote_stage}" =~ ^/home/[A-Za-z0-9._-]+/\.morning-briefing-release\.[A-Za-z0-9._-]+$ ]] \
   || die "Remote staging path is unsafe."
 remote_bundle="${remote_stage}/release-bundle.tar.gz"
-rsync -a --chmod=F600 "${bundle_path}" "personal-projects:${remote_bundle}"
+rsync -a --chmod=Fu+rw,Fgo-rwx "${bundle_path}" "personal-projects:${remote_bundle}"
 
 activation_status=0
 ssh personal-projects \

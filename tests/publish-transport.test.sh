@@ -10,6 +10,22 @@ mkdir -p "${FAKE_BIN}"
 touch "${FAKE_LOG}"
 export FAKE_LOG
 
+real_rsync="$(command -v rsync)"
+rsync_mode_arg="$(sed -nE 's/.*rsync -a (--chmod=[^ ]+).*/\1/p' "${ROOT_DIR}/scripts/publish-release.sh")"
+[[ -n "${rsync_mode_arg}" ]] || { echo 'not ok - publisher has no staged-file mode contract' >&2; exit 1; }
+touch "${TEST_TMP}/rsync-source"
+if ! "${real_rsync}" -a "${rsync_mode_arg}" "${TEST_TMP}/rsync-source" "${TEST_TMP}/rsync-destination"; then
+  echo 'not ok - publisher staged-file mode is rejected by the installed rsync' >&2
+  exit 1
+fi
+if stat -f '%Lp' "${TEST_TMP}/rsync-destination" >/dev/null 2>&1; then
+  staged_mode="$(stat -f '%Lp' "${TEST_TMP}/rsync-destination")"
+else
+  staged_mode="$(stat -c '%a' "${TEST_TMP}/rsync-destination")"
+fi
+[[ "${staged_mode}" == 600 ]] || { echo "not ok - portable rsync mode produced ${staged_mode}, not 0600" >&2; exit 1; }
+echo 'ok - installed rsync accepts the publisher mode and creates a 0600 staged file'
+
 cat > "${FAKE_BIN}/git" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -69,7 +85,7 @@ cat > "${FAKE_BIN}/rsync" <<'SH'
 set -euo pipefail
 destination="${!#}"
 printf 'rsync %s\n' "${destination}" >>"${FAKE_LOG}"
-[[ " $* " == *' --chmod=F600 '* ]] || { echo 'staged bundle is not mode 0600' >&2; exit 1; }
+[[ " $* " == *' --chmod=Fu+rw,Fgo-rwx '* ]] || { echo 'staged bundle is not portably restricted to mode 0600' >&2; exit 1; }
 [[ "${destination}" == personal-projects:/home/ralfe/.morning-briefing-release.test-stage/* ]] || {
   echo "rsync destination is not user-owned staging: ${destination}" >&2
   exit 1

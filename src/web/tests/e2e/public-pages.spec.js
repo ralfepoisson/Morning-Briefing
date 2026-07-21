@@ -44,7 +44,9 @@ test.describe('Public pages', () => {
     await page.getByLabel('Message').fill('I would like to learn more about the Daily Briefing product and roadmap.');
     await page.getByRole('button', { name: 'Send message' }).click();
 
-    expect(contactPayload).toEqual({
+    await expect.poll(function () {
+      return contactPayload;
+    }).toEqual({
       name: 'Jane Doe',
       email: 'jane@example.com',
       subject: 'Interested in Daily Briefing',
