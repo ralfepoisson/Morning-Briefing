@@ -100,7 +100,8 @@ grep -q 'OnCalendar=\*-\*-\* 01:00:00 UTC' "${ROOT_DIR}/cicd/host/systemd/mornin
 grep -q 'OnCalendar=\*-\*-\* 05:00:00 UTC' "${ROOT_DIR}/cicd/host/systemd/morning-briefing-dashboard-audio-refresh.timer" || fail "audio timer is not exact"
 echo "ok - exact UTC schedules are preserved"
 
-grep -Fq "install -d -m 0750 -o '#10001' -g '#10001'" "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host data ownership is not expressed as numeric UID/GID"
+grep -Fq 'sudo install -d -m 0750 "${APP_ROOT}/data/audio"' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host data directory is not created securely"
+grep -Fq 'sudo chown 10001:10001 "${APP_ROOT}/data/audio"' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host data ownership is not expressed as numeric UID/GID"
 echo "ok - host data ownership uses numeric UID and GID"
 
 if rg -g '!**/node_modules/**' -e 'AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN).*(printf|echo)' -e 'source .*export_credentials' "${ROOT_DIR}/cicd" "${ROOT_DIR}/scripts" >/dev/null; then
