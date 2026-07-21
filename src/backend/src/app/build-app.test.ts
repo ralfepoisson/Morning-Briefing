@@ -1,6 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildApp } from './build-app.js';
+import { buildApp, checkApplicationReadiness } from './build-app.js';
+
+test('checkApplicationReadiness requires both PostgreSQL and RabbitMQ readiness', async function () {
+  const checks: string[] = [];
+  await checkApplicationReadiness(
+    async () => { checks.push('database'); },
+    async () => { checks.push('broker'); }
+  );
+  assert.deepEqual(checks, ['database', 'broker']);
+});
 
 test('GET /health returns ok', async function () {
   const app = await buildApp();

@@ -18,6 +18,7 @@ import { registerSnapshotRoutes } from '../modules/snapshots/snapshot-routes.js'
 import { registerUserRoutes } from '../modules/users/user-routes.js';
 import { registerWidgetRoutes } from '../modules/widgets/widget-routes.js';
 import { getPrismaClient } from '../infrastructure/prisma/prisma-client.js';
+import { checkRabbitMqReadiness } from '../modules/snapshots/rabbitmq-connection.js';
 
 export type BuildAppOptions = {
   readinessCheck?: () => Promise<void>;
@@ -42,7 +43,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
 
   app.get('/health/ready', async function handleReadiness(_request, reply) {
     try {
-      await (options.readinessCheck || checkDatabaseReadiness)();
+      await (options.readinessCheck || checkApplicationReadiness)();
       return {
         status: 'ready'
       };
@@ -95,6 +96,14 @@ export async function buildApp(options: BuildAppOptions = {}) {
 
 async function checkDatabaseReadiness(): Promise<void> {
   await getPrismaClient().$queryRaw`SELECT 1`;
+}
+
+export async function checkApplicationReadiness(
+  databaseCheck: () => Promise<void> = checkDatabaseReadiness,
+  brokerCheck: () => Promise<void> = checkRabbitMqReadiness
+): Promise<void> {
+  await databaseCheck();
+  await brokerCheck();
 }
 
 function isProtectedApiRoute(url: string): boolean {

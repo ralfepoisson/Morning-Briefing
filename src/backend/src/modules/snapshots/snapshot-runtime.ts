@@ -11,13 +11,13 @@ import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
 import { OpenMeteoWeatherClient } from './open-meteo-weather-client.js';
 import { PrismaSnapshotRepository } from './prisma-snapshot-repository.js';
 import { HttpRssFeedClient } from './rss-feed-client.js';
-import { getSnapshotQueueConfig } from './snapshot-queue-config.js';
-import { createSnapshotSqsClient } from './snapshot-sqs-client.js';
+import { getMessageBrokerConfig } from './message-broker-config.js';
 import { SnapshotJobProcessor } from './snapshot-job-processor.js';
 import { QueueJobProcessor } from './queue-job-processor.js';
 import type { SnapshotJobPublisher } from './snapshot-job-publisher.js';
 import { SnapshotService } from './snapshot-service.js';
-import { SqsSnapshotJobPublisher, NoopSnapshotJobPublisher } from './sqs-snapshot-job-publisher.js';
+import { RabbitMqSnapshotJobPublisher, NoopSnapshotJobPublisher } from './rabbitmq-snapshot-job-publisher.js';
+import { ConnectedRabbitMqJobPublisher } from './rabbitmq-job-publisher.js';
 import { TodoistTaskClientImpl } from './todoist-task-client.js';
 import { NightlyRefreshService } from './nightly-refresh-service.js';
 import { XkcdClientImpl } from './xkcd-client.js';
@@ -66,13 +66,13 @@ export function createSnapshotService(): SnapshotService {
 }
 
 export function createSnapshotJobPublisherFromEnvironment(): SnapshotJobPublisher {
-  const config = getSnapshotQueueConfig();
+  const config = getMessageBrokerConfig();
 
-  if (!config.enabled || !config.queueUrl) {
+  if (!config.enabled || !config.url) {
     return new NoopSnapshotJobPublisher();
   }
 
-  return new SqsSnapshotJobPublisher(createSnapshotSqsClient(), config.queueUrl);
+  return new RabbitMqSnapshotJobPublisher(new ConnectedRabbitMqJobPublisher(config));
 }
 
 export function createSnapshotJobProcessor(): SnapshotJobProcessor {

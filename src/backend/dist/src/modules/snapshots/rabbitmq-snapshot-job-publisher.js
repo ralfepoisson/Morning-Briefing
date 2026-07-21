@@ -1,12 +1,9 @@
-import { SendMessageCommand } from '@aws-sdk/client-sqs';
 import { logSnapshotJob } from './snapshot-job-logger.js';
 import { createSnapshotJobId, buildSnapshotJobIdempotencyKey } from './snapshot-job-utils.js';
-export class SqsSnapshotJobPublisher {
-    sqs;
-    queueUrl;
-    constructor(sqs, queueUrl) {
-        this.sqs = sqs;
-        this.queueUrl = queueUrl;
+export class RabbitMqSnapshotJobPublisher {
+    broker;
+    constructor(broker) {
+        this.broker = broker;
     }
     async publishGenerateWidgetSnapshot(input) {
         const requestedAt = input.requestedAt || new Date();
@@ -39,10 +36,7 @@ export class SqsSnapshotJobPublisher {
             type: 'GenerateWidgetSnapshotRequested',
             payload
         };
-        await this.sqs.send(new SendMessageCommand({
-            QueueUrl: this.queueUrl,
-            MessageBody: JSON.stringify(message)
-        }));
+        await this.broker.publish(message, payload.jobId);
         logSnapshotJob('info', 'snapshot_job_enqueued', {
             jobId: payload.jobId,
             idempotencyKey: payload.idempotencyKey,
@@ -83,7 +77,7 @@ export class NoopSnapshotJobPublisher {
             requestedAt: requestedAt.toISOString()
         };
         logSnapshotJob('info', 'snapshot_job_enqueue_skipped', {
-            reason: 'queue_disabled',
+            reason: 'broker_disabled',
             jobId: payload.jobId,
             idempotencyKey: payload.idempotencyKey,
             widgetId: payload.widgetId,

@@ -1,10 +1,9 @@
-import { GetQueueAttributesCommand, type SQSClient } from '@aws-sdk/client-sqs';
 import type { PrismaClient } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
 import { DefaultUserService } from '../default-user/default-user-service.js';
-import { createSnapshotSqsClient } from '../snapshots/snapshot-sqs-client.js';
-import { getSnapshotQueueConfig } from '../snapshots/snapshot-queue-config.js';
+import { getMessageBrokerConfig } from '../snapshots/message-broker-config.js';
+import { readRabbitMqQueueStats } from '../snapshots/rabbitmq-connection.js';
 import { getWidgetDefinition } from '../widgets/widget-definitions.js';
 
 type MessageBrokerRouteDependencies = {
@@ -12,8 +11,8 @@ type MessageBrokerRouteDependencies = {
     PrismaClient,
     '$queryRaw' | 'snapshotGenerationJob'
   >;
-  sqs: Pick<SQSClient, 'send'> | null;
-  queueConfig: ReturnType<typeof getSnapshotQueueConfig>;
+  brokerProbe: { check(): Promise<{ readyMessages: number; retryMessages: number; deadLetterMessages: number; consumerCount: number }> } | null;
+  brokerConfig: ReturnType<typeof getMessageBrokerConfig>;
   defaultUserService: Pick<DefaultUserService, 'getDefaultUser'>;
 };
 
@@ -85,7 +84,7 @@ export async function registerMessageBrokerRoutes(
       }),
       listChartRows(dependencies.prisma),
       countTodayStatuses(dependencies.prisma),
-      loadQueueStats(dependencies.sqs, dependencies.queueConfig)
+      loadQueueStats(dependencies.brokerProbe, dependencies.brokerConfig)
     ]);
 
     return {
@@ -111,12 +110,12 @@ export async function registerMessageBrokerRoutes(
 
 function createMessageBrokerRouteDependencies(): MessageBrokerRouteDependencies {
   const prisma = getPrismaClient();
-  const queueConfig = getSnapshotQueueConfig();
+  const brokerConfig = getMessageBrokerConfig();
 
   return {
     prisma,
-    sqs: queueConfig.enabled && queueConfig.queueUrl ? createSnapshotSqsClient() : null,
-    queueConfig,
+    brokerProbe: brokerConfig.enabled && brokerConfig.url ? { check: () => readRabbitMqQueueStats() } : null,
+    brokerConfig,
     defaultUserService: new DefaultUserService(prisma)
   };
 }
@@ -214,51 +213,42 @@ async function listChartRows(prisma: MessageBrokerRouteDependencies['prisma']): 
 }
 
 async function loadQueueStats(
-  sqs: Pick<SQSClient, 'send'> | null,
-  queueConfig: ReturnType<typeof getSnapshotQueueConfig>
+  brokerProbe: MessageBrokerRouteDependencies['brokerProbe'],
+  brokerConfig: ReturnType<typeof getMessageBrokerConfig>
 ): Promise<{
   enabled: boolean;
   queueName: string;
-  queueUrl: string | null;
   status: 'connected' | 'disabled' | 'unconfigured' | 'error';
   visibleMessages: number | null;
   inFlightMessages: number | null;
   delayedMessages: number | null;
+  deadLetterMessages: number | null;
+  consumerCount: number | null;
   totalMessages: number | null;
   lastError: string | null;
 }> {
-  if (!queueConfig.enabled) {
-    return buildQueueStats('disabled', queueConfig, null, null);
+  if (!brokerConfig.enabled) {
+    return buildQueueStats('disabled', brokerConfig, null, null);
   }
 
-  if (!queueConfig.queueUrl || !sqs) {
-    return buildQueueStats('unconfigured', queueConfig, null, null);
+  if (!brokerConfig.url || !brokerProbe) {
+    return buildQueueStats('unconfigured', brokerConfig, null, null);
   }
 
   try {
-    const response = await sqs.send(new GetQueueAttributesCommand({
-      QueueUrl: queueConfig.queueUrl,
-      AttributeNames: [
-        'ApproximateNumberOfMessages',
-        'ApproximateNumberOfMessagesNotVisible',
-        'ApproximateNumberOfMessagesDelayed'
-      ]
-    }));
-
-    const visibleMessages = Number(response.Attributes?.ApproximateNumberOfMessages || 0);
-    const inFlightMessages = Number(response.Attributes?.ApproximateNumberOfMessagesNotVisible || 0);
-    const delayedMessages = Number(response.Attributes?.ApproximateNumberOfMessagesDelayed || 0);
-
-    return buildQueueStats('connected', queueConfig, {
-      visibleMessages,
-      inFlightMessages,
-      delayedMessages,
-      totalMessages: visibleMessages + inFlightMessages + delayedMessages
+    const counts = await brokerProbe.check();
+    return buildQueueStats('connected', brokerConfig, {
+      visibleMessages: counts.readyMessages,
+      inFlightMessages: null,
+      delayedMessages: counts.retryMessages,
+      deadLetterMessages: counts.deadLetterMessages,
+      consumerCount: counts.consumerCount,
+      totalMessages: counts.readyMessages + counts.retryMessages
     }, null);
   } catch (error) {
     return buildQueueStats(
       'error',
-      queueConfig,
+      brokerConfig,
       null,
       error instanceof Error ? error.message : 'Unable to read queue attributes.'
     );
@@ -267,23 +257,26 @@ async function loadQueueStats(
 
 function buildQueueStats(
   status: 'connected' | 'disabled' | 'unconfigured' | 'error',
-  queueConfig: ReturnType<typeof getSnapshotQueueConfig>,
+  brokerConfig: ReturnType<typeof getMessageBrokerConfig>,
   counts: {
     visibleMessages: number;
-    inFlightMessages: number;
+    inFlightMessages: number | null;
     delayedMessages: number;
+    deadLetterMessages: number;
+    consumerCount: number;
     totalMessages: number;
   } | null,
   lastError: string | null
 ) {
   return {
-    enabled: queueConfig.enabled,
-    queueName: queueConfig.queueName,
-    queueUrl: queueConfig.queueUrl,
+    enabled: brokerConfig.enabled,
+    queueName: brokerConfig.queue,
     status,
     visibleMessages: counts ? counts.visibleMessages : null,
     inFlightMessages: counts ? counts.inFlightMessages : null,
     delayedMessages: counts ? counts.delayedMessages : null,
+    deadLetterMessages: counts ? counts.deadLetterMessages : null,
+    consumerCount: counts ? counts.consumerCount : null,
     totalMessages: counts ? counts.totalMessages : null,
     lastError
   };

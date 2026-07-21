@@ -1,5 +1,5 @@
 import { logApplicationEvent, toLogErrorContext } from '../admin/application-logger.js';
-import { getSnapshotQueueConfig } from '../snapshots/snapshot-queue-config.js';
+import { getMessageBrokerConfig } from '../snapshots/message-broker-config.js';
 export class DashboardBriefingJobProcessor {
     repository;
     service;
@@ -9,7 +9,7 @@ export class DashboardBriefingJobProcessor {
     }
     async process(message) {
         const payload = parseGenerateDashboardAudioBriefingMessage(message.body);
-        const leaseExpiresAt = new Date(Date.now() + getSnapshotQueueConfig().jobLeaseSeconds * 1000);
+        const leaseExpiresAt = new Date(Date.now() + getMessageBrokerConfig().jobLeaseSeconds * 1000);
         const claim = await this.repository.claimDashboardBriefingJob(payload, message.messageId || message.receiptHandle || null, leaseExpiresAt);
         if (claim.status !== 'claimed') {
             return claim.status === 'already_processing' ? 'retry' : 'skipped';
@@ -24,7 +24,7 @@ export class DashboardBriefingJobProcessor {
                 dashboardId: payload.dashboardId,
                 ownerUserId: payload.ownerUserId,
                 force: payload.force,
-                sqsMessageId: message.messageId || null
+                brokerMessageId: message.messageId || null
             }
         });
         try {

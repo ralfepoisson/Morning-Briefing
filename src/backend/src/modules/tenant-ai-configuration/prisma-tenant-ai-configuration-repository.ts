@@ -9,6 +9,13 @@ export class PrismaTenantAiConfigurationRepository implements TenantAiConfigurat
     const record = await this.prisma.tenantAiConfiguration.findUnique({
       where: {
         tenantId
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        openAiModel: true,
+        createdAt: true,
+        updatedAt: true
       }
     });
 
@@ -17,7 +24,6 @@ export class PrismaTenantAiConfigurationRepository implements TenantAiConfigurat
 
   async upsertByTenantId(input: {
     tenantId: string;
-    openAiApiKey: string | null;
     openAiModel: string;
   }): Promise<TenantAiConfigurationRecord> {
     const record = await this.prisma.tenantAiConfiguration.upsert({
@@ -25,13 +31,18 @@ export class PrismaTenantAiConfigurationRepository implements TenantAiConfigurat
         tenantId: input.tenantId
       },
       update: {
-        openAiApiKey: input.openAiApiKey,
         openAiModel: input.openAiModel
       },
       create: {
         tenantId: input.tenantId,
-        openAiApiKey: input.openAiApiKey,
         openAiModel: input.openAiModel
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        openAiModel: true,
+        createdAt: true,
+        updatedAt: true
       }
     });
 
@@ -42,7 +53,6 @@ export class PrismaTenantAiConfigurationRepository implements TenantAiConfigurat
 function mapRecord(record: {
   id: string;
   tenantId: string;
-  openAiApiKey: string | null;
   openAiModel: string;
   createdAt: Date;
   updatedAt: Date;
@@ -50,7 +60,6 @@ function mapRecord(record: {
   return {
     id: record.id,
     tenantId: record.tenantId,
-    openAiApiKey: record.openAiApiKey,
     openAiModel: record.openAiModel,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt

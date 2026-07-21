@@ -5,12 +5,9 @@ Parameters:
   HostRoleName:
     Type: String
     Default: personal-projects-consolidation-host
-  DatabaseSecretArn:
+  ExistingLogGroupName:
     Type: String
-  GoogleClientSecretArn:
-    Type: String
-  GoogleStateSecretArn:
-    Type: String
+    Default: /personal-projects/morning-briefing
 
 Resources:
   BackendRepository:
@@ -43,29 +40,6 @@ Resources:
         LifecyclePolicyText: |
           {"rules":[{"rulePriority":1,"description":"Retain the newest 12 release images","selection":{"tagStatus":"tagged","tagPrefixList":["git-"],"countType":"imageCountMoreThan","countNumber":12},"action":{"type":"expire"}}]}
 
-  SnapshotDeadLetterQueue:
-    Type: AWS::SQS::Queue
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      QueueName: morning-briefing-prod-snapshot-jobs-dlq
-      MessageRetentionPeriod: 1209600
-      SqsManagedSseEnabled: true
-
-  SnapshotQueue:
-    Type: AWS::SQS::Queue
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      QueueName: morning-briefing-prod-snapshot-jobs
-      MessageRetentionPeriod: 345600
-      ReceiveMessageWaitTimeSeconds: 10
-      VisibilityTimeout: 120
-      SqsManagedSseEnabled: true
-      RedrivePolicy:
-        deadLetterTargetArn: !GetAtt SnapshotDeadLetterQueue.Arn
-        maxReceiveCount: 5
-
   HostApplicationPolicy:
     Type: AWS::IAM::Policy
     Properties:
@@ -89,30 +63,13 @@ Resources:
             Resource:
               - !GetAtt BackendRepository.Arn
               - !GetAtt FrontendRepository.Arn
-          - Sid: ProcessSnapshotQueue
+          - Sid: WriteApplicationLogs
             Effect: Allow
             Action:
-              - sqs:SendMessage
-              - sqs:ReceiveMessage
-              - sqs:DeleteMessage
-              - sqs:ChangeMessageVisibility
-              - sqs:GetQueueAttributes
-              - sqs:GetQueueUrl
-            Resource: !GetAtt SnapshotQueue.Arn
-          - Sid: InspectDeadLetterQueue
-            Effect: Allow
-            Action:
-              - sqs:GetQueueAttributes
-              - sqs:GetQueueUrl
-            Resource: !GetAtt SnapshotDeadLetterQueue.Arn
-          - Sid: ReadApplicationSecrets
-            Effect: Allow
-            Action:
-              - secretsmanager:GetSecretValue
+              - logs:CreateLogStream
+              - logs:PutLogEvents
             Resource:
-              - !Ref DatabaseSecretArn
-              - !Ref GoogleClientSecretArn
-              - !Ref GoogleStateSecretArn
+              - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ExistingLogGroupName}:*
           - Sid: SynthesizeBriefingAudio
             Effect: Allow
             Action:
@@ -120,7 +77,5 @@ Resources:
             Resource: '*'
 
 Outputs:
-  SnapshotQueueUrl:
-    Value: !Ref SnapshotQueue
-  SnapshotDeadLetterQueueUrl:
-    Value: !Ref SnapshotDeadLetterQueue
+  ExistingLogGroupName:
+    Value: !Ref ExistingLogGroupName

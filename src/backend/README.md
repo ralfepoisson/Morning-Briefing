@@ -31,46 +31,42 @@ Default values assume:
 - After the initial migration exists, future schema changes should be made by editing `prisma/schema.prisma` and generating a new named migration.
 - `reference:import:cities` downloads the GeoNames `cities5000` dataset and imports it into `reference_cities` for weather widget location search.
 
-## Snapshot Queue Architecture
+## Durable Message Broker Architecture
 
-- Widget updates publish `GenerateWidgetSnapshotRequested` commands to SQS.
-- Admin dashboard audio regeneration publishes `GenerateDashboardAudioBriefingRequested` commands to the same SQS queue.
+- Widget updates publish persistent `GenerateWidgetSnapshotRequested` commands to RabbitMQ and wait for publisher confirms.
+- Admin dashboard audio regeneration publishes `GenerateDashboardAudioBriefingRequested` commands to the same durable exchange.
 - The queue carries commands only, never snapshot payloads.
-- A worker consumes messages, routes them by command type, generates widget snapshots or dashboard audio briefings, and persists the resulting state.
-- EventBridge Scheduler is expected to invoke the nightly enqueue handler, which enumerates eligible widgets and pushes one command per widget to SQS.
-- Failed deliveries retry through the source queue until SQS redrives them to the DLQ.
+- A separate worker uses bounded prefetch and manual acknowledgements, routes commands by type, and persists widget snapshots or dashboard audio briefings.
+- Host systemd timers invoke one-shot Compose services at `01:00` and `05:00` UTC after the approved legacy-writer handoff.
+- Retryable failures move through a quorum retry queue with TTL backoff. A monotonic application retry header enforces the configured attempt bound before the terminal quorum DLQ.
 
 ### Design choices
 
-- Queue type: SQS Standard
+- Queue type: RabbitMQ durable quorum main, retry, and dead-letter queues
 - Idempotency key: `widgetId:snapshotDate:widgetConfigHash`
 - Stale detection: compare the message's `widgetConfigVersion` and `widgetConfigHash` against the current widget row at processing time
 - Persisted widget job state: `snapshot_generation_jobs`
 - Persisted dashboard-audio job state: `dashboard_briefing_generation_jobs`
 - Processing leases allow abandoned `PROCESSING` work to be recovered after a worker failure
 - Deleted or hidden widgets: worker marks the job as skipped
-- Retry policy: infrastructure or unexpected failures throw so SQS retries; domain/config/provider failures are persisted as failed snapshots and the job is marked completed
+- Retry policy: confirmed forwarding to the retry queue precedes source acknowledgement; invalid or exhausted deliveries are confirmed into the DLQ; PostgreSQL job rows remain authoritative for idempotency and processing leases
 
-## Local Development With LocalStack
+## Local Development With RabbitMQ
 
-Set these variables in `src/backend/.env` when using LocalStack:
+Start a local RabbitMQ instance, then set at least these variables in `src/backend/.env`:
 
-- `SNAPSHOT_QUEUE_ENABLED=true`
-- `AWS_ENDPOINT_URL_SQS=http://127.0.0.1:4566`
-- `AWS_ACCESS_KEY_ID=test`
-- `AWS_SECRET_ACCESS_KEY=test`
+- `MESSAGE_BROKER_ENABLED=true`
+- `MESSAGE_BROKER_URL=amqp://<local-user>:<local-password>@127.0.0.1:5672`
 
-Then bootstrap the queues and capture the generated queue URL:
+Declare the durable topology:
 
-- `npm run snapshot:queues:setup`
-
-Copy the reported queue URL into `SNAPSHOT_QUEUE_URL`.
+- `npm run message-broker:setup`
 
 ### Run the worker locally
 
 - `npm run snapshot:worker`
 
-The worker long-polls SQS, processes available widget snapshot and dashboard audio jobs, and leaves failed messages for retry/DLQ handling.
+The worker consumes RabbitMQ deliveries and acknowledges them only after successful processing or confirmed retry/dead-letter forwarding.
 
 For normal local app startup, `./scripts/start_backend.sh` now enables the local worker inside the backend dev process by default, so a separate worker terminal is optional unless you want one explicitly.
 
@@ -98,16 +94,12 @@ When started through `./scripts/start_scheduler.sh`, output is written to `src/b
 
 ## Environment Variables
 
-- `SNAPSHOT_QUEUE_ENABLED`: toggles queue publishing
-- `SNAPSHOT_QUEUE_URL`: source queue URL used by publishers and the local worker
-- `SNAPSHOT_QUEUE_NAME`: queue name used by the setup script
-- `SNAPSHOT_DLQ_NAME`: DLQ name used by the setup script
-- `SNAPSHOT_QUEUE_MAX_RECEIVE_COUNT`: max receives before redrive to DLQ
-- `SNAPSHOT_WORKER_WAIT_TIME_SECONDS`: SQS long-poll duration
-- `SNAPSHOT_WORKER_VISIBILITY_TIMEOUT_SECONDS`: worker visibility timeout
-- `SNAPSHOT_WORKER_MAX_MESSAGES`: batch size for local polling
-- `SNAPSHOT_WORKER_POLL_INTERVAL_MS`: loop delay between local polls
-- `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL_SQS`: AWS/LocalStack connection settings
+- `MESSAGE_BROKER_ENABLED`: toggles broker publishing and readiness
+- `MESSAGE_BROKER_URL`: secret AMQP connection URL supplied through a protected env file in production
+- `MESSAGE_BROKER_EXCHANGE`, `MESSAGE_BROKER_QUEUE`, `MESSAGE_BROKER_RETRY_QUEUE`, `MESSAGE_BROKER_DLQ`: durable topology names
+- `MESSAGE_BROKER_RETRY_DELAY_MS`, `MESSAGE_BROKER_MAX_ATTEMPTS`: retry backoff and terminal attempt bound
+- `MESSAGE_BROKER_PREFETCH`, `MESSAGE_BROKER_RECONNECT_DELAY_MS`: worker flow control and reconnect delay
+- `SNAPSHOT_JOB_LEASE_SECONDS`: PostgreSQL processing-lease duration
 
 ## Observability
 
@@ -152,10 +144,7 @@ Audio Briefing is a dashboard-level derived artifact. It is not stored as a widg
 
 Shared AI settings are now tenant-scoped and edited from `Admin > Configuration`.
 
-For the MVP, the admin page stores:
-
-- the shared OpenAI API key
-- the shared OpenAI model
+The admin page stores only the non-secret shared OpenAI model. `OPENAI_API_KEY` is supplied to backend and worker processes through root-owned mode-`0600` environment files outside immutable releases; the browser and API never accept or return its value.
 
 That shared OpenAI configuration is used by:
 

@@ -1,5 +1,5 @@
 import { logSnapshotJob } from './snapshot-job-logger.js';
-import { getSnapshotQueueConfig } from './snapshot-queue-config.js';
+import { getMessageBrokerConfig } from './message-broker-config.js';
 export class SnapshotJobProcessor {
     repository;
     snapshotService;
@@ -16,9 +16,9 @@ export class SnapshotJobProcessor {
             dashboardId: payload.dashboardId,
             snapshotDate: payload.snapshotDate,
             triggerSource: payload.triggerSource,
-            sqsMessageId: message.messageId || null
+            brokerMessageId: message.messageId || null
         });
-        const leaseExpiresAt = new Date(Date.now() + getSnapshotQueueConfig().jobLeaseSeconds * 1000);
+        const leaseExpiresAt = new Date(Date.now() + getMessageBrokerConfig().jobLeaseSeconds * 1000);
         const claim = await this.repository.claimSnapshotJob(payload, message.messageId || message.receiptHandle || null, leaseExpiresAt);
         if (claim.status !== 'claimed') {
             logSnapshotJob('info', 'snapshot_job_duplicate_skipped', {

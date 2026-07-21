@@ -27,7 +27,7 @@ module.exports = defineConfig({
   ],
   webServer: [
     {
-      command: `env PORT=${backendPort} SNAPSHOT_QUEUE_ENABLED=false node dist/src/app/server.js`,
+      command: `env PORT=${backendPort} MESSAGE_BROKER_ENABLED=false node dist/src/app/server.js`,
       url: `http://127.0.0.1:${backendPort}/health`,
       reuseExistingServer: false,
       timeout: 600000,

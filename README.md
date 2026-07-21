@@ -240,13 +240,20 @@ Why PostgreSQL:
 ### Secrets management
 
 - environment variables for local development
-- Vault / cloud secret manager / encrypted secret store for production
+- production application secrets are injected as environment variables from root-owned mode-`0600` files outside immutable release directories
+- `OPENAI_API_KEY`, database credentials, broker credentials, OAuth material, JWT verification material, and delivery-provider credentials must never be committed, baked into images, written to release manifests, or printed to logs
+- the root-only legacy OpenAI cutover utility validates the single database value, takes a checksummed backup, atomically installs protected backend/worker environment files, verifies application status semantics, and only then clears the deprecated database column
+- the legacy tenant AI configuration database column is retained only for schema compatibility and migration safety; runtime code must not read API keys from it
+- Vault or a cloud secret manager remains a future alternative to the protected host files
 
 ### Hosting
 
 - Local development uses containerised dependencies and local application processes.
 - The production target is immutable ARM64 Docker Compose releases on the private consolidated personal-projects EC2 host, with Apache behind the shared TLS/WAF-protected ALB.
-- Backend and worker remain separate processes, PostgreSQL joins an external protected Docker network, and durable SQS/DLQ job handling is retained.
+- Backend and worker remain separate processes, PostgreSQL joins an external protected Docker network, and an on-host RabbitMQ broker provides durable quorum job, retry, and dead-letter queues.
+- RabbitMQ delivery is at least once: publishers use persistent mandatory messages and publisher confirms, while the worker uses manual acknowledgements, bounded retry backoff, and PostgreSQL idempotency/processing leases.
+- Container logs use Docker's `awslogs` driver with distinct service stream prefixes in the existing retained seven-day `/personal-projects/morning-briefing` group; this project does not create the group or manage its retention.
+- The frontend is already built and served as an immutable Docker image. Any bucket named by the legacy CloudFormation deployment tooling is a deployment-packaging bucket, not the live UI origin or a replacement for the frontend container.
 - The current ECS/Fargate deployment and drifted CloudFormation stack are legacy rollback surfaces until an explicitly approved cutover and retirement phase.
 - See `docs/deployment_approach.md` for the release, migration, health, and rollback gates.
 

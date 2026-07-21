@@ -18,7 +18,7 @@ describe('admin route controller', function () {
     await admin.loadDashboards();
     await admin.regenerateDashboardAudio('d1');
     await admin.loadConfiguration();
-    await admin.updateConfiguration({ openAiApiKey: 'replacement', openAiModel: 'gpt-5-mini' });
+    await admin.updateConfiguration({ openAiModel: 'gpt-5-mini' });
     await admin.loadConnectorInventory();
     await admin.loadWidgets();
     await admin.regenerateWidget('w1');
@@ -32,6 +32,7 @@ describe('admin route controller', function () {
       '/admin/widgets/regenerate-all-snapshots', '/admin/logs?q=failed&levels=error&limit=50&range=24h'
     ]);
     expect(JSON.parse(String(calls[2]?.init?.body))).toEqual({ isAdmin: true });
+    expect(JSON.parse(String(calls[6]?.init?.body))).toEqual({ openAiModel: 'gpt-5-mini' });
     expect(JSON.parse(String(calls[9]?.init?.body))).toEqual({ bypassDuplicateCheck: true });
     expect(context.notify).toHaveBeenCalled();
   });

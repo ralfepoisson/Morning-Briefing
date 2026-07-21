@@ -1,14 +1,12 @@
-import { SendMessageCommand, type SQSClient } from '@aws-sdk/client-sqs';
 import { logSnapshotJob } from './snapshot-job-logger.js';
 import type { SnapshotJobPublisher, PublishWidgetSnapshotJobInput } from './snapshot-job-publisher.js';
 import type { GenerateWidgetSnapshotEnvelope, GenerateWidgetSnapshotRequested } from './snapshot-job-types.js';
 import { createSnapshotJobId, buildSnapshotJobIdempotencyKey } from './snapshot-job-utils.js';
 
-export class SqsSnapshotJobPublisher implements SnapshotJobPublisher {
-  constructor(
-    private readonly sqs: Pick<SQSClient, 'send'>,
-    private readonly queueUrl: string
-  ) {}
+type BrokerPublisher = { publish(envelope: unknown, messageId: string): Promise<void> };
+
+export class RabbitMqSnapshotJobPublisher implements SnapshotJobPublisher {
+  constructor(private readonly broker: BrokerPublisher) {}
 
   async publishGenerateWidgetSnapshot(input: PublishWidgetSnapshotJobInput): Promise<GenerateWidgetSnapshotRequested> {
     const requestedAt = input.requestedAt || new Date();
@@ -41,12 +39,7 @@ export class SqsSnapshotJobPublisher implements SnapshotJobPublisher {
       type: 'GenerateWidgetSnapshotRequested',
       payload
     };
-
-    await this.sqs.send(new SendMessageCommand({
-      QueueUrl: this.queueUrl,
-      MessageBody: JSON.stringify(message)
-    }));
-
+    await this.broker.publish(message, payload.jobId);
     logSnapshotJob('info', 'snapshot_job_enqueued', {
       jobId: payload.jobId,
       idempotencyKey: payload.idempotencyKey,
@@ -55,7 +48,6 @@ export class SqsSnapshotJobPublisher implements SnapshotJobPublisher {
       snapshotDate: payload.snapshotDate,
       triggerSource: payload.triggerSource
     });
-
     return payload;
   }
 }
@@ -88,9 +80,8 @@ export class NoopSnapshotJobPublisher implements SnapshotJobPublisher {
       causationId: input.causationId || null,
       requestedAt: requestedAt.toISOString()
     };
-
     logSnapshotJob('info', 'snapshot_job_enqueue_skipped', {
-      reason: 'queue_disabled',
+      reason: 'broker_disabled',
       jobId: payload.jobId,
       idempotencyKey: payload.idempotencyKey,
       widgetId: payload.widgetId,
@@ -98,7 +89,6 @@ export class NoopSnapshotJobPublisher implements SnapshotJobPublisher {
       snapshotDate: payload.snapshotDate,
       triggerSource: payload.triggerSource
     });
-
     return payload;
   }
 }

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { getPrismaClient } from '../../infrastructure/prisma/prisma-client.js';
-import { createSnapshotSqsClient } from '../snapshots/snapshot-sqs-client.js';
-import { getSnapshotQueueConfig } from '../snapshots/snapshot-queue-config.js';
+import { getMessageBrokerConfig } from '../snapshots/message-broker-config.js';
+import { ConnectedRabbitMqJobPublisher } from '../snapshots/rabbitmq-job-publisher.js';
 import { PrismaTenantAiConfigurationRepository } from '../tenant-ai-configuration/prisma-tenant-ai-configuration-repository.js';
 import { TenantAiConfigurationService } from '../tenant-ai-configuration/tenant-ai-configuration-service.js';
 import { DashboardBriefingAggregationService } from './dashboard-briefing-aggregation-service.js';
@@ -12,7 +12,7 @@ import { DashboardBriefingPromptService } from './dashboard-briefing-prompt-serv
 import { PrismaDashboardBriefingRepository } from './prisma-dashboard-briefing-repository.js';
 import { ScheduledDashboardBriefingRefreshService } from './scheduled-dashboard-briefing-refresh-service.js';
 import { DashboardBriefingService } from './dashboard-briefing-service.js';
-import { SqsDashboardBriefingJobPublisher } from './sqs-dashboard-briefing-job-publisher.js';
+import { RabbitMqDashboardBriefingJobPublisher } from './rabbitmq-dashboard-briefing-job-publisher.js';
 import { AwsPollyDashboardBriefingTtsProvider, DashboardBriefingTtsService, StubDashboardBriefingTtsProvider } from './dashboard-briefing-tts-service.js';
 export function createDashboardBriefingService() {
     const prisma = getPrismaClient();
@@ -27,11 +27,11 @@ export function createDashboardBriefingService() {
     ]));
 }
 export function createDashboardBriefingJobPublisherFromEnvironment() {
-    const config = getSnapshotQueueConfig();
-    if (!config.enabled || !config.queueUrl) {
+    const config = getMessageBrokerConfig();
+    if (!config.enabled || !config.url) {
         return null;
     }
-    return new SqsDashboardBriefingJobPublisher(createSnapshotSqsClient(), config.queueUrl);
+    return new RabbitMqDashboardBriefingJobPublisher(new ConnectedRabbitMqJobPublisher(config));
 }
 export function createDashboardBriefingJobProcessor() {
     const prisma = getPrismaClient();

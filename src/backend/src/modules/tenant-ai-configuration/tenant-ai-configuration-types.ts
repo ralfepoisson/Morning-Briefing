@@ -9,7 +9,6 @@ export type AvailableOpenAiModel = typeof AVAILABLE_OPENAI_MODELS[number];
 export type TenantAiConfigurationRecord = {
   id: string;
   tenantId: string;
-  openAiApiKey: string | null;
   openAiModel: string;
   createdAt: Date;
   updatedAt: Date;

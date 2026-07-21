@@ -1,4 +1,8 @@
-# AWS Deployment With Serverless
+# Legacy AWS Deployment With Serverless
+
+This directory describes the legacy ECS/Fargate deployment and is retained as a rollback and resource-ownership surface during the consolidated-host migration. It is not the target deployment path. The stack is drifted and must not be updated, removed, or redeployed until its live resources and the externally deleted database have been reconciled.
+
+The Serverless Framework creates or uses a CloudFormation deployment bucket to hold packaged templates and deployment artifacts. That bucket does **not** host the Morning Briefing website. The legacy live UI is the frontend Docker image in ECR, running as the ECS frontend service behind the Application Load Balancer. Do not delete the deployment bucket as “old frontend hosting”; it remains part of the legacy stack's deployment history until the separately approved retirement phase.
 
 This directory provisions the AWS infrastructure for Morning Briefing with the Serverless Framework. The stack creates:
 
@@ -17,6 +21,8 @@ This directory provisions the AWS infrastructure for Morning Briefing with the S
 - VPC, subnets, security groups, and IAM roles required for the above
 
 ## First deployment
+
+The instructions below are historical. Do not run them against the live production account during the consolidated-host cutover.
 
 The deployment flow is intentionally two-phase because the stack itself creates the ECR repositories.
 
@@ -59,3 +65,17 @@ The deploy script will:
 - The deploy script looks up the Route53 hosted zone ID automatically from `HOSTED_ZONE_NAME`.
 - The reference city import downloads the GeoNames `cities5000` dataset from inside the ECS task and can take a few minutes the first time.
 - The initial database password is stored in AWS Secrets Manager for ECS task injection, but the RDS master password is also set from the same deployment input. Rotate it after the first deployment if this environment will be long-lived.
+
+## Consolidated-host cutover boundary
+
+The target host deployment runs immutable ARM64 frontend and backend images with a separate backend worker and a durable private RabbitMQ service. Runtime credentials are supplied from root-owned, root-group, non-symlink `0600` files outside release directories:
+
+- `/srv/apps/morning-briefing/secrets/backend.env`
+- `/srv/apps/morning-briefing/secrets/worker.env`
+- `/srv/apps/morning-briefing/secrets/rabbitmq.env`
+
+Docker sends every service to the existing retained seven-day CloudWatch group `/personal-projects/morning-briefing`, using distinct stream prefixes. All four `*_AWSLOGS_GROUP` release variables should name that group. Morning Briefing infrastructure grants only stream creation and event writes to the supplied group ARN; it must not create the group or change retention.
+
+During an approved cutover, disable EventBridge producers, drain the SQS source queue with the legacy worker, reconcile the DLQ and PostgreSQL job states, then stop the ECS worker before enabling any RabbitMQ-backed host worker or timer. Retain the disabled SQS/DLQ, EventBridge rules, ECS definitions, deployment bucket, and stack for at least fourteen days and until rollback acceptance is explicitly closed. A rollback to the SQS release must first drain or deliberately reconcile RabbitMQ work with original idempotency keys; it must never discard or blindly duplicate pending commands.
+
+The authoritative live procedure, health gates, backup requirements, and rollback constraints are documented in `../../docs/deployment_approach.md`.

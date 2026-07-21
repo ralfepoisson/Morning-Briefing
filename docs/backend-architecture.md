@@ -19,7 +19,7 @@ This document describes the implemented modular backend and its approved target 
 - Database: PostgreSQL
 - Migrations: Prisma Migrate
 - Query layer: Prisma ORM
-- Background jobs: Amazon SQS plus a dedicated worker process; local development can embed the scheduler and worker
+- Background jobs: on-host RabbitMQ plus a dedicated worker process; local development can embed the scheduler and worker
 - Configuration: environment variables with typed config loading
 - Logging: structured JSON logs with request IDs
 
@@ -190,18 +190,24 @@ A typical generation path is:
 
 This model keeps the dashboard editor fast and independent from the timing of data collection.
 
-### Current queue-based implementation
+### Durable broker implementation
 
-The codebase uses a queue-backed generation pipeline:
+The target Compose deployment uses a RabbitMQ-backed generation pipeline:
 
-- widget configuration changes enqueue `GenerateWidgetSnapshotRequested` messages to SQS Standard
+- widget configuration changes enqueue `GenerateWidgetSnapshotRequested` messages through the broker publisher
 - admin widget operations can queue one widget or all eligible widgets for manual snapshot regeneration through the same job pipeline
 - admin dashboard audio regeneration enqueues `GenerateDashboardAudioBriefingRequested` messages to the same queue
-- a dedicated worker process long-polls SQS and handles both widget-snapshot and dashboard-audio commands
+- a dedicated worker process consumes RabbitMQ deliveries and handles both widget-snapshot and dashboard-audio commands
 - in the target production deployment, systemd timers invoke one-shot Compose services that enqueue widget refresh work at `01:00` UTC and dashboard audio work at `05:00` UTC
 - `snapshot_generation_jobs` and `dashboard_briefing_generation_jobs` persist independent idempotency, attempt, duplicate, lease, and failure state
 - workers detect stale widget jobs by comparing the queued widget config version/hash with the current widget row before generating anything
-- a DLQ receives messages that exhaust SQS retries
+- the durable topology consists of a quorum main queue, a quorum retry queue with TTL-based backoff, and a quorum terminal dead-letter queue
+- publishers declare persistent messages as mandatory and wait for publisher confirms; an unroutable or unconfirmed message fails the enqueue operation
+- consumers use bounded prefetch and manual acknowledgements, acknowledging only after a job is processed or safely coalesced
+- retryable failures are dead-lettered to the retry queue, which returns them to the main exchange after its TTL; the worker reads the RabbitMQ `x-death` history and explicitly dead-letters a delivery after the configured bounded attempt count
+- malformed, unsupported, linked, or otherwise unsafe message shapes go directly to the terminal dead-letter queue rather than being acknowledged and discarded
+
+The retry queue is an application topology boundary, not an alternative job ledger. RabbitMQ owns durable delivery and backoff; PostgreSQL remains authoritative for idempotency, attempts, active processing leases, stale widget configuration, and terminal application outcome. Broker redelivery is therefore safe but still at least once, not exactly once.
 
 The logical idempotency key is:
 
@@ -255,7 +261,10 @@ Connectors should be tenant-scoped integrations such as weather, calendar, email
 Secrets should be abstracted behind a `SecretStore` interface:
 
 - local development: `.env` or a local secret file outside source control
-- AWS test/prod: AWS Secrets Manager or SSM Parameter Store
+- production: environment variables loaded from root-owned mode-`0600` files outside release directories
+- future alternative: AWS Secrets Manager, SSM Parameter Store, or another secret store
+
+Production secret inputs include `DATABASE_URL`, `MESSAGE_BROKER_URL`, RabbitMQ bootstrap credentials, OAuth credentials, Life2 JWT verification material, delivery-provider credentials, and `OPENAI_API_KEY`. These values must not appear in Git, image layers, release bundles/manifests, Compose command output, or logs. `tenant_ai_configurations.openai_api_key` remains in the current schema only as a deprecated compatibility column; runtime providers read `OPENAI_API_KEY` from the protected environment and must never read or write that column.
 
 ## Authentication And Multi-Tenancy
 
@@ -282,18 +291,19 @@ Implemented approach:
 - one stateless backend container and a separately restartable worker using the same immutable ARM64 image digest
 - static frontend bundle in a minimal Nginx container
 - PostgreSQL 18.4 on the existing external Docker network `personal-projects-postgresql`
-- Secrets outside the database
-- SQS and DLQ for durable job separation
+- RabbitMQ on the internal application network with persistent host storage and durable quorum main, retry, and dead-letter queues
+- secrets supplied from root-owned mode-`0600` environment files outside releases
 - one-shot Compose commands driven by persistent, non-overlapping systemd timers
 - Apache on host port `8080` proxies `/api/*` to a loopback backend port and all other paths to a loopback frontend port behind the shared ALB/WAF
 - a protected host audio directory mounted into backend and worker at `AUDIO_BRIEFING_STORAGE_DIR`
+- Docker `awslogs` logging with distinct service stream prefixes in the existing retained seven-day `/personal-projects/morning-briefing` group; project infrastructure grants write access but does not create or manage the group
 
 The production database is not owned by the application Compose project and must not publish port 5432 publicly. The restored database was independently verified at 19 tables and 92,767 rows. Migrations run as an explicit one-shot release gate; normal deployment never runs the production seed.
 
 ## Production Process Boundaries
 
-- `backend`: API traffic, OAuth callbacks, audio playback, queue publication, and readiness
-- `worker`: SQS long polling, idempotency/staleness checks, connector/provider work, snapshot persistence, audio generation, and delivery fan-out
+- `backend`: API traffic, OAuth callbacks, audio playback, confirmed broker publication, and readiness checks for PostgreSQL, required configuration, and RabbitMQ when enabled
+- `worker`: RabbitMQ manual-ack consumption, retry/dead-letter routing, idempotency/staleness checks, connector/provider work, snapshot persistence, audio generation, and delivery fan-out
 - `widget-refresh`: one-shot enqueue command `npm run snapshot:refresh:nightly:prod`
 - `dashboard-audio-refresh`: one-shot enqueue command `npm run dashboard-briefing:refresh:scheduled:prod`
 - `migrate`: one-shot `npm run db:deploy`
@@ -302,10 +312,12 @@ Candidate workers and timers stay disabled until the legacy ECS worker and Event
 
 ## Reliability and Storage
 
-- SQS Standard delivery is at least once; the widget and dashboard-audio generation-job tables supply separate idempotency, processing leases, attempt state, duplicate accounting, and stale-config detection.
-- Failed deliveries remain visible for retry and are redriven to the DLQ after the configured receive limit.
-- Backend readiness must check PostgreSQL and required runtime configuration; process liveness alone is insufficient.
+- RabbitMQ delivery is at least once. Durable quorum queues, persistent mandatory publication, publisher confirms, and manual consumer acknowledgements prevent a successful enqueue or completion from being reported before the corresponding durability boundary.
+- Retryable failures pass through a durable TTL retry queue for backoff. The consumer derives the bounded attempt count from trusted `x-death` headers and explicitly routes exhausted or invalid deliveries to the durable terminal DLQ; it never accepts a caller-supplied retry count as authority.
+- The widget and dashboard-audio generation-job tables remain unchanged and supply separate idempotency keys, processing leases, attempt state, duplicate accounting, stale-config detection, and recovery after a worker dies between an external side effect and acknowledgement.
+- Backend readiness must check PostgreSQL, required runtime configuration, and RabbitMQ connectivity/topology when publication is enabled. Worker health must prove a live broker channel and registered consumer rather than merely finding a process name. Process liveness alone is insufficient.
 - Audio bytes live in the protected persistent host mount, while PostgreSQL stores their metadata and relative storage key.
+- RabbitMQ data also lives in a protected persistent host mount and survives container or application-release replacement. Application rollback must not delete or recreate that volume.
 - Audio storage is backed up and must survive replacement of either application container.
 - Releases use digest-pinned ARM64 images and retain prior manifests/digests for rollback.
 

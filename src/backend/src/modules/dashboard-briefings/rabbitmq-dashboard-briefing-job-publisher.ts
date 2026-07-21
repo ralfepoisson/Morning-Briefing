@@ -1,14 +1,12 @@
-import { SendMessageCommand, type SQSClient } from '@aws-sdk/client-sqs';
 import { logApplicationEvent } from '../admin/application-logger.js';
 import { createSnapshotJobId } from '../snapshots/snapshot-job-utils.js';
 import type { GenerateDashboardAudioBriefingEnvelope, GenerateDashboardAudioBriefingRequested } from './dashboard-briefing-job-types.js';
 import type { DashboardBriefingJobPublisher, PublishDashboardAudioBriefingJobInput } from './dashboard-briefing-job-publisher.js';
 
-export class SqsDashboardBriefingJobPublisher implements DashboardBriefingJobPublisher {
-  constructor(
-    private readonly sqs: Pick<SQSClient, 'send'>,
-    private readonly queueUrl: string
-  ) {}
+type BrokerPublisher = { publish(envelope: unknown, messageId: string): Promise<void> };
+
+export class RabbitMqDashboardBriefingJobPublisher implements DashboardBriefingJobPublisher {
+  constructor(private readonly broker: BrokerPublisher) {}
 
   async publishGenerateDashboardAudioBriefing(
     input: PublishDashboardAudioBriefingJobInput
@@ -37,12 +35,7 @@ export class SqsDashboardBriefingJobPublisher implements DashboardBriefingJobPub
       type: 'GenerateDashboardAudioBriefingRequested',
       payload
     };
-
-    await this.sqs.send(new SendMessageCommand({
-      QueueUrl: this.queueUrl,
-      MessageBody: JSON.stringify(message)
-    }));
-
+    await this.broker.publish(message, payload.jobId);
     logApplicationEvent({
       level: 'info',
       scope: 'dashboard-briefing',
@@ -55,7 +48,6 @@ export class SqsDashboardBriefingJobPublisher implements DashboardBriefingJobPub
         force: payload.force
       }
     });
-
     return payload;
   }
 }

@@ -1,12 +1,9 @@
-import { SendMessageCommand } from '@aws-sdk/client-sqs';
 import { logApplicationEvent } from '../admin/application-logger.js';
 import { createSnapshotJobId } from '../snapshots/snapshot-job-utils.js';
-export class SqsDashboardBriefingJobPublisher {
-    sqs;
-    queueUrl;
-    constructor(sqs, queueUrl) {
-        this.sqs = sqs;
-        this.queueUrl = queueUrl;
+export class RabbitMqDashboardBriefingJobPublisher {
+    broker;
+    constructor(broker) {
+        this.broker = broker;
     }
     async publishGenerateDashboardAudioBriefing(input) {
         const requestedAt = input.requestedAt || new Date();
@@ -33,10 +30,7 @@ export class SqsDashboardBriefingJobPublisher {
             type: 'GenerateDashboardAudioBriefingRequested',
             payload
         };
-        await this.sqs.send(new SendMessageCommand({
-            QueueUrl: this.queueUrl,
-            MessageBody: JSON.stringify(message)
-        }));
+        await this.broker.publish(message, payload.jobId);
         logApplicationEvent({
             level: 'info',
             scope: 'dashboard-briefing',

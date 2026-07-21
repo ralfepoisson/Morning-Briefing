@@ -82,31 +82,32 @@ test('GET /api/v1/admin/message-broker returns queue metrics, chart data, and re
         }
       }
     }),
-    sqs: {
-      async send() {
+    brokerProbe: {
+      async check() {
         return {
-          Attributes: {
-            ApproximateNumberOfMessages: '7',
-            ApproximateNumberOfMessagesNotVisible: '2',
-            ApproximateNumberOfMessagesDelayed: '1'
-          }
+          readyMessages: 7,
+          retryMessages: 1,
+          deadLetterMessages: 3,
+          consumerCount: 1
         };
       }
     },
-    queueConfig: {
+    brokerConfig: {
       enabled: true,
-      queueUrl: 'http://localhost:4566/000000000000/morning-briefing-snapshot-jobs',
-      queueName: 'morning-briefing-snapshot-jobs',
-      dlqName: 'morning-briefing-snapshot-jobs-dlq',
-      awsRegion: 'eu-west-3',
-      awsEndpointUrl: 'http://localhost:4566',
-      workerWaitTimeSeconds: 10,
-      workerVisibilityTimeoutSeconds: 60,
-      workerVisibilityHeartbeatSeconds: 30,
+      url: 'amqp://user:secret@rabbitmq:5672',
+      exchange: 'morning-briefing.jobs',
+      queue: 'morning-briefing.jobs',
+      retryQueue: 'morning-briefing.jobs.retry',
+      dlq: 'morning-briefing.jobs.dlq',
+      mainRoutingKey: 'jobs',
+      retryRoutingKey: 'retry',
+      deadLetterRoutingKey: 'dead',
+      retryDelayMs: 30000,
+      maxAttempts: 5,
+      prefetch: 5,
+      reconnectDelayMs: 1000,
       jobLeaseSeconds: 300,
-      workerMaxMessages: 5,
-      workerPollIntervalMs: 1000,
-      queueMaxReceiveCount: 5
+      workerHealthFile: '/tmp/worker-ready'
     },
     defaultUserService: {
       async getDefaultUser() {
@@ -133,13 +134,14 @@ test('GET /api/v1/admin/message-broker returns queue metrics, chart data, and re
     assert.deepEqual(response.json(), {
       queue: {
         enabled: true,
-        queueName: 'morning-briefing-snapshot-jobs',
-        queueUrl: 'http://localhost:4566/000000000000/morning-briefing-snapshot-jobs',
+        queueName: 'morning-briefing.jobs',
         status: 'connected',
         visibleMessages: 7,
-        inFlightMessages: 2,
+        inFlightMessages: null,
         delayedMessages: 1,
-        totalMessages: 10,
+        deadLetterMessages: 3,
+        consumerCount: 1,
+        totalMessages: 8,
         lastError: null
       },
       overview: {
@@ -205,21 +207,23 @@ test('GET /api/v1/admin/message-broker reports an unconfigured queue when no que
         }
       }
     }),
-    sqs: null,
-    queueConfig: {
+    brokerProbe: null,
+    brokerConfig: {
       enabled: true,
-      queueUrl: null,
-      queueName: 'morning-briefing-snapshot-jobs',
-      dlqName: 'morning-briefing-snapshot-jobs-dlq',
-      awsRegion: 'eu-west-3',
-      awsEndpointUrl: null,
-      workerWaitTimeSeconds: 10,
-      workerVisibilityTimeoutSeconds: 60,
-      workerVisibilityHeartbeatSeconds: 30,
+      url: null,
+      exchange: 'morning-briefing.jobs',
+      queue: 'morning-briefing-snapshot-jobs',
+      retryQueue: 'morning-briefing-snapshot-jobs-retry',
+      dlq: 'morning-briefing-snapshot-jobs-dlq',
+      mainRoutingKey: 'jobs',
+      retryRoutingKey: 'retry',
+      deadLetterRoutingKey: 'dead',
+      retryDelayMs: 30000,
+      maxAttempts: 5,
+      prefetch: 5,
+      reconnectDelayMs: 1000,
       jobLeaseSeconds: 300,
-      workerMaxMessages: 5,
-      workerPollIntervalMs: 1000,
-      queueMaxReceiveCount: 5
+      workerHealthFile: '/tmp/worker-ready'
     },
     defaultUserService: {
       async getDefaultUser() {

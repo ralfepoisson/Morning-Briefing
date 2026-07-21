@@ -8,6 +8,8 @@ The frontend is a framework-free strict TypeScript single-page application built
 
 The production target is a static bundle served by a minimal Nginx container on a loopback-only host port. Apache on the consolidated EC2 host will proxy all non-`/api/*` traffic to that container behind the shared ALB/WAF. The existing ECS frontend remains the live deployment until an explicitly approved cutover.
 
+The admin AI configuration page now edits only the non-secret model choice. It reports whether `OPENAI_API_KEY` is present in the protected host environment but never accepts, returns, or persists the key through the browser or REST API.
+
 ## Implemented
 
 ### Application shell

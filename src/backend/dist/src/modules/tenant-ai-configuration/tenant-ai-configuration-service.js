@@ -1,8 +1,10 @@
 import { AVAILABLE_OPENAI_MODELS } from './tenant-ai-configuration-types.js';
 export class TenantAiConfigurationService {
     repository;
-    constructor(repository) {
+    env;
+    constructor(repository, env = process.env) {
         this.repository = repository;
+        this.env = env;
     }
     async getConfiguration(tenantId) {
         const record = await this.repository.findByTenantId(tenantId);
@@ -10,7 +12,7 @@ export class TenantAiConfigurationService {
             return {
                 id: null,
                 tenantId,
-                hasOpenAiApiKey: false,
+                hasOpenAiApiKey: readOpenAiApiKey(this.env) !== null,
                 openAiModel: AVAILABLE_OPENAI_MODELS[0],
                 availableOpenAiModels: AVAILABLE_OPENAI_MODELS,
                 createdAt: null,
@@ -20,7 +22,7 @@ export class TenantAiConfigurationService {
         return {
             id: record.id,
             tenantId: record.tenantId,
-            hasOpenAiApiKey: !!record.openAiApiKey,
+            hasOpenAiApiKey: readOpenAiApiKey(this.env) !== null,
             openAiModel: record.openAiModel,
             availableOpenAiModels: AVAILABLE_OPENAI_MODELS,
             createdAt: record.createdAt.toISOString(),
@@ -30,16 +32,14 @@ export class TenantAiConfigurationService {
     async updateConfiguration(input) {
         const existing = await this.repository.findByTenantId(input.tenantId);
         const nextModel = normalizeOpenAiModel(input.openAiModel || existing?.openAiModel || AVAILABLE_OPENAI_MODELS[0]);
-        const nextApiKey = normalizeOpenAiApiKey(input.openAiApiKey, existing?.openAiApiKey || null);
         const saved = await this.repository.upsertByTenantId({
             tenantId: input.tenantId,
-            openAiApiKey: nextApiKey,
             openAiModel: nextModel
         });
         return {
             id: saved.id,
             tenantId: saved.tenantId,
-            hasOpenAiApiKey: !!saved.openAiApiKey,
+            hasOpenAiApiKey: readOpenAiApiKey(this.env) !== null,
             openAiModel: saved.openAiModel,
             availableOpenAiModels: AVAILABLE_OPENAI_MODELS,
             createdAt: saved.createdAt.toISOString(),
@@ -48,12 +48,13 @@ export class TenantAiConfigurationService {
     }
     async getRequiredOpenAiConfiguration(tenantId) {
         const record = await this.repository.findByTenantId(tenantId);
-        if (!record || !record.openAiApiKey) {
-            throw new Error('OpenAI configuration is missing. Add the API key in Admin > Configuration.');
+        const apiKey = readOpenAiApiKey(this.env);
+        if (!apiKey) {
+            throw new Error('OPENAI_API_KEY is not configured in the protected runtime environment.');
         }
         return {
-            apiKey: record.openAiApiKey,
-            model: normalizeOpenAiModel(record.openAiModel)
+            apiKey,
+            model: normalizeOpenAiModel(record?.openAiModel || AVAILABLE_OPENAI_MODELS[0])
         };
     }
 }
@@ -63,12 +64,7 @@ function normalizeOpenAiModel(model) {
     }
     return AVAILABLE_OPENAI_MODELS[0];
 }
-function normalizeOpenAiApiKey(nextApiKey, fallbackApiKey) {
-    if (typeof nextApiKey !== 'string') {
-        return fallbackApiKey;
-    }
-    if (!nextApiKey.trim()) {
-        return fallbackApiKey;
-    }
-    return nextApiKey.trim();
+function readOpenAiApiKey(env) {
+    const value = env.OPENAI_API_KEY?.trim();
+    return value || null;
 }

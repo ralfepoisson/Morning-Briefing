@@ -12,11 +12,13 @@ node "Consolidated ARM64 EC2\npersonal-projects" as Host {
   package "Morning Briefing Compose Release" as Compose {
     component "Frontend\nStrict TypeScript + Vite 8\nNginx static SPA\nloopback port" as Frontend
     package "Backend image\nNode.js + Fastify" as BackendImage {
-      component "Backend API\n/api/v1 + readiness" as Backend
-      component "Worker\nSQS long poll" as Worker
+      component "Backend API\n/api/v1 + DB/broker readiness" as Backend
+      component "Worker\nmanual ack + bounded prefetch" as Worker
       component "One-shot commands\nmigrate / widget refresh / audio refresh" as OneShots
     }
     folder "Persistent audio\nAUDIO_BRIEFING_STORAGE_DIR" as AudioStorage
+    queue "RabbitMQ\ndurable quorum queues" as Rabbit
+    folder "Persistent RabbitMQ data" as RabbitStorage
   }
   component "systemd timers\n01:00 / 05:00 UTC\nRoot-owned oneshot boundary\nPersistent + locked / umask 0077" as Timers
 }
@@ -44,7 +46,7 @@ package "Backend modular monolith" as ModularBackend {
   package "Infrastructure Layer" as InfraLayer {
     [Prisma Repositories]
     [Connector Clients]
-    [Snapshot Queue Publisher]
+    [Confirmed Job Publisher]
     [Snapshot Job Processor]
     [LLM Provider]
     [TTS Provider]
@@ -54,10 +56,12 @@ package "Backend modular monolith" as ModularBackend {
 }
 
 database "PostgreSQL 18.4\nexternal Docker network\npersonal-projects-postgresql" as Postgres
-queue "Amazon SQS Standard\nSnapshot jobs" as Sqs
-queue "SQS DLQ" as Dlq
+queue "Main quorum queue\ndurable job deliveries" as MainQueue
+queue "Retry quorum queue\nTTL backoff" as RetryQueue
+queue "Terminal quorum DLQ" as Dlq
 cloud "Life2 Auth\nsign-in + JWT callback" as AuthService
-cloud "AWS Secrets Manager\nor protected host files" as Secrets
+folder "Root-owned env files\noutside releases / mode 0600" as Secrets
+cloud "CloudWatch Logs\nawslogs / 7-day retention" as CloudWatch
 cloud "External providers\nGoogle / weather / RSS / tasks" as Providers
 cloud "OpenAI Responses API" as OpenAi
 cloud "AWS Polly" as Polly
@@ -80,9 +84,13 @@ ApiLayer --> AppLayer
 AppLayer --> DomainLayer
 AppLayer --> InfraLayer
 [Prisma Repositories] --> Postgres
-[Snapshot Queue Publisher] --> Sqs
-Sqs --> Worker : at-least-once delivery
-Sqs --> Dlq : redrive after retry limit
+[Confirmed Job Publisher] --> Rabbit : persistent + mandatory\npublisher confirms
+Rabbit --> MainQueue
+MainQueue --> Worker : at-least-once / manual ack
+Worker --> RetryQueue : retryable failure
+RetryQueue --> MainQueue : TTL expiry / backoff
+Worker --> Dlq : bounded x-death exhausted\nor invalid envelope
+Rabbit --> RabbitStorage : durable state
 [Snapshot Job Processor] --> [Briefing Use Cases]
 [Snapshot Job Processor] --> [Audio Briefing Use Cases]
 [Connector Clients] --> Providers
@@ -95,6 +103,10 @@ Worker --> Secrets : scoped runtime secrets
 Backend --> AudioStorage : read/playback
 Worker --> AudioStorage : generate/deliver
 Timers --> OneShots : locked one-shot execution
+Frontend --> CloudWatch : Docker awslogs
+Backend --> CloudWatch : Docker awslogs
+Worker --> CloudWatch : Docker awslogs
+Rabbit --> CloudWatch : Docker awslogs
 
 note on link
 Host root reaches the protected release and Docker socket.
@@ -109,6 +121,7 @@ Application containers do not own PostgreSQL.
 Backend and frontend bind only to loopback-facing ports.
 Backend, worker, and one-shots use a separate egress bridge
 for AWS and provider APIs; PostgreSQL remains internal.
+RabbitMQ is reachable only on the internal application network.
 Worker and timers stay disabled until the approved
 ECS/EventBridge writer handoff.
 end note
@@ -120,8 +133,15 @@ Port 5432 is not publicly exposed.
 end note
 
 note bottom of Dlq
-SnapshotGenerationJob persists idempotency,
-attempt state, duplicate accounting, and stale-job decisions.
+The broker provides durable delivery, retry backoff, and a
+terminal DLQ. PostgreSQL job rows remain authoritative for
+idempotency, leases, attempt evidence, and stale-job decisions.
+end note
+
+note bottom of Secrets
+Includes DATABASE_URL, MESSAGE_BROKER_URL,
+RabbitMQ bootstrap credentials, OAuth/JWT/delivery secrets,
+and OPENAI_API_KEY. No secret is stored in a release or image.
 end note
 
 note bottom of SharedAlb

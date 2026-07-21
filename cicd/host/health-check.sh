@@ -36,6 +36,7 @@ wait_for_http() {
   return 1
 }
 
+wait_healthy rabbitmq
 wait_healthy frontend
 wait_healthy backend
 if [[ "${START_WORKER}" == "true" ]]; then

@@ -1,33 +1,45 @@
 # Values only; never copy real secrets into Git.
+# release.env should set FRONTEND_AWSLOGS_GROUP, BACKEND_AWSLOGS_GROUP,
+# WORKER_AWSLOGS_GROUP, and RABBITMQ_AWSLOGS_GROUP to the existing retained
+# seven-day group /personal-projects/morning-briefing. Stream prefixes keep
+# services distinct inside that shared group.
 # shared/config/backend.env (0644, no secrets)
 NODE_ENV=production
 FRONTEND_BASE_URL=https://briefing.ralfepoisson.com/
-SNAPSHOT_QUEUE_ENABLED=true
-SNAPSHOT_QUEUE_URL=https://sqs.eu-west-1.amazonaws.com/154596858576/morning-briefing-prod-snapshot-jobs
-SNAPSHOT_QUEUE_NAME=morning-briefing-prod-snapshot-jobs
-SNAPSHOT_DLQ_NAME=morning-briefing-prod-snapshot-jobs-dlq
-SNAPSHOT_WORKER_WAIT_TIME_SECONDS=10
-SNAPSHOT_WORKER_VISIBILITY_TIMEOUT_SECONDS=120
-SNAPSHOT_WORKER_MAX_MESSAGES=5
-SNAPSHOT_WORKER_POLL_INTERVAL_MS=1000
+MESSAGE_BROKER_ENABLED=true
+MESSAGE_BROKER_EXCHANGE=morning-briefing.commands
+MESSAGE_BROKER_QUEUE=morning-briefing.snapshot-jobs
+MESSAGE_BROKER_RETRY_QUEUE=morning-briefing.snapshot-jobs.retry
+MESSAGE_BROKER_DLQ=morning-briefing.snapshot-jobs.dlq
+MESSAGE_BROKER_RETRY_DELAY_MS=30000
+MESSAGE_BROKER_MAX_ATTEMPTS=5
+MESSAGE_BROKER_PREFETCH=5
+MESSAGE_BROKER_RECONNECT_DELAY_MS=1000
+SNAPSHOT_JOB_LEASE_SECONDS=300
 CONTACT_DELIVERY_PROVIDER=ses
 CONTACT_AWS_REGION=eu-west-1
 
 # shared/config/worker.env (0644, no secrets)
 NODE_ENV=production
-SNAPSHOT_QUEUE_ENABLED=true
-SNAPSHOT_QUEUE_URL=https://sqs.eu-west-1.amazonaws.com/154596858576/morning-briefing-prod-snapshot-jobs
-SNAPSHOT_QUEUE_NAME=morning-briefing-prod-snapshot-jobs
-SNAPSHOT_DLQ_NAME=morning-briefing-prod-snapshot-jobs-dlq
-SNAPSHOT_WORKER_WAIT_TIME_SECONDS=10
-SNAPSHOT_WORKER_VISIBILITY_TIMEOUT_SECONDS=120
-SNAPSHOT_WORKER_MAX_MESSAGES=5
-SNAPSHOT_WORKER_POLL_INTERVAL_MS=1000
+MESSAGE_BROKER_ENABLED=true
+MESSAGE_BROKER_EXCHANGE=morning-briefing.commands
+MESSAGE_BROKER_QUEUE=morning-briefing.snapshot-jobs
+MESSAGE_BROKER_RETRY_QUEUE=morning-briefing.snapshot-jobs.retry
+MESSAGE_BROKER_DLQ=morning-briefing.snapshot-jobs.dlq
+MESSAGE_BROKER_RETRY_DELAY_MS=30000
+MESSAGE_BROKER_MAX_ATTEMPTS=5
+MESSAGE_BROKER_PREFETCH=5
+MESSAGE_BROKER_RECONNECT_DELAY_MS=1000
+SNAPSHOT_JOB_LEASE_SECONDS=300
 GOOGLE_OAUTH_REDIRECT_URI=https://briefing.ralfepoisson.com/api/v1/connections/google-calendar/oauth/callback
 GOOGLE_GMAIL_OAUTH_REDIRECT_URI=https://briefing.ralfepoisson.com/api/v1/connections/gmail/oauth/callback
 
-# secrets/backend.env and secrets/worker.env must each be mode 0600.
-# Both require DATABASE_URL and Life2 JWT verification material.
+# secrets/backend.env, secrets/worker.env, and secrets/rabbitmq.env must each be
+# root-owned, non-symlink regular files at exact mode 0600.
+# Backend and worker require DATABASE_URL, MESSAGE_BROKER_URL, OPENAI_API_KEY,
+# Google OAuth credentials, and Life2 JWT verification material.
 # Worker also requires Google OAuth client ID/secret/state, Telegram and any
 # connector credentials used during queued processing. Backend requires the
 # corresponding callback credentials and contact-provider secrets.
+# RabbitMQ requires RABBITMQ_DEFAULT_USER, RABBITMQ_DEFAULT_PASS, and
+# RABBITMQ_ERLANG_COOKIE. Never put these values in release.env or Git.

@@ -2,7 +2,7 @@ import { logApplicationEvent, toLogErrorContext } from '../admin/application-log
 import type { DashboardBriefingService } from './dashboard-briefing-service.js';
 import type { GenerateDashboardAudioBriefingEnvelope, GenerateDashboardAudioBriefingRequested } from './dashboard-briefing-job-types.js';
 import type { DashboardBriefingJobRepository } from './dashboard-briefing-repository.js';
-import { getSnapshotQueueConfig } from '../snapshots/snapshot-queue-config.js';
+import { getMessageBrokerConfig } from '../snapshots/message-broker-config.js';
 
 export type DashboardBriefingQueueMessage = {
   body: string;
@@ -18,7 +18,7 @@ export class DashboardBriefingJobProcessor {
 
   async process(message: DashboardBriefingQueueMessage): Promise<'processed' | 'skipped' | 'retry'> {
     const payload = parseGenerateDashboardAudioBriefingMessage(message.body);
-    const leaseExpiresAt = new Date(Date.now() + getSnapshotQueueConfig().jobLeaseSeconds * 1000);
+    const leaseExpiresAt = new Date(Date.now() + getMessageBrokerConfig().jobLeaseSeconds * 1000);
     const claim = await this.repository.claimDashboardBriefingJob(
       payload,
       message.messageId || message.receiptHandle || null,
@@ -39,7 +39,7 @@ export class DashboardBriefingJobProcessor {
         dashboardId: payload.dashboardId,
         ownerUserId: payload.ownerUserId,
         force: payload.force,
-        sqsMessageId: message.messageId || null
+        brokerMessageId: message.messageId || null
       }
     });
 

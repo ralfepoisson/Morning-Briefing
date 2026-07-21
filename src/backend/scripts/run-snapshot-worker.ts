@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import { createQueueJobProcessor } from '../src/modules/snapshots/snapshot-runtime.js';
-import { createSnapshotSqsClient } from '../src/modules/snapshots/snapshot-sqs-client.js';
-import { runSnapshotWorkerLoop } from '../src/modules/snapshots/snapshot-worker.js';
+import { runRabbitMqWorker } from '../src/modules/snapshots/rabbitmq-worker.js';
 
-await runSnapshotWorkerLoop(createSnapshotSqsClient(), createQueueJobProcessor());
+const abortController = new AbortController();
+process.once('SIGTERM', () => abortController.abort());
+process.once('SIGINT', () => abortController.abort());
+await runRabbitMqWorker(createQueueJobProcessor(), process.env, abortController.signal);

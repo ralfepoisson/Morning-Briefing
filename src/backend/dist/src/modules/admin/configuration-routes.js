@@ -22,9 +22,14 @@ export async function registerAdminConfigurationRoutes(app, dependencies = creat
                 message: 'Admin access is required.'
             };
         }
+        if (body && Object.prototype.hasOwnProperty.call(body, 'openAiApiKey')) {
+            reply.code(400);
+            return {
+                message: 'OpenAI API keys must be configured through the protected runtime environment.'
+            };
+        }
         return dependencies.tenantAiConfigurationService.updateConfiguration({
             tenantId: user.tenantId,
-            openAiApiKey: body?.openAiApiKey,
             openAiModel: body?.openAiModel
         });
     });

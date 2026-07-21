@@ -7,6 +7,13 @@ export class PrismaTenantAiConfigurationRepository {
         const record = await this.prisma.tenantAiConfiguration.findUnique({
             where: {
                 tenantId
+            },
+            select: {
+                id: true,
+                tenantId: true,
+                openAiModel: true,
+                createdAt: true,
+                updatedAt: true
             }
         });
         return record ? mapRecord(record) : null;
@@ -17,13 +24,18 @@ export class PrismaTenantAiConfigurationRepository {
                 tenantId: input.tenantId
             },
             update: {
-                openAiApiKey: input.openAiApiKey,
                 openAiModel: input.openAiModel
             },
             create: {
                 tenantId: input.tenantId,
-                openAiApiKey: input.openAiApiKey,
                 openAiModel: input.openAiModel
+            },
+            select: {
+                id: true,
+                tenantId: true,
+                openAiModel: true,
+                createdAt: true,
+                updatedAt: true
             }
         });
         return mapRecord(record);
@@ -33,7 +45,6 @@ function mapRecord(record) {
     return {
         id: record.id,
         tenantId: record.tenantId,
-        openAiApiKey: record.openAiApiKey,
         openAiModel: record.openAiModel,
         createdAt: record.createdAt,
         updatedAt: record.updatedAt

@@ -1,5 +1,5 @@
 import { logApplicationEvent } from '../admin/application-logger.js';
-import { getSnapshotQueueConfig } from '../snapshots/snapshot-queue-config.js';
+import { getMessageBrokerConfig } from '../snapshots/message-broker-config.js';
 
 let started = false;
 
@@ -12,9 +12,9 @@ export function startLocalDevSnapshotWorker(env: NodeJS.ProcessEnv = process.env
     return;
   }
 
-  const queueConfig = getSnapshotQueueConfig(env);
+  const queueConfig = getMessageBrokerConfig(env);
 
-  if (!queueConfig.enabled || !queueConfig.queueUrl) {
+  if (!queueConfig.enabled || !queueConfig.url) {
     logApplicationEvent({
       level: 'warn',
       scope: 'snapshot-jobs',
@@ -32,9 +32,9 @@ export function startLocalDevSnapshotWorker(env: NodeJS.ProcessEnv = process.env
     event: 'local_snapshot_worker_started',
     message: 'Local snapshot worker started.',
     context: {
-      queueUrl: queueConfig.queueUrl,
-      workerMaxMessages: queueConfig.workerMaxMessages,
-      workerPollIntervalMs: queueConfig.workerPollIntervalMs
+      queueName: queueConfig.queue,
+      workerPrefetch: queueConfig.prefetch,
+      reconnectDelayMs: queueConfig.reconnectDelayMs
     }
   });
 
@@ -43,13 +43,12 @@ export function startLocalDevSnapshotWorker(env: NodeJS.ProcessEnv = process.env
 
 async function startLocalSnapshotWorkerLoop(env: NodeJS.ProcessEnv): Promise<void> {
   try {
-    const [{ createQueueJobProcessor }, { createSnapshotSqsClient }, { runSnapshotWorkerLoop }] = await Promise.all([
+    const [{ createQueueJobProcessor }, { runRabbitMqWorker }] = await Promise.all([
       import('../snapshots/snapshot-runtime.js'),
-      import('../snapshots/snapshot-sqs-client.js'),
-      import('../snapshots/snapshot-worker.js')
+      import('../snapshots/rabbitmq-worker.js')
     ]);
 
-    await runSnapshotWorkerLoop(createSnapshotSqsClient(), createQueueJobProcessor(), env);
+    await runRabbitMqWorker(createQueueJobProcessor(), env);
   } catch (error) {
     started = false;
     logApplicationEvent({

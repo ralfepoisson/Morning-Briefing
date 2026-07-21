@@ -362,7 +362,7 @@ end note
 
 note right of SnapshotGenerationJob
 Tracks idempotent widget snapshot commands.
-Used to coalesce duplicate SQS deliveries,
+Used to coalesce duplicate RabbitMQ deliveries,
 record retries, and mark stale jobs skipped.
 duplicate_skip_count and last_duplicate_at retain
 evidence of coalesced duplicate deliveries.
@@ -379,6 +379,9 @@ note right of DashboardBriefingGenerationJob
 Tracks dashboard-audio commands independently from
 widget jobs, including idempotency, retry evidence,
 duplicate accounting, and a recoverable processing lease.
+RabbitMQ quorum queues provide durable at-least-once
+delivery, TTL retry backoff, and terminal dead lettering;
+this table remains authoritative for job state.
 end note
 
 note bottom of Connector
@@ -420,10 +423,11 @@ which widgets contribute content.
 end note
 
 note right of TenantAiConfiguration
-The current Prisma model stores the tenant-scoped
-OpenAI API key and selected model. Production design
-should externalise the key and retain only a secret
-reference in PostgreSQL.
+openai_api_key is a deprecated compatibility column.
+Runtime code must neither read nor write it. OPENAI_API_KEY
+is injected from a root-owned mode-0600 environment file
+outside immutable releases; the selected model remains
+non-secret tenant configuration in PostgreSQL.
 end note
 
 note right of DashboardBriefingAudio

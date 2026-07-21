@@ -20,7 +20,7 @@ test('SnapshotJobProcessor skips stale messages and records the skip', async fun
       type: 'GenerateWidgetSnapshotRequested',
       payload: createMessage()
     }),
-    messageId: 'sqs-1'
+    messageId: 'broker-1'
   });
 
   assert.equal(result, 'skipped');
@@ -47,7 +47,7 @@ test('SnapshotJobProcessor marks successful work as completed', async function (
       type: 'GenerateWidgetSnapshotRequested',
       payload: createMessage()
     }),
-    messageId: 'sqs-1'
+    messageId: 'broker-1'
   });
 
   assert.equal(result, 'processed');
@@ -75,7 +75,7 @@ test('SnapshotJobProcessor clears the generating flag when work is skipped', asy
       type: 'GenerateWidgetSnapshotRequested',
       payload: createMessage()
     }),
-    messageId: 'sqs-1'
+    messageId: 'broker-1'
   });
 
   assert.deepEqual(repository.generating, [
@@ -96,7 +96,7 @@ test('SnapshotJobProcessor leaves an active duplicate available for retry', asyn
       type: 'GenerateWidgetSnapshotRequested',
       payload: createMessage()
     }),
-    messageId: 'sqs-1'
+    messageId: 'broker-1'
   });
 
   assert.equal(result, 'retry');

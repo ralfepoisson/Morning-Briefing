@@ -36,7 +36,7 @@ test('DashboardBriefingJobProcessor regenerates audio as the dashboard owner', a
       type: 'GenerateDashboardAudioBriefingRequested',
       payload: createMessage()
     }),
-    messageId: 'sqs-1'
+    messageId: 'broker-1'
   });
 
   assert.equal(result, 'processed');

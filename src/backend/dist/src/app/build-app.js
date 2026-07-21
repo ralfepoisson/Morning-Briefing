@@ -18,6 +18,7 @@ import { registerSnapshotRoutes } from '../modules/snapshots/snapshot-routes.js'
 import { registerUserRoutes } from '../modules/users/user-routes.js';
 import { registerWidgetRoutes } from '../modules/widgets/widget-routes.js';
 import { getPrismaClient } from '../infrastructure/prisma/prisma-client.js';
+import { checkRabbitMqReadiness } from '../modules/snapshots/rabbitmq-connection.js';
 export async function buildApp(options = {}) {
     const app = Fastify({
         logger: false
@@ -34,7 +35,7 @@ export async function buildApp(options = {}) {
     });
     app.get('/health/ready', async function handleReadiness(_request, reply) {
         try {
-            await (options.readinessCheck || checkDatabaseReadiness)();
+            await (options.readinessCheck || checkApplicationReadiness)();
             return {
                 status: 'ready'
             };
@@ -83,6 +84,10 @@ export async function buildApp(options = {}) {
 }
 async function checkDatabaseReadiness() {
     await getPrismaClient().$queryRaw `SELECT 1`;
+}
+export async function checkApplicationReadiness(databaseCheck = checkDatabaseReadiness, brokerCheck = checkRabbitMqReadiness) {
+    await databaseCheck();
+    await brokerCheck();
 }
 function isProtectedApiRoute(url) {
     const pathname = url.split('?')[0];

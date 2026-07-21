@@ -29,8 +29,8 @@ export async function registerAdminConfigurationRoutes(
   app.patch('/api/v1/admin/configuration', async function handleUpdateConfiguration(request, reply) {
     const user = await dependencies.defaultUserService.getDefaultUser(request);
     const body = request.body as {
-      openAiApiKey?: string;
       openAiModel?: string;
+      openAiApiKey?: unknown;
     } | undefined;
 
     if (!user.isAdmin) {
@@ -40,9 +40,15 @@ export async function registerAdminConfigurationRoutes(
       };
     }
 
+    if (body && Object.prototype.hasOwnProperty.call(body, 'openAiApiKey')) {
+      reply.code(400);
+      return {
+        message: 'OpenAI API keys must be configured through the protected runtime environment.'
+      };
+    }
+
     return dependencies.tenantAiConfigurationService.updateConfiguration({
       tenantId: user.tenantId,
-      openAiApiKey: body?.openAiApiKey,
       openAiModel: body?.openAiModel
     });
   });

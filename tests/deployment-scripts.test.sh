@@ -118,9 +118,9 @@ fi
 echo "ok - scheduled jobs use a deployment-preserved root oneshot boundary"
 
 grep -Fq 'Deployment must run through the root activation boundary.' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host deployment is not restricted to the root activation boundary"
-grep -Fq 'install -d -m 0750 "${APP_ROOT}/data/audio"' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host data directory is not created securely"
-grep -Fq 'chown 10001:10001 "${APP_ROOT}/data/audio"' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host data ownership is not expressed as numeric UID/GID"
-echo "ok - host data ownership uses numeric UID and GID"
+grep -Fq 'prepare_runtime_directory "${APP_ROOT}/data/audio" 10001 10001' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host audio directory is not prepared securely"
+grep -Fq 'prepare_runtime_directory "${APP_ROOT}/data/rabbitmq" 100 101' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host RabbitMQ directory is not prepared securely"
+echo "ok - host data ownership uses validated numeric UID and GID boundaries"
 
 grep -Fq 'sudo -n /srv/apps/morning-briefing/current/cicd/host/rollback.sh' "${ROOT_DIR}/scripts/rollback.sh" || fail "rollback cannot traverse the root-owned application path"
 grep -Fq 'acquire_deploy_lock "${APP_ROOT}/locks/deploy.lock"' "${ROOT_DIR}/cicd/host/rollback.sh" || fail "root-bound rollback does not preserve deployment locking"
@@ -133,6 +133,90 @@ echo "ok - host-port readiness probes are bounded and retried"
 awk '/^  frontend:/{inside=1} /^  backend:/{inside=0} inside && /- host-port/{found=1} END{exit !found}' "${ROOT_DIR}/cicd/compose/compose.yaml" || fail "frontend is not attached to the host-port bridge"
 grep -Fq '  host-port: {}' "${ROOT_DIR}/cicd/compose/compose.yaml" || fail "host-port bridge is not declared"
 echo "ok - frontend loopback publishing has a non-internal bridge"
+
+compose_file="${ROOT_DIR}/cicd/compose/compose.yaml"
+infra_file="${ROOT_DIR}/cicd/aws/consolidation-resources.yaml"
+environment_example="${ROOT_DIR}/cicd/compose/environment.example"
+
+grep -Fq 'image: rabbitmq:4.1-alpine@sha256:d2baf254132a017d54f1bf546dbf827190f4063644065307d8fe7f9532106919' "${compose_file}" \
+  || fail "RabbitMQ is not pinned to the verified Linux ARM64 4.1.8 digest"
+grep -Fq 'user: "100:101"' "${compose_file}" || fail "RabbitMQ does not run as its image UID/GID"
+grep -Fq '${APP_ROOT:-/srv/apps/morning-briefing}/data/rabbitmq:/var/lib/rabbitmq' "${compose_file}" \
+  || fail "RabbitMQ data is not persisted outside immutable releases"
+grep -Fq '${APP_ROOT:-/srv/apps/morning-briefing}/secrets/rabbitmq.env' "${compose_file}" \
+  || fail "RabbitMQ does not consume its external secret file"
+grep -Fq '["CMD", "rabbitmq-diagnostics", "-q", "ping"]' "${compose_file}" || fail "RabbitMQ has no broker health check"
+if awk '/^  rabbitmq:/{inside=1; next} /^  [a-zA-Z0-9-]+:/{inside=0} inside && /ports:/{found=1} END{exit !found}' "${compose_file}"; then
+  fail "RabbitMQ publishes a host port"
+fi
+echo "ok - RabbitMQ is immutable, private, persistent, non-root, and health checked"
+
+grep -Fq 'MESSAGE_BROKER_WORKER_HEALTH_FILE: /tmp/morning-briefing-worker-ready' "${compose_file}" \
+  || fail "worker readiness file path is not explicit"
+grep -Fq "existsSync('/tmp/morning-briefing-worker-ready')" "${compose_file}" \
+  || fail "worker health does not require the active-consumer readiness file"
+if grep -Fq "readdirSync('/proc')" "${compose_file}"; then
+  fail "worker health still treats process presence as broker readiness"
+fi
+echo "ok - worker health follows active broker-consumer readiness"
+
+[[ "$(grep -c 'driver: awslogs' "${compose_file}")" -ge 6 ]] || fail "not every service uses the awslogs driver"
+[[ "$(grep -c 'awslogs-create-group: "false"' "${compose_file}")" -ge 6 ]] || fail "services may create CloudWatch log groups"
+if grep -Fq 'driver: json-file' "${compose_file}"; then
+  fail "local json-file logging remains in production Compose"
+fi
+for group_var in FRONTEND_AWSLOGS_GROUP BACKEND_AWSLOGS_GROUP WORKER_AWSLOGS_GROUP RABBITMQ_AWSLOGS_GROUP; do
+  grep -Fq "${group_var}" "${compose_file}" || fail "Compose does not configure ${group_var}"
+  grep -Fq "${group_var}=" "${ROOT_DIR}/scripts/publish-release.sh" || fail "release.env does not configure ${group_var}"
+done
+grep -Fq 'frontend_awslogs_group="${FRONTEND_AWSLOGS_GROUP:-/personal-projects/morning-briefing}"' "${ROOT_DIR}/scripts/publish-release.sh" \
+  || fail "publisher does not permit safe log-group overrides"
+for stream_prefix in frontend backend worker rabbitmq migrate snapshot-refresh dashboard-audio-refresh; do
+  grep -Fq "awslogs-stream-prefix: ${stream_prefix}" "${compose_file}" || fail "Compose omits the ${stream_prefix} log stream prefix"
+done
+echo "ok - Docker logging uses the configurable retained group with distinct streams"
+
+if grep -Fq 'Type: AWS::Logs::LogGroup' "${infra_file}"; then
+  fail "project infrastructure attempts to create the retained host log group"
+fi
+grep -Fq 'ExistingLogGroupName:' "${infra_file}" || fail "infrastructure has no existing log-group name parameter"
+grep -Fq 'Default: /personal-projects/morning-briefing' "${infra_file}" || fail "infrastructure targets the wrong retained log group"
+if grep -Fq 'ExistingLogGroupArn:' "${infra_file}"; then
+  fail "infrastructure unnecessarily requires a duplicate log-group ARN parameter"
+fi
+grep -Fq -- '- logs:CreateLogStream' "${infra_file}" || fail "host cannot create CloudWatch log streams"
+grep -Fq -- '- logs:PutLogEvents' "${infra_file}" || fail "host cannot publish CloudWatch log events"
+grep -Fq -- '- !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ExistingLogGroupName}:*' "${infra_file}" \
+  || fail "log writes are not scoped to streams in the retained group"
+if rg -n 'AWS::SQS::Queue|sqs:|secretsmanager:|logs:CreateLogGroup|logs:PutRetentionPolicy' "${infra_file}" >/dev/null; then
+  fail "retired queue/secret policy or excessive CloudWatch permission remains"
+fi
+echo "ok - infrastructure only grants least-privilege writes to the existing retained group"
+
+for secret_name in backend worker rabbitmq; do
+  grep -Fq "assert_secret_file_mode \"\${APP_ROOT}/secrets/${secret_name}.env\"" "${ROOT_DIR}/cicd/host/deploy.sh" \
+    || fail "deployment does not validate ${secret_name}.env"
+done
+for secret_key in RABBITMQ_DEFAULT_USER RABBITMQ_DEFAULT_PASS RABBITMQ_ERLANG_COOKIE; do
+  grep -Fq "${secret_key}" "${ROOT_DIR}/cicd/host/deploy.sh" || fail "deployment does not require ${secret_key}"
+done
+[[ "$(grep -c 'MESSAGE_BROKER_URL' "${ROOT_DIR}/cicd/host/deploy.sh")" -ge 1 ]] \
+  || fail "deployment does not require broker connection secrets"
+grep -Fq 'require_env_key "${secret_file}" OPENAI_API_KEY' "${ROOT_DIR}/cicd/host/deploy.sh" \
+  || fail "deployment does not require the external OpenAI secret"
+for runtime_key in MESSAGE_BROKER_ENABLED MESSAGE_BROKER_EXCHANGE MESSAGE_BROKER_QUEUE MESSAGE_BROKER_RETRY_QUEUE MESSAGE_BROKER_DLQ MESSAGE_BROKER_RETRY_DELAY_MS MESSAGE_BROKER_MAX_ATTEMPTS MESSAGE_BROKER_PREFETCH MESSAGE_BROKER_RECONNECT_DELAY_MS SNAPSHOT_JOB_LEASE_SECONDS; do
+  grep -Fq "${runtime_key}=" "${environment_example}" || fail "environment example omits ${runtime_key}"
+done
+grep -Fq 'require_env_value "${config_file}" MESSAGE_BROKER_ENABLED true' "${ROOT_DIR}/cicd/host/deploy.sh" \
+  || fail "deployment permits the durable broker to be disabled silently"
+if rg -n 'SNAPSHOT_QUEUE_|SNAPSHOT_DLQ_|AWS_ENDPOINT_URL_SQS' "${environment_example}" >/dev/null; then
+  fail "SQS runtime configuration remains in the host environment example"
+fi
+echo "ok - host deployment separates broker secrets from non-secret runtime topology"
+
+grep -Fq 'config --services | grep -Fxq rabbitmq' "${ROOT_DIR}/cicd/host/rollback.sh" \
+  || fail "rollback unconditionally requires RabbitMQ in pre-broker releases"
+echo "ok - rollback preserves compatibility with pre-RabbitMQ releases"
 
 if rg -g '!**/node_modules/**' -e 'AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN).*(printf|echo)' -e 'source .*export_credentials' "${ROOT_DIR}/cicd" "${ROOT_DIR}/scripts" >/dev/null; then
   fail "credential-printing behavior remains"
@@ -155,6 +239,8 @@ grep -q 'src/web" audit$' "${ROOT_DIR}/scripts/ci.sh" || fail "CI does not enfor
 echo "ok - CI enforces complete type, build, unit, configuration, and audit gates"
 
 "${ROOT_DIR}/tests/systemd-permission-model.test.sh"
+"${ROOT_DIR}/tests/secret-file-permissions.test.sh"
+"${ROOT_DIR}/tests/openai-secret-cutover.test.sh"
 "${ROOT_DIR}/tests/publish-transport.test.sh"
 "${ROOT_DIR}/tests/release-bundle-activation.test.sh"
 

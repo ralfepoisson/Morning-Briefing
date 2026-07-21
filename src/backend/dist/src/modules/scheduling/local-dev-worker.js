@@ -1,5 +1,5 @@
 import { logApplicationEvent } from '../admin/application-logger.js';
-import { getSnapshotQueueConfig } from '../snapshots/snapshot-queue-config.js';
+import { getMessageBrokerConfig } from '../snapshots/message-broker-config.js';
 let started = false;
 export function isLocalDevSnapshotWorkerEnabled(env = process.env) {
     return env.LOCAL_SNAPSHOT_WORKER_ENABLED === 'true' && env.NODE_ENV !== 'production';
@@ -8,8 +8,8 @@ export function startLocalDevSnapshotWorker(env = process.env) {
     if (started) {
         return;
     }
-    const queueConfig = getSnapshotQueueConfig(env);
-    if (!queueConfig.enabled || !queueConfig.queueUrl) {
+    const queueConfig = getMessageBrokerConfig(env);
+    if (!queueConfig.enabled || !queueConfig.url) {
         logApplicationEvent({
             level: 'warn',
             scope: 'snapshot-jobs',
@@ -25,21 +25,20 @@ export function startLocalDevSnapshotWorker(env = process.env) {
         event: 'local_snapshot_worker_started',
         message: 'Local snapshot worker started.',
         context: {
-            queueUrl: queueConfig.queueUrl,
-            workerMaxMessages: queueConfig.workerMaxMessages,
-            workerPollIntervalMs: queueConfig.workerPollIntervalMs
+            queueName: queueConfig.queue,
+            workerPrefetch: queueConfig.prefetch,
+            reconnectDelayMs: queueConfig.reconnectDelayMs
         }
     });
     void startLocalSnapshotWorkerLoop(env);
 }
 async function startLocalSnapshotWorkerLoop(env) {
     try {
-        const [{ createQueueJobProcessor }, { createSnapshotSqsClient }, { runSnapshotWorkerLoop }] = await Promise.all([
+        const [{ createQueueJobProcessor }, { runRabbitMqWorker }] = await Promise.all([
             import('../snapshots/snapshot-runtime.js'),
-            import('../snapshots/snapshot-sqs-client.js'),
-            import('../snapshots/snapshot-worker.js')
+            import('../snapshots/rabbitmq-worker.js')
         ]);
-        await runSnapshotWorkerLoop(createSnapshotSqsClient(), createQueueJobProcessor(), env);
+        await runRabbitMqWorker(createQueueJobProcessor(), env);
     }
     catch (error) {
         started = false;

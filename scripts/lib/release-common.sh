@@ -99,20 +99,52 @@ acquire_deploy_lock() {
 
 assert_secret_file_mode() {
   local file="$1"
-  local mode
-  [[ -f "${file}" ]] || die "Missing secret file: ${file}"
+  local mode owner group
+  [[ -f "${file}" && ! -L "${file}" ]] || { die "Secret path must be a regular non-symlink file: ${file}"; return 1; }
   if stat -c '%a' "${file}" >/dev/null 2>&1; then
     mode="$(stat -c '%a' "${file}")"
+    owner="$(stat -c '%u' "${file}")"
+    group="$(stat -c '%g' "${file}")"
   else
     mode="$(stat -f '%Lp' "${file}")"
+    owner="$(stat -f '%u' "${file}")"
+    group="$(stat -f '%g' "${file}")"
   fi
-  [[ "${mode}" == "600" ]] || die "Secret file must have mode 0600: ${file}"
+  [[ "${owner}" == "0" ]] || { die "Secret file must be owned by root: ${file}"; return 1; }
+  [[ "${group}" == "0" ]] || { die "Secret file group must be root: ${file}"; return 1; }
+  [[ "${mode}" == "600" ]] || { die "Secret file must have mode 0600: ${file}"; return 1; }
+}
+
+prepare_runtime_directory() {
+  local directory="$1"
+  local owner="$2"
+  local group="$3"
+  local actual
+  [[ "$(id -u)" == "0" ]] || { die "Runtime directories must be prepared as root."; return 1; }
+  [[ "${directory}" == /* && "${owner}" =~ ^[0-9]+$ && "${group}" =~ ^[0-9]+$ ]] \
+    || { die "Runtime directory ownership input is invalid."; return 1; }
+  install -d -o "${owner}" -g "${group}" -m 0750 "${directory}"
+  if stat -c '%a:%u:%g' "${directory}" >/dev/null 2>&1; then
+    actual="$(stat -c '%a:%u:%g' "${directory}")"
+  else
+    actual="$(stat -f '%Lp:%u:%g' "${directory}")"
+  fi
+  [[ "${actual}" == "750:${owner}:${group}" ]] \
+    || { die "Runtime directory mode or ownership is incorrect: ${directory}"; return 1; }
 }
 
 require_env_key() {
   local file="$1"
   local key="$2"
   grep -Eq "^${key}=.+$" "${file}" || die "Required key ${key} is missing from $(basename "${file}")."
+}
+
+require_env_value() {
+  local file="$1"
+  local key="$2"
+  local expected="$3"
+  grep -Fqx "${key}=${expected}" "${file}" \
+    || die "Required value for ${key} is not configured in $(basename "${file}")."
 }
 
 require_one_env_key() {

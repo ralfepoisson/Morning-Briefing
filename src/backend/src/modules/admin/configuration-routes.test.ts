@@ -85,7 +85,6 @@ test('PATCH /api/v1/admin/configuration updates tenant AI configuration', async 
       async updateConfiguration(input) {
         assert.deepEqual(input, {
           tenantId: 'tenant-1',
-          openAiApiKey: 'sk-test',
           openAiModel: 'gpt-5'
         });
 
@@ -107,7 +106,6 @@ test('PATCH /api/v1/admin/configuration updates tenant AI configuration', async 
       method: 'PATCH',
       url: '/api/v1/admin/configuration',
       payload: {
-        openAiApiKey: 'sk-test',
         openAiModel: 'gpt-5'
       }
     });
@@ -115,6 +113,38 @@ test('PATCH /api/v1/admin/configuration updates tenant AI configuration', async 
     assert.equal(response.statusCode, 200);
     assert.equal(response.json().openAiModel, 'gpt-5');
     assert.equal(response.json().hasOpenAiApiKey, true);
+  } finally {
+    await app.close();
+  }
+});
+
+test('PATCH /api/v1/admin/configuration rejects API keys at the HTTP boundary', async function () {
+  const app = Fastify();
+  let updateCalled = false;
+  await registerAdminConfigurationRoutes(app, {
+    defaultUserService: {
+      async getDefaultUser() {
+        return {
+          tenantId: 'tenant-1', userId: 'admin-1', displayName: 'Admin', timezone: 'UTC',
+          locale: 'en-GB', email: 'admin@example.com', isAdmin: true
+        };
+      }
+    },
+    tenantAiConfigurationService: {
+      async getConfiguration() { throw new Error('not used'); },
+      async updateConfiguration() { updateCalled = true; throw new Error('must not be called'); }
+    }
+  });
+
+  try {
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/v1/admin/configuration',
+      payload: { openAiApiKey: 'must-not-enter-runtime-configuration', openAiModel: 'gpt-5' }
+    });
+    assert.equal(response.statusCode, 400);
+    assert.equal(updateCalled, false);
+    assert.match(response.json().message, /protected runtime environment/);
   } finally {
     await app.close();
   }

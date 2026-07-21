@@ -29,6 +29,9 @@ if [[ "${START_WORKER}" == "true" && "${WRITER_HANDOFF_APPROVED:-false}" != "tru
   die "Worker start requires WRITER_HANDOFF_APPROVED=true."
 fi
 services=(frontend backend)
+if docker compose --project-name morning-briefing --env-file "${target}/release.env" -f "${target}/cicd/compose/compose.yaml" config --services | grep -Fxq rabbitmq; then
+  services=(rabbitmq frontend backend)
+fi
 [[ "${START_WORKER}" == "true" ]] && services+=(worker)
 docker compose --project-name morning-briefing --env-file "${target}/release.env" -f "${target}/cicd/compose/compose.yaml" pull "${services[@]}"
 docker compose --project-name morning-briefing --env-file "${target}/release.env" -f "${target}/cicd/compose/compose.yaml" up -d --remove-orphans "${services[@]}"

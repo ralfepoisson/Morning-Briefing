@@ -41,7 +41,7 @@ export function createAdminController(context: RouteContext) {
       'Audio briefing regeneration queued.'
     ),
     loadConfiguration: () => context.api('/admin/configuration'),
-    updateConfiguration: (payload: { openAiApiKey?: string; openAiModel: string }) => mutation(
+    updateConfiguration: (payload: { openAiModel: string }) => mutation(
       '/admin/configuration', { method: 'PATCH', body: JSON.stringify(payload) }, 'AI configuration updated.'
     ),
     loadConnectorInventory: () => context.api('/admin/connectors'),
@@ -71,14 +71,13 @@ export async function renderAdminRoute(context: RouteContext, path: string): Pro
       const value = asRecord(await controller.loadConfiguration());
       const models = stringArray(value.availableOpenAiModels);
       context.container.innerHTML = adminShell(section, `<form data-admin-configuration>
-        <label>OpenAI API key<input name="openAiApiKey" type="password" placeholder="${value.hasOpenAiApiKey ? 'Stored key present; leave blank to retain it' : 'sk-…'}"></label>
+        <p>OpenAI API key: ${value.hasOpenAiApiKey ? 'configured by protected host environment' : 'not configured in protected host environment'}.</p>
         <label>Model<select name="openAiModel">${models.map((model) => `<option${model === value.openAiModel ? ' selected' : ''}>${escapeHtml(model)}</option>`).join('')}</select></label>
         <button type="submit">Save configuration</button></form>`);
       context.container.querySelector<HTMLFormElement>('[data-admin-configuration]')?.addEventListener('submit', function (event) {
         event.preventDefault();
         const data = new FormData(event.currentTarget as HTMLFormElement);
-        const openAiApiKey = stringValue(data.get('openAiApiKey'));
-        const payload = { openAiModel: stringValue(data.get('openAiModel')), ...(openAiApiKey ? { openAiApiKey } : {}) };
+        const payload = { openAiModel: stringValue(data.get('openAiModel')) };
         void controller.updateConfiguration(payload);
       });
       return;

@@ -37,6 +37,16 @@ compose_sha="$(sha256_file "${ROOT_DIR}/cicd/compose/compose.yaml")"
 migration_id="$(basename "$(find "${ROOT_DIR}/src/backend/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | sort | tail -1)")"
 commit_time="$(git -C "${ROOT_DIR}" show -s --format=%cI HEAD)"
 created_at="$(node -e 'process.stdout.write(new Date(process.argv[1]).toISOString())' "${commit_time}")"
+awslogs_region="${AWSLOGS_REGION:-eu-west-1}"
+frontend_awslogs_group="${FRONTEND_AWSLOGS_GROUP:-/personal-projects/morning-briefing}"
+backend_awslogs_group="${BACKEND_AWSLOGS_GROUP:-/personal-projects/morning-briefing}"
+worker_awslogs_group="${WORKER_AWSLOGS_GROUP:-/personal-projects/morning-briefing}"
+rabbitmq_awslogs_group="${RABBITMQ_AWSLOGS_GROUP:-/personal-projects/morning-briefing}"
+[[ "${awslogs_region}" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]] || die "AWSLOGS_REGION is invalid."
+for log_group in "${frontend_awslogs_group}" "${backend_awslogs_group}" "${worker_awslogs_group}" "${rabbitmq_awslogs_group}"; do
+  [[ -n "${log_group}" && ${#log_group} -le 512 && "${log_group}" =~ ^[A-Za-z0-9._/#-]+$ ]] \
+    || die "CloudWatch log group name is invalid."
+done
 
 jq -n \
   --arg gitSha "${sha}" --arg backend "${backend_ref}" --arg frontend "${frontend_ref}" \
@@ -49,6 +59,11 @@ BACKEND_IMAGE=${backend_ref}
 FRONTEND_IMAGE=${frontend_ref}
 BACKEND_LOOPBACK_PORT=13000
 FRONTEND_LOOPBACK_PORT=18080
+AWSLOGS_REGION=${awslogs_region}
+FRONTEND_AWSLOGS_GROUP=${frontend_awslogs_group}
+BACKEND_AWSLOGS_GROUP=${backend_awslogs_group}
+WORKER_AWSLOGS_GROUP=${worker_awslogs_group}
+RABBITMQ_AWSLOGS_GROUP=${rabbitmq_awslogs_group}
 EOF
 validate_release_manifest "${artifact_dir}/release-manifest.json"
 
