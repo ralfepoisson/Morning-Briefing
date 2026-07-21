@@ -108,6 +108,10 @@ grep -Fq 'backend_ready="$(wait_for_http http://127.0.0.1:13000/health/ready)"' 
 grep -Fq 'wait_for_http http://127.0.0.1:18080/healthz >/dev/null' "${ROOT_DIR}/cicd/host/health-check.sh" || fail "frontend host-port readiness is not retried"
 echo "ok - host-port readiness probes are bounded and retried"
 
+awk '/^  frontend:/{inside=1} /^  backend:/{inside=0} inside && /- host-port/{found=1} END{exit !found}' "${ROOT_DIR}/cicd/compose/compose.yaml" || fail "frontend is not attached to the host-port bridge"
+grep -Fq '  host-port: {}' "${ROOT_DIR}/cicd/compose/compose.yaml" || fail "host-port bridge is not declared"
+echo "ok - frontend loopback publishing has a non-internal bridge"
+
 if rg -g '!**/node_modules/**' -e 'AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN).*(printf|echo)' -e 'source .*export_credentials' "${ROOT_DIR}/cicd" "${ROOT_DIR}/scripts" >/dev/null; then
   fail "credential-printing behavior remains"
 fi

@@ -32,6 +32,7 @@ services:
       - 127.0.0.1:${FRONTEND_LOOPBACK_PORT:-18080}:8080
     networks:
       - app
+      - host-port
     security_opt:
       - no-new-privileges:true
     read_only: true
@@ -138,6 +139,7 @@ services:
 networks:
   app:
     internal: true
+  host-port: {}
   egress: {}
   postgresql:
     external: true
