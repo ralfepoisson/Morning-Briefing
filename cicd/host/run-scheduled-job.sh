@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 0077
 
 APP_ROOT="${APP_ROOT:-/srv/apps/morning-briefing}"
 job="${1:-}"

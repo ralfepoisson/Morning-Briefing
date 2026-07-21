@@ -17,7 +17,7 @@ node "Consolidated ARM64 EC2\npersonal-projects" as Host {
     }
     folder "Persistent audio\nAUDIO_BRIEFING_STORAGE_DIR" as AudioStorage
   }
-  component "systemd timers\n01:00 / 05:00 UTC\nPersistent + locked" as Timers
+  component "systemd timers\n01:00 / 05:00 UTC\nRoot-owned oneshot boundary\nPersistent + locked / umask 0077" as Timers
 }
 
 package "Backend modular monolith" as ModularBackend {
@@ -93,6 +93,12 @@ Worker --> Secrets : scoped runtime secrets
 Backend --> AudioStorage : read/playback
 Worker --> AudioStorage : generate/deliver
 Timers --> OneShots : locked one-shot execution
+
+note on link
+Host root reaches the protected release and Docker socket.
+The one-shot container retains its non-root application UID;
+runtime secret files remain root-owned mode 0600.
+end note
 
 note bottom of Host
 Application containers do not own PostgreSQL.

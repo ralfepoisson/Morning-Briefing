@@ -127,6 +127,8 @@ Use systemd timers to invoke one-shot Compose services:
 
 Each timer uses `Persistent=true`, a non-overlap lock, bounded runtime, explicit failure status, and journal/monitoring integration. After installation, prove missed executions run once after reboot and that two overlapping invocations cannot execute concurrently.
 
+The host application tree is deliberately root-owned and not traversable by the login account. Scheduled services therefore use a narrow root-owned oneshot boundary to reach the immutable release and the Docker socket; the application command itself still runs inside the backend image as its non-root UID. The units set `UMask=0077`, `NoNewPrivileges=true`, and systemd filesystem protections. Every deployment reinstalls the four root-owned unit files and reloads systemd without changing timer enablement, preserving the writer-handoff decision. Runtime secret files remain root-owned mode `0600` and are consumed by Compose; they are never made group- or world-readable to solve path traversal.
+
 Do not enable host timers while the corresponding EventBridge rules remain enabled against the same production database/queue. Duplicate schedulers or consumers can create duplicate Telegram and audio effects even when database writes are idempotent.
 
 ## Required health and functional checks

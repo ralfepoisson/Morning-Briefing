@@ -100,6 +100,23 @@ grep -q 'OnCalendar=\*-\*-\* 01:00:00 UTC' "${ROOT_DIR}/cicd/host/systemd/mornin
 grep -q 'OnCalendar=\*-\*-\* 05:00:00 UTC' "${ROOT_DIR}/cicd/host/systemd/morning-briefing-dashboard-audio-refresh.timer" || fail "audio timer is not exact"
 echo "ok - exact UTC schedules are preserved"
 
+for service in \
+  morning-briefing-snapshot-refresh.service \
+  morning-briefing-dashboard-audio-refresh.service; do
+  service_file="${ROOT_DIR}/cicd/host/systemd/${service}"
+  grep -Fqx 'User=root' "${service_file}" || fail "${service} does not use the root-owned oneshot boundary"
+  grep -Fqx 'Group=root' "${service_file}" || fail "${service} does not use the root group boundary"
+  grep -Fqx 'UMask=0077' "${service_file}" || fail "${service} does not preserve private created-file modes"
+  grep -Fqx 'NoNewPrivileges=true' "${service_file}" || fail "${service} does not prevent privilege escalation"
+done
+grep -Fq 'install-systemd-units.sh' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "deployments do not preserve the systemd permission model"
+grep -Fq 'install -o root -g root -m 0644' "${ROOT_DIR}/cicd/host/install-systemd-units.sh" || fail "systemd units are not installed with root-only ownership changes"
+grep -Fq 'systemctl daemon-reload' "${ROOT_DIR}/cicd/host/install-systemd-units.sh" || fail "systemd is not reloaded after unit installation"
+if rg -n 'systemctl (enable|start|restart)|systemctl .*--now' "${ROOT_DIR}/cicd/host/install-systemd-units.sh" >/dev/null; then
+  fail "unit installation changes timer enablement before writer handoff"
+fi
+echo "ok - scheduled jobs use a deployment-preserved root oneshot boundary"
+
 grep -Fq 'sudo install -d -m 0750 "${APP_ROOT}/data/audio"' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host data directory is not created securely"
 grep -Fq 'sudo chown 10001:10001 "${APP_ROOT}/data/audio"' "${ROOT_DIR}/cicd/host/deploy.sh" || fail "host data ownership is not expressed as numeric UID/GID"
 echo "ok - host data ownership uses numeric UID and GID"
@@ -131,5 +148,7 @@ grep -q 'src/web" run test:container-config' "${ROOT_DIR}/scripts/ci.sh" || fail
 grep -q 'src/web" audit --omit=dev' "${ROOT_DIR}/scripts/ci.sh" || fail "CI does not enforce the frontend production audit"
 grep -q 'src/web" audit$' "${ROOT_DIR}/scripts/ci.sh" || fail "CI does not enforce the complete frontend audit"
 echo "ok - CI enforces complete type, build, unit, configuration, and audit gates"
+
+"${ROOT_DIR}/tests/systemd-permission-model.test.sh"
 
 echo "deployment script tests passed"
