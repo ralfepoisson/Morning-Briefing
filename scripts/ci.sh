@@ -26,6 +26,7 @@ npm --prefix "${ROOT_DIR}/src/backend" audit
 npm --prefix "${ROOT_DIR}/src/web" ci
 npm --prefix "${ROOT_DIR}/src/web" test
 npm --prefix "${ROOT_DIR}/src/web" run build
+npm --prefix "${ROOT_DIR}/src/web" run test:assets
 npm --prefix "${ROOT_DIR}/src/web" run test:container-config
 npm --prefix "${ROOT_DIR}/src/web" audit --omit=dev
 npm --prefix "${ROOT_DIR}/src/web" audit

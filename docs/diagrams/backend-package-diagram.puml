@@ -150,4 +150,8 @@ The legacy ECS/Fargate ALB and drifted CloudFormation stack
 remain rollback surfaces until separately approved retirement.
 end note
 
+note right of Frontend
+  API 401 clears the rejected browser session and offers sign-in.
+  Static assets retain /assets/img paths after Vite builds.
+end note
 @enduml

@@ -3,6 +3,7 @@ import '@fortawesome/fontawesome-free/css/all.min.css';
 import '../assets/styles/main.css';
 import './modern.css';
 import { buildSignInUrl, parseToken, type Session } from './auth.ts';
+import { ApiError, requestJson } from './http.ts';
 import { DashboardStore, type Widget } from './dashboard-store.ts';
 import { renderAdminRoute, type RouteContext } from './routes/admin.ts';
 import { renderConnectorsRoute } from './routes/connectors.ts';
@@ -63,7 +64,18 @@ captureIncomingToken();
 window.addEventListener('hashchange', function () { void route(); });
 void route();
 
+/** Ensure failed route loads always leave a usable page. */
 async function route(): Promise<void> {
+  try {
+    await renderRoute();
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) return;
+    renderShell('<section role="alert"><h1>Unable to load this page</h1><p>The service could not complete the request. Please try again.</p><button class="btn btn-primary" id="retry-route">Try again</button></section>');
+    requiredElement('#retry-route').addEventListener('click', () => { void route(); });
+  }
+}
+
+async function renderRoute(): Promise<void> {
   window.clearTimeout(autoRefreshTimer);
   const path = hashPath();
   if (path === '/auth/callback') {
@@ -180,7 +192,9 @@ async function renderDashboard(): Promise<void> {
   ]);
   store.replace(widgetsResponse.items || []);
   await loadSnapshot(dashboardId);
+  if (!session) return;
   await restoreOAuthResult();
+  if (!session) return;
   drawDashboard();
   scheduleAutoRefresh();
 }
@@ -244,7 +258,7 @@ async function refreshDashboard(): Promise<void> {
   const response = await api<{ items: Widget[] }>(`/dashboards/${activeDashboard.id}/widgets`);
   store.replace(response.items || []);
   await loadSnapshot(activeDashboard.id);
-  refreshing = false; drawDashboard(); scheduleAutoRefresh();
+  refreshing = false; if (!session) return; drawDashboard(); scheduleAutoRefresh();
 }
 
 async function loadSnapshot(dashboardId: string): Promise<void> {
@@ -398,10 +412,22 @@ function notify(message: string, kind: 'success' | 'error' | 'info' = 'info'): v
 }
 
 async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers = new Headers(init.headers); headers.set('Content-Type', 'application/json'); const token = localStorage.getItem(TOKEN_KEY); if (token) headers.set('Authorization', `Bearer ${token}`);
-  const response = await fetch(`${config.apiBaseUrl}${path}`, { ...init, headers });
-  if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
-  return response.json() as Promise<T>;
+  return requestJson<T>(`${config.apiBaseUrl}${path}`, init, localStorage.getItem(TOKEN_KEY), rejectSession);
+}
+
+/** Clear only the rejected session, never a newer login from another tab. */
+function rejectSession(rejectedToken: string | null): void {
+  if (localStorage.getItem(TOKEN_KEY) !== rejectedToken) return;
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(SESSION_KEY);
+  localStorage.setItem(ERROR_KEY, 'Daily Briefing could not verify your session. Please sign in again. If this continues, the service authentication configuration needs attention.');
+  session = null;
+  window.clearTimeout(autoRefreshTimer);
+  dashboards = [];
+  activeDashboard = null;
+  store.replace([]);
+  history.replaceState({}, '', `${location.pathname}${location.search}#/signed-out`);
+  renderPublic('/signed-out');
 }
 
 function captureIncomingToken(): void {

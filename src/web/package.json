@@ -6,7 +6,8 @@
   "scripts": {
     "start": "vite --host 127.0.0.1 --port 8080",
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && cp -R assets dist/assets && cp favicon.ico dist/favicon.ico && node ../../cicd/ci/render-frontend-config.mjs dist/config.js",
+    "build": "tsc --noEmit && vite build && cp -R assets/. dist/assets/ && cp favicon.ico dist/favicon.ico && node ../../cicd/ci/render-frontend-config.mjs dist/config.js",
+    "test:assets": "node --test ../../cicd/ci/frontend-assets.test.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
